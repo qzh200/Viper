@@ -20,6 +20,18 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | WMI 方法调用（Get/Set 系列） | ✅ |
 | CPU / GPU / 主板温度 | ✅ |
 | CPU / GPU 风扇转速 | ✅ |
+| 风扇模式：自动 / 全速 / 固定占空比 | ✅ |
+| CoolBoost 开关 | ✅ |
+| 性能档位：静音 / 均衡 | ✅ |
+| 键盘背光亮度与超时 | ✅ |
+| RGB 灯效：颜色、效果、速度、方向 | ✅ |
+| LCD 超频开关 | ✅ |
+| Windows 键锁定 | ✅ |
+| 超频能力探测 | ✅ |
+| CPU / GPU 超频配置 | 🚧 读取已通，写入待确认 |
+| 配置持久化与开机还原 | 🚧 |
+| 图形界面 | 🚧 |
+| PSSvc 兼容管道协议 | 🚧 |
 
 ## 运行
 
@@ -73,6 +85,8 @@ WMI COM 接口的 vtable 布局在不同 Windows 版本上并不一致，公开�
 | `IWbemClassObject::GetMethod` | 槽位 19 |
 | `IWbemClassObject::SpawnInstance` | 槽位 15 |
 | 参数 VARIANT 类型 | provider 把 UInt32 参数声明成无符号整数，却只接受 `VT_I4` 或 `VT_BSTR`，写入时按 `I4 → UI8 → UI4 → BSTR` 依次尝试 |
+| 风扇模式编码 | 写入用 `1/2/3`（自动/全速/自定义），读回用 `0/1/2`，需要减一 |
+| Setter 的输出参数 | 回显新值而不是状态码，所以不能拿它判断成败，改为设置后读回验证 |
 | 权限 | 枚举实例与调用方法都需要管理员权限 |
 
 ## 参考
