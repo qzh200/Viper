@@ -86,6 +86,14 @@ func (b *Backend) SetFans(config FanConfig) error {
 		}); err != nil {
 			return fmt.Errorf("hardware: set CPU fan speed: %w", err)
 		}
+	} else {
+		// Hand the duty cycle back to the controller, otherwise the last
+		// requested value keeps running even in automatic mode.
+		if _, err := b.callGaming("SetGamingFanSpeed", map[string]wmi.Value{
+			"gmInput": wmi.Uint64(FanIndexCPU),
+		}); err != nil {
+			return fmt.Errorf("hardware: reset CPU fan speed: %w", err)
+		}
 	}
 
 	if config.GPUMode == FanCustom || config.GPUMode == FanMax {
@@ -116,11 +124,14 @@ func (b *Backend) SetFans(config FanConfig) error {
 }
 
 // Fans reads the current fan configuration.
+//
+// The provider only reports the behaviour of the primary group, so the
+// group of the graphics fan cannot be read back. Its duty cycle can.
 func (b *Backend) Fans() (FanState, error) {
 	var state FanState
 
 	outputs, err := b.callGaming("GetGamingFanBehavior", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(0),
+		"gmInput": wmi.Uint32(1),
 	})
 	if err != nil {
 		return state, err
@@ -129,11 +140,8 @@ func (b *Backend) Fans() (FanState, error) {
 	if err != nil {
 		return state, err
 	}
-	// The provider encodes the behaviour as one, two or three while the
-	// zero value means auto, so the reading is one lower than the value
-	// that is written.
-	state.CPUMode = decodeFanMode((raw >> 16) & 0x3)
-	state.GPUMode = decodeFanMode((raw >> 22) & 0x3)
+	// The behaviour is reported in the third byte.
+	state.CPUMode = decodeFanMode((raw >> 8) & 0x3)
 
 	if speed, err := b.fanSpeed(FanIndexCPU); err == nil {
 		state.CPUPercent = speed
@@ -147,6 +155,19 @@ func (b *Backend) Fans() (FanState, error) {
 		return state, err
 	}
 	return state, nil
+}
+
+// FanTable reads the selected fan table.
+func (b *Backend) FanTable() (uint64, error) {
+	outputs, err := b.callGaming("GetGamingFanTable", nil)
+	if err != nil {
+		return 0, err
+	}
+	raw, err := decodeUint(outputs["gmOutput"])
+	if err != nil {
+		return 0, err
+	}
+	return (raw >> 8) & 0xFF, nil
 }
 
 // fanSpeed reads the duty cycle of one fan.

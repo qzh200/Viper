@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"viper/internal/app"
 	"viper/internal/hardware"
 )
 
@@ -54,38 +55,44 @@ func usage() {
 	fmt.Println(`viper - Acer gaming laptop control centre
 
 Usage:
-  viper status                     live temperatures and fan speeds
-  viper fans                       show the fan configuration
-  viper fan auto                   hand the fans back to the controller
-  viper fan max                    run the fans at full speed
-  viper fan custom <cpu%> <gpu%>   run the fans at a fixed duty cycle
-  viper fan coolboost <on|off>     toggle the boost fan table
+  viper status                      live temperatures and fan speeds
+  viper fans                        show the fan configuration
+  viper fan auto                    hand the fans back to the controller
+  viper fan max                     run the fans at full speed
+  viper fan custom <cpu%> <gpu%>    run the fans at a fixed duty cycle
+  viper fan coolboost <on|off>      toggle the boost fan table
   viper power                       show the performance profile
   viper power <mode>                set quiet|balanced|performance|turbo
   viper lighting                    show the keyboard lighting
-  viper lighting set <options>      configure the keyboard lighting
+  viper lighting reset              restore the default lighting
+  viper lighting set [options]      configure the keyboard lighting
+  viper lighting timeout <on|off>   switch the backlight off on its own
   viper profile                     show overdrive and key lock state
   viper profile overdrive <on|off>  toggle the display overdrive
   viper profile winkey <on|off>     lock or unlock the Windows key
-  viper diag                        report the hardware capabilities`)
-}
+  viper diag                        report the hardware capabilities
 
-// backend opens the ACPI provider.
-func backend() (*hardware.Backend, error) {
-	return hardware.NewBackend()
+Lighting options:
+  effect <name>      static|breathing|neon|wave|switch|scale|meteor|flash
+  speed <n>          animation speed
+  direction <n>      animation direction, 0 or 1
+  brightness <0-100> overall brightness
+  color <#RRGGBB>    one colour for every zone
+  zone <n> <#RRGGBB> colour of a single zone, may be repeated
+  all                apply the colours to every zone`)
 }
 
 // runStatus prints a live telemetry snapshot.
 func runStatus() error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
-	fmt.Println("instance:", b.Instance())
+	fmt.Println("instance:", application.Instance())
 
-	sensors, err := b.Sensors()
+	sensors, err := application.Sensors()
 	if err != nil {
 		return err
 	}
@@ -101,14 +108,14 @@ func runStatus() error {
 
 // runFan shows or changes the fan configuration.
 func runFan(args []string) error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
 	if len(args) == 0 {
-		state, err := b.Fans()
+		state, err := application.Fans()
 		if err != nil {
 			return err
 		}
@@ -127,7 +134,7 @@ func runFan(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := b.CoolBoost(enabled); err != nil {
+		if err := application.SetCoolBoost(enabled); err != nil {
 			return err
 		}
 		fmt.Println("CoolBoost:", onOff(enabled))
@@ -137,7 +144,7 @@ func runFan(args []string) error {
 		if args[0] == "max" {
 			mode = hardware.FanMax
 		}
-		return applyFan(b, hardware.FanConfig{CPUMode: mode, GPUMode: mode})
+		return applyFan(application, hardware.FanConfig{CPUMode: mode, GPUMode: mode})
 	case "custom":
 		if len(args) < 3 {
 			return fmt.Errorf("usage: viper fan custom <cpu%%> <gpu%%>")
@@ -150,7 +157,7 @@ func runFan(args []string) error {
 		if err != nil {
 			return err
 		}
-		return applyFan(b, hardware.FanConfig{
+		return applyFan(application, hardware.FanConfig{
 			CPUMode:    hardware.FanCustom,
 			GPUMode:    hardware.FanCustom,
 			CPUPercent: cpu,
@@ -162,11 +169,11 @@ func runFan(args []string) error {
 }
 
 // applyFan applies a fan configuration and reports the result.
-func applyFan(b *hardware.Backend, config hardware.FanConfig) error {
-	if err := b.SetFans(config); err != nil {
+func applyFan(application *app.App, config hardware.FanConfig) error {
+	if err := application.SetFans(config); err != nil {
 		return err
 	}
-	state, err := b.Fans()
+	state, err := application.Fans()
 	if err != nil {
 		return err
 	}
@@ -181,19 +188,19 @@ func describeFan(mode hardware.FanMode, percent int) string {
 	if mode == hardware.FanCustom {
 		return fmt.Sprintf("%s (%d%%)", mode, percent)
 	}
-	return fmt.Sprintf("%s (controller curve)", mode)
+	return mode.String()
 }
 
 // runPower shows or changes the performance profile.
 func runPower(args []string) error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
 	if len(args) == 0 {
-		mode, err := b.PowerMode()
+		mode, err := application.PowerMode()
 		if err != nil {
 			return err
 		}
@@ -208,10 +215,10 @@ func runPower(args []string) error {
 	if mode == hardware.PowerTurbo && !hardware.IsPredator() {
 		return fmt.Errorf("turbo is exclusive to the Predator series")
 	}
-	if err := b.SetPowerMode(mode); err != nil {
+	if err := application.SetPowerMode(mode); err != nil {
 		return err
 	}
-	current, err := b.PowerMode()
+	current, err := application.PowerMode()
 	if err != nil {
 		return err
 	}
@@ -221,24 +228,52 @@ func runPower(args []string) error {
 
 // runLighting shows or changes the keyboard lighting.
 func runLighting(args []string) error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
-	if len(args) == 0 || args[0] != "set" {
-		config, err := b.Lighting()
+	if len(args) > 0 && args[0] == "reset" {
+		if err := application.ResetLighting(); err != nil {
+			return err
+		}
+		fmt.Println("lighting reset to the default")
+		return nil
+	}
+
+	if len(args) > 0 && args[0] == "timeout" {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: viper lighting timeout <on|off>")
+		}
+		enabled, err := parseOnOff(args[1])
 		if err != nil {
 			return err
 		}
-		fmt.Printf("  effect      : %d\n", config.Effect)
+		if err := application.SetBacklightTimeout(enabled); err != nil {
+			return err
+		}
+		fmt.Println("backlight timeout:", onOff(enabled))
+		return nil
+	}
+
+	if len(args) == 0 || args[0] != "set" {
+		config, err := application.Lighting()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("  brightness  : %d\n", config.Brightness)
+		fmt.Printf("  effect      : %s\n", config.Effect)
 		fmt.Printf("  speed       : %d\n", config.Speed)
 		fmt.Printf("  direction   : %d\n", config.Direction)
-		fmt.Printf("  brightness  : %d\n", config.Brightness)
 		for i, zone := range config.Zones {
 			fmt.Printf("  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
 		}
+		timeout, err := application.BacklightTimeout()
+		if err == nil {
+			fmt.Println("  timeout     :", onOff(timeout))
+		}
+		fmt.Println("  settings    :", application.SettingsPath())
 		return nil
 	}
 
@@ -246,7 +281,7 @@ func runLighting(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := b.SetLighting(*options); err != nil {
+	if err := application.SetLighting(*options); err != nil {
 		return err
 	}
 	fmt.Println("lighting applied")
@@ -256,6 +291,7 @@ func runLighting(args []string) error {
 // parseLightingOptions parses the arguments of "viper lighting set".
 func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
 	config := &hardware.RGBConfig{Effect: hardware.EffectStatic, Speed: 3, Brightness: 50}
+	zoneColours := map[int]hardware.RGBColor{}
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -263,9 +299,9 @@ func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("effect needs a value")
 			}
-			effect, err := parseEffect(args[i+1])
-			if err != nil {
-				return nil, err
+			effect, ok := hardware.ParseLightingEffect(strings.ToLower(args[i+1]))
+			if !ok {
+				return nil, fmt.Errorf("unknown lighting effect %q", args[i+1])
 			}
 			config.Effect = effect
 			i++
@@ -299,80 +335,86 @@ func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
 			}
 			config.Brightness = uint64(brightness)
 			i++
-		case "color":
+		case "color", "colour":
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("color needs a value")
 			}
-			zones, err := parseColors(args[i+1])
+			colour, err := parseColor(args[i+1])
 			if err != nil {
 				return nil, err
 			}
-			config.Zones = zones
+			for zone := range config.Zones {
+				config.Zones[zone] = colour
+			}
+			config.PerZone = false
 			i++
+		case "zone":
+			if i+2 >= len(args) {
+				return nil, fmt.Errorf("zone needs a number and a colour")
+			}
+			zone, err := strconv.Atoi(args[i+1])
+			if err != nil {
+				return nil, err
+			}
+			if zone < 1 || zone > hardware.LightingZones {
+				return nil, fmt.Errorf("zone %d is out of range", zone)
+			}
+			colour, err := parseColor(args[i+2])
+			if err != nil {
+				return nil, err
+			}
+			zoneColours[zone] = colour
+			config.PerZone = true
+			i += 2
+		case "all":
+			for zone := range config.Zones {
+				if colour, ok := zoneColours[zone+1]; ok {
+					config.Zones[zone] = colour
+				}
+			}
+			config.PerZone = len(zoneColours) > 1
 		default:
 			return nil, fmt.Errorf("unknown lighting option %q", args[i])
 		}
 	}
+
+	for zone, colour := range zoneColours {
+		config.Zones[zone-1] = colour
+	}
 	return config, nil
 }
 
-// parseEffect maps a name onto a lighting effect.
-func parseEffect(name string) (uint64, error) {
-	switch strings.ToLower(name) {
-	case "static":
-		return hardware.EffectStatic, nil
-	case "breathing", "breathe":
-		return hardware.EffectBreathing, nil
-	case "wave":
-		return hardware.EffectWave, nil
-	case "lightning", "flash":
-		return hardware.EffectLightning, nil
-	case "spectrum", "rainbow":
-		return hardware.EffectSpectrum, nil
-	default:
-		return 0, fmt.Errorf("unknown lighting effect %q", name)
+// parseColor parses a hex colour.
+func parseColor(text string) (hardware.RGBColor, error) {
+	hex := strings.TrimPrefix(strings.TrimSpace(text), "#")
+	if len(hex) != 6 {
+		return hardware.RGBColor{}, fmt.Errorf("colour %q must be six hex digits", text)
 	}
-}
-
-// parseColors parses a comma separated list of hex colours.
-func parseColors(list string) ([4]hardware.RGBColor, error) {
-	var zones [4]hardware.RGBColor
-	parts := strings.Split(list, ",")
-	if len(parts) > 4 {
-		return zones, fmt.Errorf("at most four zone colours are accepted")
+	value, err := strconv.ParseUint(hex, 16, 32)
+	if err != nil {
+		return hardware.RGBColor{}, fmt.Errorf("colour %q: %w", text, err)
 	}
-	for i, part := range parts {
-		hex := strings.TrimPrefix(strings.TrimSpace(part), "#")
-		if len(hex) != 6 {
-			return zones, fmt.Errorf("colour %q must be six hex digits", part)
-		}
-		value, err := strconv.ParseUint(hex, 16, 32)
-		if err != nil {
-			return zones, fmt.Errorf("colour %q: %w", part, err)
-		}
-		zones[i] = hardware.RGBColor{
-			R: uint8(value >> 16),
-			G: uint8(value >> 8),
-			B: uint8(value),
-		}
-	}
-	return zones, nil
+	return hardware.RGBColor{
+		R: uint8(value >> 16),
+		G: uint8(value >> 8),
+		B: uint8(value),
+	}, nil
 }
 
 // runProfile shows or changes the display overdrive and the key lock.
 func runProfile(args []string) error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
 	if len(args) == 0 {
-		overdrive, err := b.LCDOverdrive()
+		overdrive, err := application.LCDOverdrive()
 		if err != nil {
 			return err
 		}
-		locked, err := b.WinKeyLocked()
+		locked, err := application.WinKeyLocked()
 		if err != nil {
 			return err
 		}
@@ -390,7 +432,7 @@ func runProfile(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := b.SetLCDOverdrive(enabled); err != nil {
+		if err := application.SetLCDOverdrive(enabled); err != nil {
 			return err
 		}
 		fmt.Println("LCD overdrive:", onOff(enabled))
@@ -403,7 +445,7 @@ func runProfile(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := b.SetWinKeyLocked(locked); err != nil {
+		if err := application.SetWinKeyLocked(locked); err != nil {
 			return err
 		}
 		fmt.Println("Windows key:", onOff(locked))
@@ -415,15 +457,15 @@ func runProfile(args []string) error {
 
 // runDiag reports the capabilities of the machine.
 func runDiag() error {
-	b, err := backend()
+	application, err := app.New()
 	if err != nil {
 		return err
 	}
-	defer b.Close()
+	defer application.Close()
 
-	fmt.Println("  instance        :", b.Instance())
+	fmt.Println("  instance        :", application.Instance())
 
-	identity, err := hardware.SystemInfo()
+	identity, err := application.Identity()
 	if err != nil {
 		return err
 	}
@@ -433,41 +475,45 @@ func runDiag() error {
 	fmt.Println("  Predator series :", onOff(isPredator))
 
 	modes := make([]string, 0, 4)
-	for _, mode := range hardware.AvailablePowerModes(isPredator) {
+	for _, mode := range application.AvailablePowerModes() {
 		modes = append(modes, mode.String())
 	}
 	fmt.Println("  profiles        :", strings.Join(modes, ", "))
 
-	mode, err := b.PowerMode()
+	mode, err := application.PowerMode()
 	if err != nil {
 		return err
 	}
 	fmt.Println("  power profile   :", mode)
 
-	discrete, err := b.DiscreteGPU()
+	state, err := application.Fans()
+	if err != nil {
+		return err
+	}
+	fmt.Println("  CPU fan         :", describeFan(state.CPUMode, state.CPUPercent))
+	fmt.Println("  GPU fan         :", describeFan(state.GPUMode, state.GPUPercent))
+	fmt.Println("  CoolBoost       :", onOff(state.CoolBoost))
+
+	discrete, err := application.DiscreteGPU()
 	if err != nil {
 		return err
 	}
 	fmt.Println("  discrete GPU    :", onOff(discrete))
 
-	gpuOC, cpuOC, err := b.OverclockCapability()
+	gpuOC, cpuOC, err := application.OverclockCapability()
 	if err != nil {
 		return err
 	}
 	fmt.Println("  GPU overclock   :", onOff(gpuOC))
 	fmt.Println("  CPU overclock   :", onOff(cpuOC))
 
-	coolBoost, err := b.CoolBoostEnabled()
+	lighting, err := application.Lighting()
 	if err != nil {
 		return err
 	}
-	fmt.Println("  CoolBoost       :", onOff(coolBoost))
-
-	backlight, err := b.Backlight()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  backlight       :", backlight.Brightness, "timeout:", onOff(backlight.Timeout))
+	fmt.Println("  key brightness  :", lighting.Brightness)
+	fmt.Println("  key effect      :", lighting.Effect)
+	fmt.Println("  settings        :", application.SettingsPath())
 	return nil
 }
 

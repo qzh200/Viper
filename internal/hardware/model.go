@@ -41,13 +41,17 @@ func (m FanMode) providerCode() uint64 {
 
 // decodeFanMode maps the provider's behaviour bits back onto a mode.
 //
-// The provider writes one, two or three but answers with zero for auto, so
-// the reading is one lower than the written value.
+// The provider reports the behaviour in the third byte, multiplied by two
+// hundred and fifty six, and uses the same numbering as the value that is
+// written: one is automatic, two is maximum and three is a fixed duty
+// cycle.
 func decodeFanMode(bits uint64) FanMode {
 	switch bits {
 	case 1:
-		return FanMax
+		return FanAuto
 	case 2:
+		return FanMax
+	case 3:
 		return FanCustom
 	default:
 		return FanAuto
@@ -168,32 +172,112 @@ type RGBColor struct {
 }
 
 // RGBConfig is the full keyboard lighting configuration.
+//
+// The effect, the speed and the direction are global, because the provider
+// applies them to the whole keyboard at once. Only the colour is set per
+// zone, which is what the official application shows as the difference
+// between a global and a per zone setup.
 type RGBConfig struct {
 	// Effect selects the lighting pattern.
-	Effect uint64
-	// Speed is the animation speed, 1 to 5.
+	Effect LightingEffect
+	// Speed is the animation speed.
 	Speed uint64
-	// Direction is the animation direction.
+	// Direction is the animation direction, zero or one.
 	Direction uint64
 	// Brightness is the overall brightness, 0 to 100.
 	Brightness uint64
 	// Zones holds the colour of each of the four lighting zones.
 	Zones [4]RGBColor
+	// PerZone reports whether the zones carry individual colours. When it
+	// is false every zone uses the colour of the first one.
+	PerZone bool
+	// ColourReadable reports whether the firmware reports the zone
+	// colours. It does not, so the caller keeps its own record.
+	ColourReadable bool
+	// EffectReadable reports whether the firmware reports the lighting
+	// effect. It does not, so the caller keeps its own record.
+	EffectReadable bool
 }
 
-// LED effect identifiers used by the provider.
+// LightingEffect is one of the keyboard lighting patterns.
+//
+// The numbering is the one the Acer lighting service uses in its profile
+// file, where every pattern carries a value field:
+//
+//	0 static      1 breathing   2 neon     3 wave
+//	4 shifting    5 zoom        6 meteor   7 twinkling
+//
+// The order is the order in which the official application lists them.
+type LightingEffect uint64
+
+// The lighting patterns of the official application, in the order it
+// lists them.
 const (
 	// EffectStatic keeps a constant colour.
-	EffectStatic uint64 = 0
+	EffectStatic LightingEffect = 0
 	// EffectBreathing fades the colour in and out.
-	EffectBreathing uint64 = 1
+	EffectBreathing LightingEffect = 1
+	// EffectNeon lights the zones one after the other.
+	EffectNeon LightingEffect = 2
 	// EffectWave moves a highlight across the zones.
-	EffectWave uint64 = 2
-	// EffectLightning flashes the zones.
-	EffectLightning uint64 = 3
-	// EffectSpectrum cycles through colours.
-	EffectSpectrum uint64 = 4
+	EffectWave LightingEffect = 3
+	// EffectSwitch alternates between two colours.
+	EffectSwitch LightingEffect = 4
+	// EffectScale grows and shrinks the highlight.
+	EffectScale LightingEffect = 5
+	// EffectMeteor runs a shower of lights.
+	EffectMeteor LightingEffect = 6
+	// EffectFlash blinks the keyboard.
+	EffectFlash LightingEffect = 7
 )
+
+// String renders the effect for display.
+func (e LightingEffect) String() string {
+	switch e {
+	case EffectStatic:
+		return "static"
+	case EffectBreathing:
+		return "breathing"
+	case EffectNeon:
+		return "neon"
+	case EffectWave:
+		return "wave"
+	case EffectSwitch:
+		return "switch"
+	case EffectScale:
+		return "scale"
+	case EffectMeteor:
+		return "meteor"
+	case EffectFlash:
+		return "flash"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseLightingEffect maps a name onto a lighting effect.
+func ParseLightingEffect(name string) (LightingEffect, bool) {
+	switch name {
+	case "static":
+		return EffectStatic, true
+	case "breathing", "breathe":
+		return EffectBreathing, true
+	case "neon":
+		return EffectNeon, true
+	case "wave":
+		return EffectWave, true
+	case "switch", "alternate":
+		return EffectSwitch, true
+	case "scale", "zoom":
+		return EffectScale, true
+	case "meteor", "meteorshower":
+		return EffectMeteor, true
+	case "flash", "strobe":
+		return EffectFlash, true
+	default:
+		return EffectStatic, false
+	}
+}
 
 // MiscSetting identifies one of the provider's miscellaneous settings.
 type MiscSetting uint32
