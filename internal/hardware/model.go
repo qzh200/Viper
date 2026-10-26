@@ -67,6 +67,8 @@ const (
 	PowerPerformance
 	// PowerTurbo is the maximum profile, available on Predator models only.
 	PowerTurbo
+	// PowerUnknown is a profile the firmware does not describe.
+	PowerUnknown
 )
 
 // String renders the mode for display.
@@ -85,6 +87,63 @@ func (m PowerMode) String() string {
 	}
 }
 
+// providerCode maps the mode onto the encoding the provider expects.
+//
+// The encoding is not a plain enumeration and it is not the one the MOF
+// suggests. Measured on a Predator Helios Neo 16, the provider keeps five
+// values and rejects everything else:
+//
+//	0 -> quiet
+//	1 -> balanced
+//	4 -> performance
+//	5 -> turbo
+//	6 -> a profile the firmware keeps but that behaves like quiet under
+//	     load, so it is not offered to the user
+//
+// Writing two or three leaves the previous profile in place, which is why
+// the values look like an ordinary enumeration to anyone who only tries
+// the obvious ones.
+func (m PowerMode) providerCode() uint64 {
+	switch m {
+	case PowerQuiet:
+		return 0
+	case PowerBalanced:
+		return 1
+	case PowerPerformance:
+		return 4
+	case PowerTurbo:
+		return 5
+	default:
+		return 1
+	}
+}
+
+// decodePowerMode maps the provider's value back onto a mode.
+func decodePowerMode(value uint64) PowerMode {
+	switch value {
+	case 0:
+		return PowerQuiet
+	case 1:
+		return PowerBalanced
+	case 4:
+		return PowerPerformance
+	case 5:
+		return PowerTurbo
+	default:
+		return PowerUnknown
+	}
+}
+
+// AvailablePowerModes lists the profiles this machine supports.
+//
+// Turbo needs a Predator, the other profiles are available everywhere.
+func AvailablePowerModes(isPredator bool) []PowerMode {
+	if isPredator {
+		return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo}
+	}
+	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance}
+}
+
 // ParsePowerMode maps a command line word onto a power mode.
 func ParsePowerMode(name string) (PowerMode, bool) {
 	switch name {
@@ -94,7 +153,7 @@ func ParsePowerMode(name string) (PowerMode, bool) {
 		return PowerBalanced, true
 	case "performance", "perf":
 		return PowerPerformance, true
-	case "turbo":
+	case "turbo", "extreme":
 		return PowerTurbo, true
 	default:
 		return PowerBalanced, false

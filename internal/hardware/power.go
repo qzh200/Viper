@@ -7,6 +7,10 @@ import (
 )
 
 // PowerMode reads the current performance profile.
+//
+// The provider packs the profile into the second byte of the setting, so
+// the full byte has to be read: six and seven are the two performance
+// profiles and a narrow mask would collapse them.
 func (b *Backend) PowerMode() (PowerMode, error) {
 	outputs, err := b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
 		"gmInput": wmi.Uint32(uint32(MiscOperationMode)),
@@ -18,7 +22,7 @@ func (b *Backend) PowerMode() (PowerMode, error) {
 	if err != nil {
 		return PowerBalanced, err
 	}
-	return PowerMode((raw >> 8) & 0x3), nil
+	return decodePowerMode((raw >> 8) & 0xFF), nil
 }
 
 // SetPowerMode applies a performance profile.
@@ -28,7 +32,7 @@ func (b *Backend) PowerMode() (PowerMode, error) {
 // than a status code, so the result is confirmed by reading it back.
 func (b *Backend) SetPowerMode(mode PowerMode) error {
 	if _, err := b.callGaming("SetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint64((uint64(mode) << 8) | uint64(MiscOperationMode)),
+		"gmInput": wmi.Uint64((mode.providerCode() << 8) | uint64(MiscOperationMode)),
 	}); err != nil {
 		return fmt.Errorf("hardware: set power mode: %w", err)
 	}

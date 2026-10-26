@@ -205,6 +205,9 @@ func runPower(args []string) error {
 	if !ok {
 		return fmt.Errorf("unknown performance profile %q", args[0])
 	}
+	if mode == hardware.PowerTurbo && !hardware.IsPredator() {
+		return fmt.Errorf("turbo is exclusive to the Predator series")
+	}
 	if err := b.SetPowerMode(mode); err != nil {
 		return err
 	}
@@ -419,6 +422,21 @@ func runDiag() error {
 	defer b.Close()
 
 	fmt.Println("  instance        :", b.Instance())
+
+	identity, err := hardware.SystemInfo()
+	if err != nil {
+		return err
+	}
+	fmt.Println("  model           :", identity.Product)
+	fmt.Println("  family          :", identity.Family)
+	isPredator := hardware.IsPredatorModel(identity.Product, identity.Family)
+	fmt.Println("  Predator series :", onOff(isPredator))
+
+	modes := make([]string, 0, 4)
+	for _, mode := range hardware.AvailablePowerModes(isPredator) {
+		modes = append(modes, mode.String())
+	}
+	fmt.Println("  profiles        :", strings.Join(modes, ", "))
 
 	mode, err := b.PowerMode()
 	if err != nil {

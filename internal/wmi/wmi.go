@@ -15,6 +15,8 @@ package wmi
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -262,6 +264,68 @@ func (c *Client) Call(class, method, instancePath string, args map[string]Value)
 	defer outParams.Release()
 
 	return readOutputs(outParams, outDef)
+}
+
+// ReadProperty reads a single numeric property of an object path.
+//
+// It is meant for the standard CIM namespace, where the classes carry
+// plain properties such as CurrentClockSpeed.
+func (c *Client) ReadProperty(objectPath, name string) (uint64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return 0, fmt.Errorf("wmi: client is closed")
+	}
+
+	path, err := com.NewBSTR(objectPath)
+	if err != nil {
+		return 0, err
+	}
+	defer path.Free()
+
+	var obj uintptr
+	r, err := c.services.Call(slotGetObject,
+		uintptr(path),
+		0, // lFlags
+		0, // ppCallResult
+		uintptr(unsafe.Pointer(&obj)),
+		0, // ppContext
+	)
+	if err != nil {
+		return 0, err
+	}
+	if failed(r) {
+		return 0, fmt.Errorf("wmi: GetObject(%s): %w", objectPath, hresult(r))
+	}
+	if obj == 0 {
+		return 0, fmt.Errorf("wmi: GetObject(%s): no object", objectPath)
+	}
+	target := com.COMObject(obj)
+	defer target.Release()
+	com.SetProxyBlanket(target)
+
+	value, err := readValue(target, name)
+	if err != nil {
+		return 0, err
+	}
+	if value.Kind == KindString {
+		return parseNumeric(value.Str)
+	}
+	return value.UInt64(), nil
+}
+
+// parseNumeric parses a decimal or hexadecimal number from a string.
+func parseNumeric(text string) (uint64, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0, nil
+	}
+	base := 10
+	if strings.HasPrefix(text, "0x") || strings.HasPrefix(text, "0X") {
+		text = text[2:]
+		base = 16
+	}
+	return strconv.ParseUint(text, base, 64)
 }
 
 // getObject fetches the class object of a WMI class.
