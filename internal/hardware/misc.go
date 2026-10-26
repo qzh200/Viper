@@ -66,19 +66,22 @@ func (b *Backend) miscValue(id MiscSetting) (uint64, bool, error) {
 	return raw >> 8, true, nil
 }
 
-// GPUMode reads the graphics mode of the machine.
+// GPUMode reads the graphics switch of the machine.
+//
+// The value is the one of the graphics mode, the same word that the
+// original service reports as the display mode.
 func (b *Backend) GPUMode() (GPUMode, error) {
 	value, ok, err := b.miscValue(MiscGPUMode)
 	if err != nil {
-		return GPUModeOptimus, err
+		return GPUModeHybrid, err
 	}
 	if !ok {
-		return GPUModeOptimus, fmt.Errorf("hardware: the firmware does not know the graphics mode")
+		return GPUModeHybrid, fmt.Errorf("hardware: the firmware does not know the graphics mode")
 	}
 	return GPUMode(value), nil
 }
 
-// SetGPUMode selects the graphics mode of the machine.
+// SetGPUMode selects the graphics switch of the machine.
 //
 // The change is taken over when the machine restarts, the official
 // application asks for the same restart.
@@ -86,43 +89,27 @@ func (b *Backend) SetGPUMode(mode GPUMode) error {
 	return b.SetMiscSettingValue(uint32(MiscGPUMode), uint64(mode))
 }
 
-// BluelightShield reads the blue light shield.
+// BootSound reports whether the sound at the start of the machine is on.
 //
-// The shield is not a plain switch, the official application offers six
-// levels from disabled to the long hour mode.
-func (b *Backend) BluelightShield() (uint64, bool, error) {
-	return b.miscValue(MiscBluelightShield)
-}
-
-// SetBluelightShield selects a level of the blue light shield.
-func (b *Backend) SetBluelightShield(level uint64) error {
-	return b.SetMiscSettingValue(uint32(MiscBluelightShield), level)
-}
-
-// USBChargeLimit reads the charging limit in percent.
-func (b *Backend) USBChargeLimit() (uint64, bool, error) {
-	return b.miscValue(MiscUSBCharge)
-}
-
-// SetUSBChargeLimit sets the charging limit in percent.
-func (b *Backend) SetUSBChargeLimit(percent uint64) error {
-	return b.SetMiscSettingValue(uint32(MiscUSBCharge), percent)
-}
-
-// USBChargeEnabled reports whether the charging over USB is allowed.
-func (b *Backend) USBChargeEnabled() (bool, bool, error) {
-	value, ok, err := b.miscValue(MiscUSBChargeSwitch)
+// The setting is a plain switch in the miscellaneous table of the
+// provider, the original service reads it under the name of the boot
+// sound.
+func (b *Backend) BootSound() (bool, error) {
+	value, ok, err := b.miscValue(MiscBootSound)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
-	return value != 0, ok, nil
+	if !ok {
+		return false, fmt.Errorf("hardware: the firmware does not know the boot sound")
+	}
+	return value != 0, nil
 }
 
-// SetUSBChargeEnabled allows or forbids the charging over USB.
-func (b *Backend) SetUSBChargeEnabled(enabled bool) error {
+// SetBootSound switches the sound at the start of the machine on or off.
+func (b *Backend) SetBootSound(enabled bool) error {
 	value := uint64(0)
 	if enabled {
 		value = 1
 	}
-	return b.SetMiscSettingValue(uint32(MiscUSBChargeSwitch), value)
+	return b.SetMiscSettingValue(uint32(MiscBootSound), value)
 }

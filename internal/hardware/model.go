@@ -290,14 +290,10 @@ type MiscSetting uint32
 // Only the settings below the tenth identifier are writable, everything
 // else answers with an undefined error.
 const (
-	// MiscBluelightShield selects the blue light shield.
-	MiscBluelightShield MiscSetting = 0x01
 	// MiscGPUMode selects the graphics switch of the machine.
 	MiscGPUMode MiscSetting = 0x02
-	// MiscUSBCharge holds the charging limit in percent.
-	MiscUSBCharge MiscSetting = 0x06
-	// MiscUSBChargeSwitch enables the charging over USB.
-	MiscUSBChargeSwitch MiscSetting = 0x08
+	// MiscBootSound switches the sound at the start of the machine.
+	MiscBootSound MiscSetting = 0x06
 	// MiscDiscreteGPU reports the discrete GPU switch state.
 	MiscDiscreteGPU MiscSetting = 0x09
 	// MiscCPUOverclock reports the CPU overclock capability.
@@ -308,31 +304,30 @@ const (
 
 // GPUMode is the way the machine drives the graphics chip.
 //
-// The official application offers three modes, the capability mask in the
-// registry of the original service says which of them the machine has. A
-// mask of seven offers all three, a mask of three only the two that keep
-// the hybrid graphics switched on.
+// The numbering is the one of the original service, it describes the
+// display mode of the machine.
 type GPUMode uint64
 
 // The graphics modes the provider understands.
 const (
-	// GPUModeAuto lets the system pick the mode on its own.
-	GPUModeAuto GPUMode = 1
-	// GPUModeOptimus keeps the integrated graphics in charge.
-	GPUModeOptimus GPUMode = 2
+	// GPUModeHybrid keeps the integrated graphics in charge, the
+	// dedicated graphics only takes over when a program asks for it.
+	GPUModeHybrid GPUMode = 1
 	// GPUModeDiscrete hands the display over to the dedicated graphics.
-	GPUModeDiscrete GPUMode = 3
+	GPUModeDiscrete GPUMode = 2
+	// GPUModeAuto lets the system pick the mode on its own.
+	GPUModeAuto GPUMode = 3
 )
 
 // String renders the mode for display.
 func (m GPUMode) String() string {
 	switch m {
-	case GPUModeAuto:
-		return "auto"
-	case GPUModeOptimus:
-		return "optimus"
+	case GPUModeHybrid:
+		return "hybrid"
 	case GPUModeDiscrete:
 		return "discrete"
+	case GPUModeAuto:
+		return "auto"
 	default:
 		return "unknown"
 	}
@@ -341,13 +336,13 @@ func (m GPUMode) String() string {
 // ParseGPUMode maps a command line word onto a graphics mode.
 func ParseGPUMode(name string) (GPUMode, bool) {
 	switch name {
-	case "auto", "automatic":
-		return GPUModeAuto, true
-	case "optimus", "hybrid":
-		return GPUModeOptimus, true
-	case "discrete", "dGPU", "nvidia":
+	case "hybrid", "optimus", "mshybrid":
+		return GPUModeHybrid, true
+	case "discrete", "dgpu", "nvidia", "only":
 		return GPUModeDiscrete, true
+	case "auto", "automatic", "dds":
+		return GPUModeAuto, true
 	default:
-		return GPUModeOptimus, false
+		return GPUModeHybrid, false
 	}
 }
