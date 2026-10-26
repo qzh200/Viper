@@ -12,6 +12,7 @@ import (
 
 	"viper/internal/app"
 	"viper/internal/hardware"
+	"viper/internal/quickaccess"
 )
 
 func main() {
@@ -45,6 +46,8 @@ func run(args []string) error {
 		return runBluelight(args[1:])
 	case "charge", "battery":
 		return runCharge(args[1:])
+	case "bootsound", "sound":
+		return runBootSound(args[1:])
 	case "diag", "diagnostics":
 		return runDiag()
 	case "help", "-h", "--help":
@@ -78,12 +81,14 @@ Usage:
   viper profile winkey <on|off>     lock or unlock the Windows key
   viper profile stickykeys <on|off> switch the sticky keys on or off
   viper gpu                         show the graphics mode
-  viper gpu <mode>                  set auto|optimus|discrete
+  viper gpu <mode>                  set hybrid|discrete|auto
   viper bluelight                   show the blue light shield
-  viper bluelight <level>           set the shield, 0 to 5
+  viper bluelight <level>           set the shield, 0 to 4
   viper charge                      show the charging settings
-  viper charge limit <percent>      set the charging limit
+  viper charge limit <percent>      set the charging limit, 10, 20 or 30
   viper charge usb <on|off>         allow or forbid charging over USB
+  viper bootsound                   show the sound at the start
+  viper bootsound <on|off>          switch the sound at the start
   viper diag                        report the hardware capabilities
 
 Lighting options:
@@ -96,7 +101,7 @@ Lighting options:
   all                apply the colours to every zone
 
 Blue light shield levels:
-  0 disabled   1 low   2 medium   3 high   4 long hour   5 customised`)
+  0 disabled   1 low   2 medium   3 high   4 long hour`)
 }
 
 // runStatus prints a live telemetry snapshot.
@@ -107,7 +112,11 @@ func runStatus() error {
 	}
 	defer application.Close()
 
-	fmt.Println("instance:", application.Instance())
+	instance, err := application.Instance()
+	if err != nil {
+		return err
+	}
+	fmt.Println("instance:", instance)
 
 	sensors, err := application.Sensors()
 	if err != nil {
@@ -527,49 +536,56 @@ func runBluelight(args []string) error {
 	defer application.Close()
 
 	if len(args) == 0 {
-		level, known, err := application.BluelightShield()
+		level, err := application.BlueLightShield()
 		if err != nil {
 			return err
 		}
-		if !known {
-			fmt.Println("  blue light shield: not supported by the firmware")
-			return nil
-		}
-		fmt.Printf("  blue light shield: %s (%d)\n", describeBlueLight(level), level)
+		fmt.Printf("  blue light shield: %s (%d)\n", level, int(level))
 		return nil
 	}
 
-	level, err := strconv.ParseUint(args[0], 10, 64)
-	if err != nil {
-		return fmt.Errorf("the blue light shield needs a level between 0 and 5: %w", err)
+	level, ok := parseBlueLight(args[0])
+	if !ok {
+		return fmt.Errorf("unknown blue light level %q", args[0])
 	}
-	if level > 5 {
-		return fmt.Errorf("the blue light shield level %d is out of range", level)
-	}
-	if err := application.SetBluelightShield(level); err != nil {
+	if err := application.SetBlueLightShield(level); err != nil {
 		return err
 	}
-	fmt.Println("  blue light shield:", describeBlueLight(level))
+	fmt.Println("  blue light shield:", level)
 	return nil
 }
 
-// describeBlueLight renders a level of the blue light shield.
-func describeBlueLight(level uint64) string {
-	switch level {
-	case 0:
-		return "disabled"
-	case 1:
-		return "low"
-	case 2:
-		return "medium"
-	case 3:
-		return "high"
-	case 4:
-		return "long hour"
-	case 5:
-		return "customised"
+// parseBlueLight parses the level of the blue light shield.
+//
+// The level may be given as a number or as one of the names of the
+// original application.
+func parseBlueLight(text string) (quickaccess.BlueLight, bool) {
+	switch strings.ToLower(text) {
+	case "disabled", "off", "none":
+		return quickaccess.BlueLightDisabled, true
+	case "low":
+		return quickaccess.BlueLightLow, true
+	case "medium":
+		return quickaccess.BlueLightMedium, true
+	case "high":
+		return quickaccess.BlueLightHigh, true
+	case "long", "longhour", "long hour":
+		return quickaccess.BlueLightLongHour, true
+	}
+
+	number, err := strconv.Atoi(text)
+	if err != nil {
+		return quickaccess.BlueLightDisabled, false
+	}
+	switch quickaccess.BlueLight(number) {
+	case quickaccess.BlueLightDisabled,
+		quickaccess.BlueLightLow,
+		quickaccess.BlueLightMedium,
+		quickaccess.BlueLightHigh,
+		quickaccess.BlueLightLongHour:
+		return quickaccess.BlueLight(number), true
 	default:
-		return "unknown"
+		return quickaccess.BlueLightDisabled, false
 	}
 }
 
@@ -582,43 +598,32 @@ func runCharge(args []string) error {
 	defer application.Close()
 
 	if len(args) == 0 {
-		limit, known, err := application.USBChargeLimit()
+		limit, err := application.USBChargeLimit()
 		if err != nil {
 			return err
 		}
-		if known {
-			fmt.Printf("  charging limit : %d%%\n", limit)
-		} else {
-			fmt.Println("  charging limit : not supported by the firmware")
-		}
-		enabled, known, err := application.USBChargeEnabled()
+		enabled, err := application.USBChargeEnabled()
 		if err != nil {
 			return err
 		}
-		if known {
-			fmt.Println("  charging over USB:", onOff(enabled))
-		} else {
-			fmt.Println("  charging over USB: not supported by the firmware")
-		}
+		fmt.Printf("  charging limit  : %d%%\n", limit)
+		fmt.Println("  charging over USB:", onOff(enabled))
 		return nil
 	}
 
 	switch args[0] {
 	case "limit":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: viper charge limit <percent>")
+			return fmt.Errorf("usage: viper charge limit <10|20|30>")
 		}
-		percent, err := strconv.ParseUint(args[1], 10, 64)
+		percent, err := strconv.Atoi(args[1])
 		if err != nil {
 			return fmt.Errorf("the charging limit needs a percentage: %w", err)
-		}
-		if percent > 100 {
-			return fmt.Errorf("the charging limit %d is out of range", percent)
 		}
 		if err := application.SetUSBChargeLimit(percent); err != nil {
 			return err
 		}
-		fmt.Printf("  charging limit : %d%%\n", percent)
+		fmt.Printf("  charging limit  : %d%%\n", percent)
 		return nil
 	case "usb":
 		if len(args) < 2 {
@@ -638,6 +643,34 @@ func runCharge(args []string) error {
 	}
 }
 
+// runBootSound shows or changes the sound at the start of the machine.
+func runBootSound(args []string) error {
+	application, err := app.New()
+	if err != nil {
+		return err
+	}
+	defer application.Close()
+
+	if len(args) == 0 {
+		enabled, err := application.BootSound()
+		if err != nil {
+			return err
+		}
+		fmt.Println("  boot sound:", onOff(enabled))
+		return nil
+	}
+
+	enabled, err := parseOnOff(args[0])
+	if err != nil {
+		return err
+	}
+	if err := application.SetBootSound(enabled); err != nil {
+		return err
+	}
+	fmt.Println("  boot sound:", onOff(enabled))
+	return nil
+}
+
 // runDiag reports the capabilities of the machine.
 func runDiag() error {
 	application, err := app.New()
@@ -646,7 +679,11 @@ func runDiag() error {
 	}
 	defer application.Close()
 
-	fmt.Println("  instance        :", application.Instance())
+	instance, err := application.Instance()
+	if err != nil {
+		return err
+	}
+	fmt.Println("  instance        :", instance)
 
 	identity, err := application.Identity()
 	if err != nil {
@@ -703,13 +740,11 @@ func runDiag() error {
 	}
 	fmt.Println("  graphics mode   :", gpuMode)
 
-	blueLight, known, err := application.BluelightShield()
+	bootSound, err := application.BootSound()
 	if err != nil {
 		return err
 	}
-	if known {
-		fmt.Printf("  blue light      : %s (%d)\n", describeBlueLight(blueLight), blueLight)
-	}
+	fmt.Println("  boot sound      :", onOff(bootSound))
 
 	sticky, err := application.StickyKeys()
 	if err != nil {
