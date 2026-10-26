@@ -251,4 +251,11 @@ func propertyNames(obj com.COMObject) ([]string, error) {
 
 // conventionalOutputNames are the output parameter names used by the WMI
 // providers when the property list cannot be read.
-var conventionalOutputNames = []string{"gmOutput", "uiOutput", "ReturnValue", "Output"}
+//
+// The Acer providers use gmOutput for the AcerGamingFunction class, uiOutput
+// for APGeAction and gmReturn for the secondary value of the methods that
+// return both a buffer and a status byte.
+var conventionalOutputNames = []string{
+	"gmOutput", "uiOutput", "gmReturn", "uiReturn",
+	"ReturnValue", "Output", "Result",
+}

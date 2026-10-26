@@ -238,12 +238,16 @@ func (c *Client) Call(class, method, instancePath string, args map[string]Value)
 	}
 
 	// The in-parameters object is a spawned instance of the method's
-	// in-parameters class.
-	inParams, err := spawnInstance(inDef)
-	if err != nil {
-		return nil, err
+	// in-parameters class. Methods without inputs have no such class and
+	// are invoked with a null in-parameters object.
+	var inParams com.COMObject
+	if inDef != 0 {
+		inParams, err = spawnInstance(inDef)
+		if err != nil {
+			return nil, err
+		}
+		defer inParams.Release()
 	}
-	defer inParams.Release()
 
 	for name, value := range args {
 		if err := putValue(inParams, name, value); err != nil {
