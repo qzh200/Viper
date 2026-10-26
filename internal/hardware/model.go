@@ -280,14 +280,74 @@ func ParseLightingEffect(name string) (LightingEffect, bool) {
 }
 
 // MiscSetting identifies one of the provider's miscellaneous settings.
+//
+// The provider keeps a small table of switches. A setting is addressed by
+// its identifier and carries its value in the upper byte of the same word.
 type MiscSetting uint32
 
 // The miscellaneous settings that are known.
+//
+// Only the settings below the tenth identifier are writable, everything
+// else answers with an undefined error.
 const (
-	// MiscOperationMode selects the performance profile.
-	MiscOperationMode MiscSetting = 0x0B
+	// MiscBluelightShield selects the blue light shield.
+	MiscBluelightShield MiscSetting = 0x01
+	// MiscGPUMode selects the graphics switch of the machine.
+	MiscGPUMode MiscSetting = 0x02
+	// MiscUSBCharge holds the charging limit in percent.
+	MiscUSBCharge MiscSetting = 0x06
+	// MiscUSBChargeSwitch enables the charging over USB.
+	MiscUSBChargeSwitch MiscSetting = 0x08
 	// MiscDiscreteGPU reports the discrete GPU switch state.
 	MiscDiscreteGPU MiscSetting = 0x09
 	// MiscCPUOverclock reports the CPU overclock capability.
 	MiscCPUOverclock MiscSetting = 0x0A
+	// MiscOperationMode selects the performance profile.
+	MiscOperationMode MiscSetting = 0x0B
 )
+
+// GPUMode is the way the machine drives the graphics chip.
+//
+// The official application offers three modes, the capability mask in the
+// registry of the original service says which of them the machine has. A
+// mask of seven offers all three, a mask of three only the two that keep
+// the hybrid graphics switched on.
+type GPUMode uint64
+
+// The graphics modes the provider understands.
+const (
+	// GPUModeAuto lets the system pick the mode on its own.
+	GPUModeAuto GPUMode = 1
+	// GPUModeOptimus keeps the integrated graphics in charge.
+	GPUModeOptimus GPUMode = 2
+	// GPUModeDiscrete hands the display over to the dedicated graphics.
+	GPUModeDiscrete GPUMode = 3
+)
+
+// String renders the mode for display.
+func (m GPUMode) String() string {
+	switch m {
+	case GPUModeAuto:
+		return "auto"
+	case GPUModeOptimus:
+		return "optimus"
+	case GPUModeDiscrete:
+		return "discrete"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseGPUMode maps a command line word onto a graphics mode.
+func ParseGPUMode(name string) (GPUMode, bool) {
+	switch name {
+	case "auto", "automatic":
+		return GPUModeAuto, true
+	case "optimus", "hybrid":
+		return GPUModeOptimus, true
+	case "discrete", "dGPU", "nvidia":
+		return GPUModeDiscrete, true
+	default:
+		return GPUModeOptimus, false
+	}
+}
