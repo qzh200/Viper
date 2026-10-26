@@ -226,3 +226,39 @@ func (a *App) DiscreteGPU() (bool, error) { return a.backend.DiscreteGPU() }
 func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 	return a.backend.OverclockCapability()
 }
+
+// StickyKeys reports whether the sticky keys are switched on.
+func (a *App) StickyKeys() (bool, error) { return hardware.StickyKeys() }
+
+// SetStickyKeys switches the sticky keys on or off.
+func (a *App) SetStickyKeys(enabled bool) error { return hardware.SetStickyKeys(enabled) }
+
+// GPUMode reads the graphics mode of the machine.
+func (a *App) GPUMode() (hardware.GPUMode, error) { return a.backend.GPUMode() }
+
+// SetGPUMode selects the graphics mode of the machine.
+func (a *App) SetGPUMode(mode hardware.GPUMode) error { return a.backend.SetGPUMode(mode) }
+
+// BluelightShield reads the level of the blue light shield.
+//
+// The second result is false when the firmware does not know the setting.
+func (a *App) BluelightShield() (uint64, bool, error) { return a.backend.BluelightShield() }
+
+// SetBluelightShield selects a level of the blue light shield.
+func (a *App) SetBluelightShield(level uint64) error { return a.backend.SetBluelightShield(level) }
+
+// USBChargeLimit reads the charging limit in percent.
+//
+// The second result is false when the firmware does not know the setting.
+func (a *App) USBChargeLimit() (uint64, bool, error) { return a.backend.USBChargeLimit() }
+
+// SetUSBChargeLimit sets the charging limit in percent.
+func (a *App) SetUSBChargeLimit(percent uint64) error { return a.backend.SetUSBChargeLimit(percent) }
+
+// USBChargeEnabled reports whether the charging over USB is allowed.
+//
+// The second result is false when the firmware does not know the setting.
+func (a *App) USBChargeEnabled() (bool, bool, error) { return a.backend.USBChargeEnabled() }
+
+// SetUSBChargeEnabled allows or forbids the charging over USB.
+func (a *App) SetUSBChargeEnabled(enabled bool) error { return a.backend.SetUSBChargeEnabled(enabled) }
