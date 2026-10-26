@@ -11,6 +11,7 @@ package hardware
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"viper/internal/wmi"
@@ -28,10 +29,10 @@ const (
 // Sensor categories of the GetGamingSysInfo method. The query is encoded
 // as category<<8 | index.
 const (
+	sysInfoCPUTemp    = 0x0101
 	sysInfoCPUFanRPM  = 0x0201
 	sysInfoSystemTemp = 0x0301
 	sysInfoGPUFanRPM  = 0x0601
-	sysInfoCPUTemp    = 0x0101
 	sysInfoGPUTemp    = 0x0A01
 )
 
@@ -46,12 +47,13 @@ type Sensors struct {
 
 // Backend talks to the Acer ACPI WMI provider.
 type Backend struct {
-	client   *wmi.Client
-	instance string
+	client     *wmi.Client
+	gamingPath string
+	actionPath string
 }
 
-// NewBackend connects to the ACPI namespace and resolves the instance that
-// carries the gaming functions.
+// NewBackend connects to the ACPI namespace and resolves the instances that
+// carry the gaming functions.
 //
 // Enumerating the instances requires administrative rights.
 func NewBackend() (*Backend, error) {
@@ -60,24 +62,48 @@ func NewBackend() (*Backend, error) {
 		return nil, err
 	}
 
-	paths, err := client.Instances(ClassGaming)
+	backend := &Backend{client: client}
+
+	gamingPaths, err := client.Instances(ClassGaming)
 	if err != nil {
 		client.Close()
 		return nil, err
 	}
-	if len(paths) == 0 {
+	if len(gamingPaths) == 0 {
 		client.Close()
 		return nil, fmt.Errorf("hardware: no %s instance found", ClassGaming)
 	}
+	backend.gamingPath = gamingPaths[0]
 
-	return &Backend{client: client, instance: paths[0]}, nil
+	// APGeAction usually shares the ACPI device with AcerGamingFunction,
+	// but the class has to be resolved separately.
+	actionPaths, err := client.Instances(ClassAction)
+	if err != nil || len(actionPaths) == 0 {
+		// Fall back to the instance of the gaming class, which is what the
+		// provider exposes on most machines.
+		backend.actionPath = backend.gamingPath
+	} else {
+		backend.actionPath = actionPaths[0]
+	}
+
+	return backend, nil
 }
 
 // Instance returns the resolved object path of the gaming functions.
-func (b *Backend) Instance() string { return b.instance }
+func (b *Backend) Instance() string { return b.gamingPath }
 
 // Close releases the WMI connection.
 func (b *Backend) Close() { b.client.Close() }
+
+// callGaming invokes a method of the AcerGamingFunction class.
+func (b *Backend) callGaming(method string, args map[string]wmi.Value) (map[string]wmi.Value, error) {
+	return b.client.Call(ClassGaming, method, b.gamingPath, args)
+}
+
+// callAction invokes a method of the APGeAction class.
+func (b *Backend) callAction(method string, args map[string]wmi.Value) (map[string]wmi.Value, error) {
+	return b.client.Call(ClassAction, method, b.actionPath, args)
+}
 
 // Sensors reads the current temperatures and fan speeds.
 func (b *Backend) Sensors() (Sensors, error) {
@@ -121,7 +147,7 @@ func (b *Backend) Sensors() (Sensors, error) {
 // The provider packs the reading into the upper bits of the result, the
 // low byte carrying the status.
 func (b *Backend) sysInfo(query uint32) (int, error) {
-	outputs, err := b.client.Call(ClassGaming, "GetGamingSysInfo", b.instance, map[string]wmi.Value{
+	outputs, err := b.callGaming("GetGamingSysInfo", map[string]wmi.Value{
 		"gmInput": wmi.Uint32(query),
 	})
 	if err != nil {
@@ -131,53 +157,38 @@ func (b *Backend) sysInfo(query uint32) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("hardware: GetGamingSysInfo returned no gmOutput")
 	}
-	return decodeSysInfo(value), nil
-}
 
-// decodeSysInfo extracts the numeric reading from a GetGamingSysInfo result.
-//
-// The result is a string in the provider's own encoding, for example
-// "0x0001" for the CPU temperature category.
-func decodeSysInfo(value wmi.Value) int {
-	text := strings.TrimSpace(value.String())
-	if text == "" {
-		return 0
+	raw, err := decodeUint(value)
+	if err != nil {
+		return 0, err
 	}
-
-	var raw uint64
-	if strings.HasPrefix(text, "0x") || strings.HasPrefix(text, "0X") {
-		if n, err := parseUint(text[2:], 16); err == nil {
-			raw = n
-		}
-	} else if n, err := parseUint(text, 10); err == nil {
-		raw = n
-	}
-
-	switch {
-	case raw>>8 != 0:
+	if raw>>8 != 0 {
 		// Fan speeds use the full 16 bit field, temperatures the low byte.
-		return int((raw >> 8) & 0xFFFF)
-	default:
-		return int(raw & 0xFF)
+		return int((raw >> 8) & 0xFFFF), nil
 	}
+	return int(raw & 0xFF), nil
 }
 
-// parseUint parses an unsigned integer in the given base.
-func parseUint(text string, base uint64) (uint64, error) {
-	var out uint64
-	for _, c := range text {
-		var digit uint64
-		switch {
-		case c >= '0' && c <= '9':
-			digit = uint64(c - '0')
-		case c >= 'a' && c <= 'f':
-			digit = uint64(c-'a') + 10
-		case c >= 'A' && c <= 'F':
-			digit = uint64(c-'A') + 10
-		default:
-			return 0, fmt.Errorf("hardware: invalid digit %q", c)
+// decodeUint extracts a numeric value from a WMI result.
+//
+// The Acer provider returns most readings as a hexadecimal string, so both
+// representations have to be accepted.
+func decodeUint(value wmi.Value) (uint64, error) {
+	if value.Kind == wmi.KindString {
+		text := strings.TrimSpace(value.Str)
+		if text == "" {
+			return 0, nil
 		}
-		out = out*base + digit
+		base := 10
+		if strings.HasPrefix(text, "0x") || strings.HasPrefix(text, "0X") {
+			text = text[2:]
+			base = 16
+		}
+		n, err := strconv.ParseUint(text, base, 64)
+		if err != nil {
+			return 0, fmt.Errorf("hardware: cannot parse %q: %w", value.Str, err)
+		}
+		return n, nil
 	}
-	return out, nil
+	return value.UInt64(), nil
 }
