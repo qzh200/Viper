@@ -1,0 +1,17 @@
+# Build output
+/bin/
+/dist/
+/.temp/
+artifacts/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Editor and OS noise
+.vs/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
