@@ -27,15 +27,17 @@ func NewSafeArrayUI1(data []byte) (SafeArray, error) {
 	if len(data) == 0 {
 		return SafeArray{}, fmt.Errorf("com: cannot create an empty SAFEARRAY")
 	}
-	hr, _, _ := procSafeArrayCreateVector.Call(
+	// SafeArrayCreateVector returns the SAFEARRAY pointer itself, not a
+	// status code, so only a null pointer means failure.
+	ptr, _, _ := procSafeArrayCreateVector.Call(
 		uintptr(VTUI1),
 		0, // lower bound
 		uintptr(len(data)),
 	)
-	if HRESULT(hr).Failed() {
-		return SafeArray{}, fmt.Errorf("com: SafeArrayCreateVector failed: HRESULT 0x%08X", uint32(hr))
+	if ptr == 0 {
+		return SafeArray{}, fmt.Errorf("com: SafeArrayCreateVector failed")
 	}
-	arr := SafeArray{ptr: hr}
+	arr := SafeArray{ptr: ptr}
 
 	for i, b := range data {
 		idx := int32(i)
