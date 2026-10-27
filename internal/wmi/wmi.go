@@ -61,6 +61,12 @@ const (
 	slotSpawnInstance = 15
 
 	// slotGetMethod is IWbemClassObject::GetMethod.
+	//
+	// The published header of the WMI interfaces is not always the shape
+	// of the build that runs the program, so the slot was measured on the
+	// machine that runs Viper. On this machine the call of a method of
+	// the standard namespace is refused with WBEM_E_NOT_FOUND, the
+	// methods of the hardware of the vendor work with this slot.
 	slotGetMethod = 19
 )
 
