@@ -1,5 +1,12 @@
 // Package hardware drives the Acer ACPI WMI provider.
 //
+// 这个包是**兜底那一侧**。硬件层的主路是原厂 AcerAgentService（见
+// internal/machine），它读得到分区颜色、灯效、两组风扇的行为、每核实时
+// 频率与显卡使用率，固件这一侧都读不到，而且它不需要管理员权限。
+//
+// 这一侧管的是原厂服务不管的几项：风扇加速、风扇表、超频能力、背光原始
+// 缓冲区与复位灯效。它同时也是顶替模式（internal/service）的数据源。
+//
 // The provider exposes two classes: AcerGamingFunction, which offers the
 // named getters and setters of the gaming hardware, and APGeAction, the
 // generic ACPI PNP0C14 action class used by the keyboard and CoolBoost.

@@ -8,6 +8,9 @@
 // oleaut32.dll, which are part of Windows itself, through the standard
 // library's lazy system DLL loader.
 //
+// 这个包是**兜底那一侧的地基**：它只实现驱动 WMI 需要的那么多 COM，
+// 硬件层的主路（internal/machine，走原厂服务）根本不碰它。
+//
 // It implements just enough of COM to drive WMI:
 //   - CoInitializeEx / CoCreateInstance / CoSetProxyBlanket
 //   - BSTR allocation (oleaut32)

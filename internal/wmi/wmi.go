@@ -6,6 +6,10 @@
 // 和 WMI 的提供程序说话，只用 Windows 自带的 ole32.dll 和 oleaut32.dll。
 // 没有辅助进程，没有第三方的 DLL，也没有 .NET 运行时。
 //
+// 这个包是**兜底那一侧的水管**：新硬件层（internal/machine）的主路是原厂
+// 服务，只有原厂服务不管的那几项才走到这里。顶替模式（internal/service）
+// 的数据源也在这一侧。
+//
 // 下面的虚表槽位号是在这台机器上量出来的，而不是照抄公开的头文件，因为
 // WMI 的 COM 接口在不同版本的 Windows 上布局不一样。每一个常量旁边都写着
 // 得出它的依据。
@@ -25,8 +29,8 @@ import (
 
 // Vtable slot numbers of the WMI COM interfaces.
 //
-// 这些值是对着活的接口探出来的，发现用的工具是 cmd/slotfind 和
-// cmd/wmiscan2。
+// 这些值是对着活的接口探出来的：当时临时写了几个探针，一个槽位一个槽位地
+// 试，探针用完就删了，结论与依据留在下面。
 const (
 	// slotConnectServer is IWbemLocator::ConnectServer.
 	//

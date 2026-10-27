@@ -1,12 +1,13 @@
 // Package app is the use case layer of Viper.
 //
-// It joins the hardware backend with the stored settings. The firmware
-// reports the fan and the power state but not the lighting state, so the
-// lighting is kept in the configuration and only the brightness is read
-// back from the hardware.
+// It joins the hardware backend with the stored settings. The settings that
+// do not belong to the gaming hardware, such as the blue light shield, are
+// read from the service of the original software.
 //
-// The settings that do not belong to the gaming hardware, such as the blue
-// light shield, are read from the service of the original software.
+// 这一层现在接的还是固件那一侧（internal/hardware），所以灯光的颜色与灯效
+// 还是从设置文件里读的。硬件层的新路线（internal/machine，原厂服务当主路）
+// 已经做好，接线是下一步的事：接上之后，灯光直接读机器真正的样子，原厂服务
+// 读得到分区颜色与灯效，固件那一侧读不到。
 package app
 
 import (
