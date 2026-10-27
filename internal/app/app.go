@@ -22,6 +22,35 @@ import (
 type App struct {
 	backend hardware.Gaming
 	store   *config.Store
+	// quickClient is the session with the Quick Access service, it is
+	// opened when one of its settings is used.
+	quickClient QuickAccess
+	// quickOptions change the behaviour of the session with the Quick
+	// Access service.
+	quickOptions quickaccess.Options
+}
+
+// QuickAccess is the set of abilities of the Quick Access service that
+// the program uses.
+//
+// The interface keeps the program testable: a test can hand the program
+// a stand for the service, so that the behaviour can be checked without
+// the service of the original software.
+type QuickAccess interface {
+	// BlueLightShield reads the level of the blue light shield.
+	BlueLightShield() (quickaccess.BlueLight, error)
+	// SetBlueLightShield selects a level of the blue light shield.
+	SetBlueLightShield(level quickaccess.BlueLight) error
+	// USBChargeLimit reads the charging limit in percent.
+	USBChargeLimit() (int, error)
+	// SetUSBChargeLimit sets the charging limit in percent.
+	SetUSBChargeLimit(percent int) error
+	// USBChargeEnabled reports whether the charging over USB is allowed.
+	USBChargeEnabled() (bool, error)
+	// SetUSBChargeEnabled allows or forbids the charging over USB.
+	SetUSBChargeEnabled(enabled bool) error
+	// Close ends the session.
+	Close() error
 }
 
 // New opens the stored settings.
@@ -51,6 +80,15 @@ func NewWithStore(store *config.Store) *App {
 // administrator to talk to the firmware.
 func NewWithBackend(store *config.Store, backend hardware.Gaming) *App {
 	return &App{store: store, backend: backend}
+}
+
+// NewWithQuickAccess opens the program with the given session of the
+// Quick Access service.
+//
+// It is used by the tests, so that they do not need the service of the
+// original software.
+func NewWithQuickAccess(store *config.Store, client QuickAccess) *App {
+	return &App{store: store, quickClient: client}
 }
 
 // Close releases the hardware.
@@ -640,10 +678,14 @@ func (a *App) SetUSBChargeEnabled(enabled bool) error {
 // hardware, such as the blue light shield and the charging over USB. It
 // is not needed for the other settings, so the session is only opened
 // when one of them is used.
-func (a *App) quick() (*quickaccess.Client, error) {
-	client, err := quickaccess.Connect(quickaccess.Options{})
+func (a *App) quick() (QuickAccess, error) {
+	if a.quickClient != nil {
+		return a.quickClient, nil
+	}
+	client, err := quickaccess.Connect(a.quickOptions)
 	if err != nil {
 		return nil, fmt.Errorf("app: the Quick Access service of the original software is not reachable: %w", err)
 	}
+	a.quickClient = client
 	return client, nil
 }

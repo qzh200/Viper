@@ -320,8 +320,11 @@ func InitCOMSecurity() error {
 	)
 	h := HRESULT(hr)
 	// RPC_E_TOO_LATE (0x80010119) means COM security was already set up,
-	// which is perfectly acceptable.
-	if h.Failed() && h != hresult(0x80010119) {
+	// which is perfectly acceptable. CO_E_SECURITY_INITIALIZATION
+	// (0x800401F0) says the same thing in the wording of the older
+	// builds: the security of the process is already in place and cannot
+	// be changed a second time.
+	if h.Failed() && h != hresult(0x80010119) && h != hresult(0x800401F0) {
 		return fmt.Errorf("com: CoInitializeSecurity failed: %w", h)
 	}
 	return nil

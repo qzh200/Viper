@@ -55,6 +55,51 @@ func NewSafeArrayUI1(data []byte) (SafeArray, error) {
 	return arr, nil
 }
 
+// NewSafeArrayBSTRs creates a SAFEARRAY of VT_BSTR elements holding the
+// given texts.
+//
+// WMI returns the names of the properties this way, so the array has to
+// be read back the same way.
+func NewSafeArrayBSTRs(texts []string) (SafeArray, error) {
+	if len(texts) == 0 {
+		return SafeArray{}, fmt.Errorf("com: cannot create an empty SAFEARRAY")
+	}
+	ptr, _, _ := procSafeArrayCreateVector.Call(
+		uintptr(VTBSTR),
+		0, // lower bound
+		uintptr(len(texts)),
+	)
+	if ptr == 0 {
+		return SafeArray{}, fmt.Errorf("com: SafeArrayCreateVector failed")
+	}
+	arr := SafeArray{ptr: ptr}
+
+	for i, text := range texts {
+		idx := int32(i)
+		bstr, err := NewBSTR(text)
+		if err != nil {
+			arr.Destroy()
+			return SafeArray{}, err
+		}
+		// The element of an array of VT_BSTR is the string itself, so
+		// the pointer of the string is handed over and not the address
+		// of the variable that holds it.
+		hr, _, _ := procSafeArrayPutElement.Call(
+			arr.ptr,
+			uintptr(unsafe.Pointer(&idx)),
+			uintptr(bstr),
+		)
+		// The array holds the string now, the caller must not release it
+		// a second time.
+		bstr.Free()
+		if HRESULT(hr).Failed() {
+			arr.Destroy()
+			return SafeArray{}, fmt.Errorf("com: SafeArrayPutElement(%d) failed: HRESULT 0x%08X", i, uint32(hr))
+		}
+	}
+	return arr, nil
+}
+
 // Destroy releases the SAFEARRAY.
 func (s SafeArray) Destroy() {
 	if s.ptr != 0 {

@@ -1,0 +1,184 @@
+//go:build windows
+
+package wmi
+
+import (
+	"testing"
+	"unsafe"
+
+	"viper/internal/com"
+)
+
+// The values are put onto the in-parameters of a method and read back
+// from the out-parameters. The objects of the standard namespace stand
+// for them, so that the tests do not need the hardware of the vendor.
+
+// instanceObject returns an instance of a class of the standard
+// namespace.
+//
+// The properties are carried by the instances, the class object only
+// describes them.
+func instanceObject(t *testing.T, name string) com.COMObject {
+	t.Helper()
+
+	if err := com.InitCOM(); err != nil {
+		t.Skipf("the COM runtime cannot be started: %v", err)
+	}
+	t.Cleanup(com.UninitCOM)
+	if err := com.InitCOMSecurity(); err != nil {
+		t.Skipf("the security cannot be established: %v", err)
+	}
+
+	locator, err := com.CoCreateInstance(com.CLSIDWbemLocator, com.IIDWbemLocator, com.CLSCTXInprocServer)
+	if err != nil {
+		t.Skipf("the locator cannot be created: %v", err)
+	}
+	t.Cleanup(locator.Release)
+
+	ns, err := com.NewBSTR(NamespaceCIM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ns.Free()
+
+	var services uintptr
+	r, _ := locator.Call(3,
+		uintptr(ns), 0, 0, 0, 0, 0, 0,
+		uintptr(unsafe.Pointer(&services)),
+	)
+	if int32(r) < 0 {
+		t.Skipf("the namespace is not reachable: HRESULT 0x%08X", uint32(r))
+	}
+	client := com.COMObject(services)
+	t.Cleanup(client.Release)
+	com.SetProxyBlanket(client)
+
+	path, err := com.NewBSTR(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer path.Free()
+
+	var object uintptr
+	r, _ = client.Call(6,
+		uintptr(path), 0, 0,
+		uintptr(unsafe.Pointer(&object)),
+		0,
+	)
+	if int32(r) < 0 {
+		t.Skipf("the class %s is not there: HRESULT 0x%08X", name, uint32(r))
+	}
+	class := com.COMObject(object)
+	t.Cleanup(class.Release)
+	com.SetProxyBlanket(class)
+
+	// The instances of the class carry the properties.
+	query, err := com.NewBSTR("SELECT * FROM " + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer query.Free()
+
+	lang, err := com.NewBSTR("WQL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lang.Free()
+
+	var enumerator uintptr
+	r, _ = client.Call(20,
+		uintptr(lang),
+		uintptr(query),
+		0x30, // WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY
+		0,    // ppCallResult
+		uintptr(unsafe.Pointer(&enumerator)),
+		0, // pFlags
+	)
+	if int32(r) < 0 {
+		t.Skipf("the instances of %s cannot be listed: HRESULT 0x%08X", name, uint32(r))
+	}
+	enum := com.COMObject(enumerator)
+	t.Cleanup(enum.Release)
+	com.SetProxyBlanket(enum)
+
+	var instance uintptr
+	var returned uint32
+	r, _ = enum.Call(4,
+		uintptr(^uint64(0)),
+		1,
+		uintptr(unsafe.Pointer(&instance)),
+		uintptr(unsafe.Pointer(&returned)),
+	)
+	if int32(r) < 0 || instance == 0 {
+		t.Skipf("the instances of %s cannot be read: HRESULT 0x%08X", name, uint32(r))
+	}
+	object2 := com.COMObject(instance)
+	t.Cleanup(object2.Release)
+	com.SetProxyBlanket(object2)
+	return object2
+}
+
+func TestReadValueOfAProperty(t *testing.T) {
+	instance := instanceObject(t, "Win32_Processor")
+
+	value, err := readValue(instance, "MaxClockSpeed")
+	if err != nil {
+		t.Skipf("the property cannot be read on this machine: %v", err)
+	}
+	if value.Kind != KindUint64 {
+		t.Errorf("the property has the kind %d, want the number", value.Kind)
+	}
+	if value.UInt64() == 0 {
+		t.Error("the processor reports the highest clock as zero")
+	}
+}
+
+func TestReadValueOfAText(t *testing.T) {
+	instance := instanceObject(t, "Win32_Processor")
+
+	value, err := readValue(instance, "Manufacturer")
+	if err != nil {
+		t.Skipf("the property cannot be read on this machine: %v", err)
+	}
+	if value.Kind != KindString {
+		t.Errorf("the property has the kind %d, want the text", value.Kind)
+	}
+}
+
+func TestReadValueOfAPropertyThatIsNotThere(t *testing.T) {
+	instance := instanceObject(t, "Win32_Processor")
+
+	if _, err := readValue(instance, "NoSuchProperty"); err == nil {
+		t.Error("a property that is not there was read")
+	}
+}
+
+func TestPutValueOntoAnObject(t *testing.T) {
+	// The in-parameters of a method are an object like any other, so a
+	// value can be put onto one.
+	instance := instanceObject(t, "Win32_Processor")
+
+	err := putValue(instance, "Caption", String("a name"))
+	if err != nil {
+		t.Skipf("the value cannot be put onto the object on this machine: %v", err)
+	}
+}
+
+func TestPutValueOfANumber(t *testing.T) {
+	instance := instanceObject(t, "Win32_Processor")
+
+	err := putValue(instance, "MaxClockSpeed", Uint64(4000))
+	if err != nil {
+		t.Skipf("the value cannot be put onto the object on this machine: %v", err)
+	}
+}
+
+func TestPutValueOfABuffer(t *testing.T) {
+	// The backlight setter takes its input as a buffer of bytes.
+	instance := instanceObject(t, "Win32_Processor")
+
+	err := putValue(instance, "Caption", Bytes([]byte{1, 2, 3, 4}))
+	if err != nil {
+		t.Skipf("the buffer cannot be put onto the object on this machine: %v", err)
+	}
+}

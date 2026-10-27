@@ -10,6 +10,29 @@ import (
 // The settings live in a single file below the user profile. A missing or
 // a broken file must not stop the program, the defaults are used instead.
 
+func TestOpenInTheUserProfile(t *testing.T) {
+	// The settings live below the profile of the user. The test points
+	// the profile at a temporary directory, so that it does not touch the
+	// settings of the user.
+	home := t.TempDir()
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("LOCALAPPDATA", home)
+	t.Setenv("APPDATA", home)
+
+	store, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.Path() == "" {
+		t.Error("the store has no path")
+	}
+	// A missing file is not an error, the defaults are used.
+	if store.Settings().PowerMode != Default().PowerMode {
+		t.Errorf("the power mode is %d, want the default %d",
+			store.Settings().PowerMode, Default().PowerMode)
+	}
+}
+
 func TestOpenAtAMissingFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 
