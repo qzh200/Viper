@@ -150,6 +150,24 @@ func decodePowerMode(value uint64) PowerMode {
 	}
 }
 
+// PowerModeCode returns the number the machine uses for a performance profile.
+//
+// The numbering is the one of the machine itself: 0 is quiet, 1 is balanced,
+// 4 is performance, 5 is turbo and 6 is eco. The provider of the firmware
+// and the original service both use it, so a number that comes from one of
+// them means the same thing in the other.
+//
+// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
+// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
+func PowerModeCode(mode PowerMode) uint64 {
+	return mode.providerCode()
+}
+
+// DecodePowerMode maps a number of the machine back onto a profile.
+func DecodePowerMode(value uint64) PowerMode {
+	return decodePowerMode(value)
+}
+
 // AvailablePowerModes lists the profiles this machine supports.
 //
 // Turbo needs a Predator, the other profiles are available everywhere.

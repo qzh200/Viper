@@ -1,0 +1,234 @@
+package machine
+
+import (
+	"fmt"
+	"strings"
+
+	"viper/internal/agentservice"
+	"viper/internal/hardware"
+)
+
+// The modes of the fan configuration of the service.
+//
+// 实测：模式 0 是自动，模式 1 是全速，模式 2 是固定占空比。写模式 1 之后
+// 风扇从 2722 RPM 升到 7092 RPM，写模式 2 并把占空比写成 50 之后风扇落在
+// 4400 RPM 左右。模式 0 与模式 2 的区别是每个风扇的 fan_custom_auto 标记，
+// 它是零的时候那个风扇按 fan_custom_speed 跑。
+const (
+	fanModeAuto   = 0
+	fanModeMax    = 1
+	fanModeCustom = 2
+)
+
+// The names of the fan groups of the service.
+const (
+	fanNameCPU = "CPU"
+	fanNameGPU = "GPU"
+)
+
+// fanData is the shape of the fan configuration of the service.
+type fanData struct {
+	Mode          int `json:"mode"`
+	CustomFanData []struct {
+		Auto  int    `json:"fan_custom_auto"`
+		Speed int    `json:"fan_custom_speed"`
+		Index int    `json:"fan_index"`
+		Name  string `json:"fan_name"`
+	} `json:"custom_fan_data"`
+}
+
+// Fans reads the fan configuration.
+//
+// 原厂服务报的是模式与每个风扇的占空比，显卡风扇组的行为它也报得回来，
+// 所以这一项比固件那一侧多一样东西。
+func (b *Backend) Fans() (hardware.FanState, error) {
+	data, err := b.fans()
+	if err != nil {
+		return hardware.FanState{}, err
+	}
+
+	state := hardware.FanState{
+		GPUModeReadable: true,
+	}
+
+	switch data.Mode {
+	case fanModeMax:
+		state.CPUMode = hardware.FanMax
+		state.GPUMode = hardware.FanMax
+	case fanModeCustom, fanModeAuto:
+		state.CPUMode = hardware.FanAuto
+		state.GPUMode = hardware.FanAuto
+		for _, fan := range data.CustomFanData {
+			mode := hardware.FanAuto
+			if fan.Auto == 0 {
+				mode = hardware.FanCustom
+			}
+			switch strings.ToUpper(fan.Name) {
+			case fanNameCPU:
+				state.CPUMode = mode
+				state.CPUPercent = fan.Speed
+			case fanNameGPU:
+				state.GPUMode = mode
+				state.GPUPercent = fan.Speed
+			}
+		}
+	default:
+		return hardware.FanState{}, fmt.Errorf("machine: 原厂服务报了不认识的风扇模式 %d", data.Mode)
+	}
+
+	// 加速标记在固件那一侧，问不到的时候不编造，单独的加速命令会给出
+	// 确切的错误。
+	if firmware, err := b.provider(); err == nil {
+		if enabled, err := firmware.CoolBoostEnabled(); err == nil {
+			state.CoolBoost = enabled
+		}
+	}
+
+	return state, nil
+}
+
+// SetFans applies a fan configuration.
+//
+// 两个风扇都是全速的时候写模式 1，其余情况写模式 2：每个风扇的
+// fan_custom_auto 标记说它是自动还是按占空比跑，fan_custom_speed 是占空比。
+//
+// 写完之后把配置读回来核对，固件没有接受哪一个设置就在错误信息里说清楚是
+// 哪一个。
+func (b *Backend) SetFans(config hardware.FanConfig) error {
+	// 加速要用固件那一侧，先问一次，够不到就不改风扇。
+	if config.CoolBoost {
+		firmware, err := b.provider()
+		if err != nil {
+			return err
+		}
+		if err := firmware.CoolBoost(true); err != nil {
+			return fmt.Errorf("machine: 打开风扇加速失败: %w", err)
+		}
+	}
+
+	mode := fanModeCustom
+	cpuAuto, cpuSpeed := fanRequest(config.CPUMode, config.CPUPercent)
+	gpuAuto, gpuSpeed := fanRequest(config.GPUMode, config.GPUPercent)
+	if config.CPUMode == hardware.FanMax && config.GPUMode == hardware.FanMax {
+		mode = fanModeMax
+	}
+
+	payload := map[string]any{
+		"mode": mode,
+		"custom_fan_data": []any{
+			map[string]any{
+				"fan_custom_auto":  cpuAuto,
+				"fan_custom_speed": cpuSpeed,
+				"fan_index":        0,
+				"fan_name":         fanNameCPU,
+			},
+			map[string]any{
+				"fan_custom_auto":  gpuAuto,
+				"fan_custom_speed": gpuSpeed,
+				"fan_index":        0,
+				"fan_name":         fanNameGPU,
+			},
+		},
+	}
+
+	if err := b.set(agentservice.FunctionFanControl, payload); err != nil {
+		return err
+	}
+
+	return b.verifyFans(mode, cpuAuto, cpuSpeed, gpuAuto, gpuSpeed)
+}
+
+// verifyFans reads the fan configuration back.
+//
+// 原厂服务把写下的值原样报回来，所以读回来的配置和写下去的不一样，就说明
+// 机器没有接受这个设置。
+func (b *Backend) verifyFans(mode int, cpuAuto int, cpuSpeed int, gpuAuto int, gpuSpeed int) error {
+	data, err := b.fans()
+	if err != nil {
+		return err
+	}
+	if data.Mode != mode {
+		return fmt.Errorf("machine: 风扇模式没有生效，服务报的是 %d，不是 %d", data.Mode, mode)
+	}
+
+	for _, fan := range data.CustomFanData {
+		auto, speed := cpuAuto, cpuSpeed
+		switch strings.ToUpper(fan.Name) {
+		case fanNameGPU:
+			auto, speed = gpuAuto, gpuSpeed
+		case fanNameCPU:
+		default:
+			continue
+		}
+
+		if fan.Auto != auto {
+			return fmt.Errorf("machine: %s 风扇的行为没有生效，服务报的是 %d，不是 %d",
+				fan.Name, fan.Auto, auto)
+		}
+		if auto == 0 && fan.Speed != speed {
+			return fmt.Errorf("machine: %s 风扇的占空比没有生效，服务报的是 %d，不是 %d",
+				fan.Name, fan.Speed, speed)
+		}
+	}
+
+	return nil
+}
+
+// fanRequest turns a behaviour of a fan into the two numbers of the service.
+//
+// 返回的第一个数字是自动标记，零是按占空比跑，一是让控制器跑自己的曲线。
+func fanRequest(mode hardware.FanMode, percent int) (auto int, speed int) {
+	switch mode {
+	case hardware.FanMax:
+		return 0, 100
+	case hardware.FanCustom:
+		return 0, int(clamp(uint64(percent), 0, 100))
+	default:
+		return 1, 0
+	}
+}
+
+// FanTable reads the selected fan table.
+//
+// 原厂服务不报风扇表，所以这一项问固件。
+func (b *Backend) FanTable() (uint64, error) {
+	firmware, err := b.provider()
+	if err != nil {
+		return 0, err
+	}
+	return firmware.FanTable()
+}
+
+// CoolBoostEnabled reports whether the boost fan table is selected.
+//
+// 加速在固件那一侧，原厂服务不报它，所以这一项问固件。
+func (b *Backend) CoolBoostEnabled() (bool, error) {
+	firmware, err := b.provider()
+	if err != nil {
+		return false, err
+	}
+	return firmware.CoolBoostEnabled()
+}
+
+// CoolBoost switches the boost fan table.
+func (b *Backend) CoolBoost(enabled bool) error {
+	firmware, err := b.provider()
+	if err != nil {
+		return err
+	}
+	return firmware.CoolBoost(enabled)
+}
+
+// fans reads the fan configuration of the service.
+func (b *Backend) fans() (fanData, error) {
+	var data fanData
+
+	answer, err := b.get(agentservice.FunctionFanControl)
+	if err != nil {
+		return data, err
+	}
+	if err := answer.Decode(&data); err != nil {
+		return data, err
+	}
+	return data, nil
+}
