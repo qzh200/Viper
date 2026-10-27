@@ -9,6 +9,10 @@ import (
 // The keyboard backlight hotkey identifier used by the action class.
 const backlightHotkey = 132
 
+// backlightTimeoutSeconds is the number of seconds after which the
+// backlight switches off on its own.
+const backlightTimeoutSeconds = 30
+
 // Keyboard lighting related bits of the action class input word.
 const (
 	backlightReadBit  = 1
@@ -65,7 +69,13 @@ func (b *Backend) SetLighting(config RGBConfig) error {
 		return fmt.Errorf("hardware: set lighting behaviour: %w", err)
 	}
 
-	return b.SetBacklight(clampPercent(int(config.Brightness)), true)
+	// The automatic switch off is a setting of its own, changing the
+	// lighting must not change it.
+	timeout := false
+	if state, err := b.Backlight(); err == nil {
+		timeout = state.Timeout
+	}
+	return b.SetBacklight(clampPercent(int(config.Brightness)), timeout)
 }
 
 // ResetLighting returns the keyboard to the default appearance.
@@ -140,7 +150,7 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 
 	timeoutByte := uint64(0)
 	if timeout {
-		timeoutByte = 0x1E
+		timeoutByte = backlightTimeoutSeconds
 	}
 
 	actionInput := uint64(backlightWriteBit) |
@@ -156,11 +166,15 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 	}
 
 	// The Acer gaming class takes the level as a sixteen byte buffer.
+	//
+	// The layout was read back from the provider with
+	// GetGamingKBBacklight: the level sits in byte two and in byte five,
+	// byte eight holds the flags of the backlight and byte nine has to be
+	// one, otherwise the provider drops the buffer and zeroes the level.
 	buffer := make([]byte, 16)
-	value := uint64(level) << 16
-	for i := 0; i < 8; i++ {
-		buffer[i] = byte(value >> (8 * i))
-	}
+	buffer[2] = byte(level)
+	buffer[5] = byte(level)
+	buffer[8] = backlightFlags
 	buffer[9] = 1
 
 	if _, err := b.callGaming("SetGamingKBBacklight", map[string]wmi.Value{
@@ -178,9 +192,24 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 	return nil
 }
 
+// backlightFlags is the value of the flags byte of the backlight buffer.
+//
+// The provider reports three for a keyboard that switches its backlight off
+// after thirty seconds.
+const backlightFlags = 3
+
 // Backlight reads the keyboard backlight state.
+//
+// The level comes from the gaming class, the automatic switch off comes
+// from the action class, which keeps it in the sixth byte of its answer.
 func (b *Backend) Backlight() (BacklightState, error) {
 	var state BacklightState
+
+	brightness, err := b.LightingBrightness()
+	if err != nil {
+		return state, err
+	}
+	state.Brightness = int(brightness)
 
 	query := uint64(backlightReadBit) |
 		(uint64(backlightHotkey) << 8) |
@@ -197,8 +226,7 @@ func (b *Backend) Backlight() (BacklightState, error) {
 		return state, err
 	}
 	if raw&0xFF == 0 && raw > 0 {
-		state.Brightness = int((raw >> 32) & 0xFF)
-		state.Timeout = (raw>>40)&0xFF == 30
+		state.Timeout = (raw>>40)&0xFF == backlightTimeoutSeconds
 	}
 	return state, nil
 }
