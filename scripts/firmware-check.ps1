@@ -36,9 +36,17 @@ if (-not (Test-Path $viper)) {
 
 function Invoke-Viper {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
+    # 有的设置这台机器就是做不到（比如锁 Windows 键）。验证脚本要把这种情况
+    # 报出来，不是让它把整个脚本打断。
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $output = & $viper @Arguments 2>&1
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+
     return [pscustomobject]@{
-        Code   = $LASTEXITCODE
+        Code   = $code
         Output = ($output | Out-String).Trim()
     }
 }

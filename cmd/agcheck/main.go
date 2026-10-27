@@ -52,7 +52,13 @@ func main() {
 // 程序给不了的那几项。它是这一层与真机之间的验证。
 func readMachine() {
 	backend, err := machine.New(machine.Options{
-		OpenFirmware: hardware.OpenFirmware,
+		OpenFirmware: func() (machine.Extras, error) {
+			provider, err := hardware.OpenFirmware()
+			if err != nil {
+				return nil, err
+			}
+			return provider, nil
+		},
 	})
 	if err != nil {
 		fmt.Println("打开机器失败:", err)
