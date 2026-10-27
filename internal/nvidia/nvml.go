@@ -51,6 +51,19 @@ type memoryV2 struct {
 	Used    uint64
 }
 
+// entry is an entry point of the management library.
+//
+// The type of the entry point is a function and not a pointer to the
+// procedure of the library, so that a test can put a stand for the
+// driver in place of the real one. A machine without the driver never
+// reaches the code that reads the card, so those branches would otherwise
+// stay untested.
+//
+// The second result tells whether the entry point is there at all. Not
+// every driver exports every entry point, and a missing one has to be
+// told apart from one that failed.
+type entry func(arguments ...uintptr) (result uintptr, present bool)
+
 // library holds the entry points of the management library.
 //
 // The name of the card, the performance state and the version of the
@@ -58,18 +71,44 @@ type memoryV2 struct {
 type library struct {
 	handle syscall.Handle
 
-	init                *syscall.LazyProc
-	shutdown            *syscall.LazyProc
-	deviceCount         *syscall.LazyProc
-	deviceHandle        *syscall.LazyProc
-	deviceUtilization   *syscall.LazyProc
-	deviceClock         *syscall.LazyProc
-	deviceMaxClock      *syscall.LazyProc
-	deviceName          *syscall.LazyProc
-	deviceMemory        *syscall.LazyProc
-	deviceMemoryV2      *syscall.LazyProc
-	devicePState        *syscall.LazyProc
-	systemDriverVersion *syscall.LazyProc
+	init                entry
+	shutdown            entry
+	deviceCount         entry
+	deviceHandle        entry
+	deviceUtilization   entry
+	deviceClock         entry
+	deviceMaxClock      entry
+	deviceName          entry
+	deviceMemory        entry
+	deviceMemoryV2      entry
+	devicePState        entry
+	systemDriverVersion entry
+}
+
+// wrap turns an entry point of the library into a call.
+//
+// Not every driver exports every entry point, so a missing one answers
+// that it is not there, and the caller leaves the value alone.
+func wrap(dll *syscall.LazyDLL, name string) entry {
+	proc := dll.NewProc(name)
+	return func(arguments ...uintptr) (uintptr, bool) {
+		if err := proc.Find(); err != nil {
+			return 0, false
+		}
+		result, _, _ := proc.Call(arguments...)
+		return result, true
+	}
+}
+
+// call runs an entry point of the library.
+//
+// The result is false when the entry point is missing, the caller then
+// leaves the value alone.
+func call(proc entry, arguments ...uintptr) (uintptr, bool) {
+	if proc == nil {
+		return 0, false
+	}
+	return proc(arguments...)
 }
 
 // Telemetry is a snapshot of the graphics card.
@@ -116,7 +155,7 @@ var (
 	mutex     sync.Mutex
 	loaded    bool
 	loadError error
-	entry     *library
+	current   *library
 )
 
 // load opens the management library of the driver.
@@ -128,36 +167,36 @@ func load() (*library, error) {
 	defer mutex.Unlock()
 
 	if loaded {
-		return entry, loadError
+		return current, loadError
 	}
 
 	handle, err := syscall.LoadLibrary("nvml.dll")
 	if err != nil {
 		loadError = fmt.Errorf("nvidia: the management library of the driver is not available: %w", err)
-		entry = nil
+		current = nil
 		loaded = true
 		return nil, loadError
 	}
 
 	dll := syscall.NewLazyDLL("nvml.dll")
-	entry = &library{
+	current = &library{
 		handle:              handle,
-		init:                dll.NewProc("nvmlInit_v2"),
-		shutdown:            dll.NewProc("nvmlShutdown"),
-		deviceCount:         dll.NewProc("nvmlDeviceGetCount_v2"),
-		deviceHandle:        dll.NewProc("nvmlDeviceGetHandleByIndex_v2"),
-		deviceUtilization:   dll.NewProc("nvmlDeviceGetUtilizationRates"),
-		deviceClock:         dll.NewProc("nvmlDeviceGetClockInfo"),
-		deviceMaxClock:      dll.NewProc("nvmlDeviceGetMaxClockInfo"),
-		deviceName:          dll.NewProc("nvmlDeviceGetName"),
-		deviceMemory:        dll.NewProc("nvmlDeviceGetMemoryInfo"),
-		deviceMemoryV2:      dll.NewProc("nvmlDeviceGetMemoryInfo_v2"),
-		devicePState:        dll.NewProc("nvmlDeviceGetPState"),
-		systemDriverVersion: dll.NewProc("nvmlSystemGetDriverVersion"),
+		init:                wrap(dll, "nvmlInit_v2"),
+		shutdown:            wrap(dll, "nvmlShutdown"),
+		deviceCount:         wrap(dll, "nvmlDeviceGetCount_v2"),
+		deviceHandle:        wrap(dll, "nvmlDeviceGetHandleByIndex_v2"),
+		deviceUtilization:   wrap(dll, "nvmlDeviceGetUtilizationRates"),
+		deviceClock:         wrap(dll, "nvmlDeviceGetClockInfo"),
+		deviceMaxClock:      wrap(dll, "nvmlDeviceGetMaxClockInfo"),
+		deviceName:          wrap(dll, "nvmlDeviceGetName"),
+		deviceMemory:        wrap(dll, "nvmlDeviceGetMemoryInfo"),
+		deviceMemoryV2:      wrap(dll, "nvmlDeviceGetMemoryInfo_v2"),
+		devicePState:        wrap(dll, "nvmlDeviceGetPState"),
+		systemDriverVersion: wrap(dll, "nvmlSystemGetDriverVersion"),
 	}
 	loadError = nil
 	loaded = true
-	return entry, nil
+	return current, nil
 }
 
 // Available reports whether the driver of an NVIDIA card is present.
@@ -174,12 +213,12 @@ func Close() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	if entry == nil || entry.handle == 0 {
+	if current == nil || current.handle == 0 {
 		return
 	}
-	entry.shutdown.Call()
-	syscall.FreeLibrary(entry.handle)
-	entry = nil
+	current.shutdown()
+	syscall.FreeLibrary(current.handle)
+	current = nil
 	loadError = nil
 	loaded = false
 }
@@ -194,13 +233,13 @@ func Read() ([]Telemetry, error) {
 		return nil, err
 	}
 
-	result, _, _ := lib.init.Call()
+	result, _ := lib.init()
 	if int32(result) != 0 {
 		return nil, fmt.Errorf("nvidia: the driver refused the access, code %d", int32(result))
 	}
 
 	var count uint32
-	result, _, _ = lib.deviceCount.Call(uintptr(unsafe.Pointer(&count)))
+	result, _ = lib.deviceCount(uintptr(unsafe.Pointer(&count)))
 	if int32(result) != 0 {
 		return nil, fmt.Errorf("nvidia: the cards cannot be counted, code %d", int32(result))
 	}
@@ -208,7 +247,7 @@ func Read() ([]Telemetry, error) {
 	out := make([]Telemetry, 0, count)
 	for index := uint32(0); index < count; index++ {
 		var handle uintptr
-		result, _, _ = lib.deviceHandle.Call(
+		result, _ = lib.deviceHandle(
 			uintptr(index),
 			uintptr(unsafe.Pointer(&handle)),
 		)
@@ -218,21 +257,6 @@ func Read() ([]Telemetry, error) {
 		out = append(out, read(lib, handle))
 	}
 	return out, nil
-}
-
-// call runs an entry point that the driver may not export.
-//
-// The result is false when the entry point is missing, the caller then
-// leaves the value alone.
-func call(proc *syscall.LazyProc, arguments ...uintptr) (uintptr, bool) {
-	if proc == nil {
-		return 0, false
-	}
-	if err := proc.Find(); err != nil {
-		return 0, false
-	}
-	result, _, _ := proc.Call(arguments...)
-	return result, true
 }
 
 // read reads the state of one card.

@@ -331,6 +331,52 @@ func TestTheChangesThatRunAtTheSameTime(t *testing.T) {
 	}
 }
 
+func TestSaveWritesTheSettingsOnItsOwn(t *testing.T) {
+	// The save is a public call of its own, not only a part of the
+	// update. The settings that were changed by hand have to reach the
+	// file.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	store, err := OpenAt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	settings := store.Settings()
+	settings.PowerMode = 4
+	store.settings = settings
+
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := OpenAt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Settings().PowerMode != 4 {
+		t.Errorf("the power mode is %d, want 4", again.Settings().PowerMode)
+	}
+}
+
+func TestSaveOfAMachineThatRefuses(t *testing.T) {
+	// The directory of the settings cannot be created, so the save has to
+	// fail instead of losing the settings silently.
+	// A file where the directory should be makes the creation fail.
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	blocked, err := OpenAt(filepath.Join(blocker, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := blocked.Save(); err == nil {
+		t.Error("the save was accepted although the directory cannot be created")
+	}
+}
+
 func TestTheFileIsWrittenWithoutALeftover(t *testing.T) {
 	// The settings are written beside the file and moved over it, so that
 	// a reader never sees a half written file. The temporary file must
