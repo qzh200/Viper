@@ -12,6 +12,13 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
   OLE 接口，处理 VARIANT、BSTR、SAFEARRAY 与 vtable 分发。
 * **Windows 专用**。当前仅支持 Windows。
 
+显卡遥测是唯一的例外：它走显卡驱动自带的 `nvml.dll`
+（NVIDIA Management Library）。这个库是 **N 卡驱动的一部分**，不是
+别的程序，Windows 本来就在提供它；没有 N 卡的机器读不到显卡遥测，
+其余功能照常工作。驱动接口本身（`nvapi64.dll`）只导出一个
+`nvapi_QueryInterface`，其余全靠数字编号调用，所以 Viper 选管理库
+而不是驱动接口。
+
 ## provider 的完整能力面
 
 `cmd/coverage` 把这个 provider 能给的东西全部扫了一遍，结论是
@@ -29,6 +36,45 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 
 剩下的缺口都不在 WMI 上，而是**别的层**：显卡遥测（使用率、频率）
 要 NVAPI，Windows 菜单键要 HID 特性报告，启动标志要写 EFI 分区。
+
+## 场景分区设置
+
+原厂应用把「灯效 + 风扇」打包成**场景**，可以绑到各个性能档位上，
+切档位时场景跟着走。Viper 实现了同一套机制：
+
+```powershell
+viper scenario list                  # 列出场景与绑定
+viper scenario save game             # 把当前的灯效与风扇存为场景
+viper scenario apply game            # 应用场景
+viper scenario bind performance game # 把场景绑到「性能」档
+viper scenario unbind performance    # 解绑
+viper scenario delete game           # 删除场景
+```
+
+绑定之后，`viper power performance` 会连同场景一起应用。
+
+存场景时，风扇模式与占空比、键盘亮度都**从机器上现读**，灯效与颜色
+固件读不回来，取 Viper 自己的记录。固件在背光自动熄灭时会把亮度报成
+零，所以零不被当成用户选的亮度。
+
+## 显卡遥测
+
+```
+viper telemetry
+  Graphics card     : NVIDIA GeForce RTX 4060 Laptop GPU
+  Graphics usage    : 43 %
+  Graphics clock    : 315 MHz (max 3105 MHz)
+  Memory clock      : 6001 MHz
+  Video memory      : 3.8 GB of 8.0 GB
+```
+
+读数与原厂服务（它走驱动接口 `nvapi64.dll`）**逐项吻合**：
+使用率 35% 对 34%、图形频率 210 MHz 对 210、最高频率 3105 MHz 对 3105。
+`cmd/gpucross` 是做这个对照的工具。
+
+两个驱动细节：显存要走 `nvmlDeviceGetMemoryInfo`（第一版，三字段），
+`_v2` 版本本机驱动直接返回"不支持"；性能状态 `nvmlDeviceGetPState`
+这个版本没有导出，所以空闲状态改用使用率判断。
 
 ## 进程依赖
 
@@ -71,6 +117,8 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | 充电限制阈值（10 / 20 / 30 %） | ✅ |
 | 键盘背光亮度与 30 秒超时 | ✅ 亮度可读回，超时可读回 |
 | 电源与电池状态（供电、电量、充电中） | ✅ 走 Windows 内核，不需要管理员权限 |
+| 显卡遥测（型号、使用率、频率、显存） | ✅ 走显卡驱动的管理库 |
+| 场景分区设置（每个性能档位绑定自己的灯效与风扇） | ✅ |
 | 超频能力探测 | ✅ |
 | CPU / GPU 超频配置 | 🚧 读取已通，写入待确认 |
 | 配置持久化与开机还原 | 🚧 |
@@ -111,6 +159,7 @@ cmd/viper          命令行入口
 internal/com       COM/OLE 互操作层（VARIANT、BSTR、SAFEARRAY、vtable）
 internal/wmi       WMI 客户端：实例解析、方法调用、参数类型自适应
 internal/hardware  Acer 硬件后端：传感器、风扇、电源、灯效
+internal/nvidia    显卡遥测：走显卡驱动的管理库
 internal/quickaccess 原厂 Quick Access 服务客户端（蓝光灯、USB 充电）
 internal/config    设置持久化
 internal/app       用例层
