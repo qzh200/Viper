@@ -12,6 +12,24 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
   OLE 接口，处理 VARIANT、BSTR、SAFEARRAY 与 vtable 分发。
 * **Windows 专用**。当前仅支持 Windows。
 
+## provider 的完整能力面
+
+`cmd/coverage` 把这个 provider 能给的东西全部扫了一遍，结论是
+**硬件层在 WMI 这一侧已经没有未探明的空白**。
+
+| 接口 | 覆盖情况 |
+| :--- | :--- |
+| `GetGamingSysInfo` | 一共只有 **5 个分类**有值（`0x01` CPU 温度、`0x02` CPU 风扇、`0x03` 主板温度、`0x06` 显卡风扇、`0x0A` 显卡温度），其余 12 个分类读回来都是 0。Viper 全读了 |
+| 风扇 | 行为、转速、风扇表三个方法全部覆盖，读写都有 |
+| 灯效 | 颜色、行为、亮度、背光缓冲区全部覆盖；三个读回方法（`GetGamingLED` / `GetGamingLEDColor` / `GetGamingLEDBehavior`）在固件里恒返回错误码，拿不到东西 |
+| 杂项设置 | `0x02` 图形显示模式、`0x06` 开机音效可读写；`0x01` 与 `0x08` 写入后没有任何可见效果 |
+| 性能档案 | `GetGamingProfile` 与 `GetGamingProfileSetting` 能读，但语义还没解开（返回的是 1 和 2 这样的标志） |
+| 动作类热键 | 只有 **132**（键盘背光）和 **7**（CoolBoost）有反应。Windows 菜单键在 HID 层，不在 WMI 面上 |
+| 超频 | `Set/GetCPUOverclockingProfile` 未用，结构体格式还没逆出来 |
+
+剩下的缺口都不在 WMI 上，而是**别的层**：显卡遥测（使用率、频率）
+要 NVAPI，Windows 菜单键要 HID 特性报告，启动标志要写 EFI 分区。
+
 ## 进程依赖
 
 **核心路径零进程依赖。** 温度、风扇、灯效、性能档位、开机音效、
@@ -52,6 +70,7 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | USB 关机充电开关 | ✅ |
 | 充电限制阈值（10 / 20 / 30 %） | ✅ |
 | 键盘背光亮度与 30 秒超时 | ✅ 亮度可读回，超时可读回 |
+| 电源与电池状态（供电、电量、充电中） | ✅ 走 Windows 内核，不需要管理员权限 |
 | 超频能力探测 | ✅ |
 | CPU / GPU 超频配置 | 🚧 读取已通，写入待确认 |
 | 配置持久化与开机还原 | 🚧 |
