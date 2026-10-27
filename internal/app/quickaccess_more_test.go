@@ -19,6 +19,18 @@ type fakeQuickAccess struct {
 	chargeLimit int
 	// chargeEnabled reports whether the charging over USB is allowed.
 	chargeEnabled bool
+	// displayMode is the graphics switch of the machine.
+	displayMode quickaccess.DisplayMode
+	// darkMode reports whether the dark mode of the system is on.
+	darkMode bool
+	// transparentEffect reports whether the windows are transparent.
+	transparentEffect bool
+	// autoHideTaskbar reports whether the taskbar hides itself.
+	autoHideTaskbar bool
+	// screenSaver reports whether the screen saver is switched on.
+	screenSaver bool
+	// screenSaverTimeout is the idle time before the screen saver starts.
+	screenSaverTimeout int
 
 	// writtenBlueLight records the level that was written.
 	writtenBlueLight []quickaccess.BlueLight
@@ -26,6 +38,18 @@ type fakeQuickAccess struct {
 	writtenLimit []int
 	// writtenEnabled records the switch that was written.
 	writtenEnabled []bool
+	// writtenDisplayMode records the graphics switch that was written.
+	writtenDisplayMode []quickaccess.DisplayMode
+	// writtenDarkMode records the dark mode that was written.
+	writtenDarkMode []bool
+	// writtenTransparent records the transparency that was written.
+	writtenTransparent []bool
+	// writtenAutoHide records the hiding of the taskbar that was written.
+	writtenAutoHide []bool
+	// writtenScreenSaver records the screen saver that was written.
+	writtenScreenSaver []bool
+	// writtenTimeout records the timeout of the screen saver that was written.
+	writtenTimeout []int
 	// closed reports whether the session was ended.
 	closed bool
 }
@@ -62,6 +86,66 @@ func (q *fakeQuickAccess) SetUSBChargeEnabled(enabled bool) error {
 
 func (q *fakeQuickAccess) Close() error {
 	q.closed = true
+	return nil
+}
+
+func (q *fakeQuickAccess) DisplayMode() (quickaccess.DisplayMode, error) {
+	return q.displayMode, nil
+}
+
+func (q *fakeQuickAccess) SetDisplayMode(mode quickaccess.DisplayMode) error {
+	q.writtenDisplayMode = append(q.writtenDisplayMode, mode)
+	q.displayMode = mode
+	return nil
+}
+
+func (q *fakeQuickAccess) DarkMode() (bool, error) {
+	return q.darkMode, nil
+}
+
+func (q *fakeQuickAccess) SetDarkMode(enabled bool) error {
+	q.writtenDarkMode = append(q.writtenDarkMode, enabled)
+	q.darkMode = enabled
+	return nil
+}
+
+func (q *fakeQuickAccess) TransparentEffect() (bool, error) {
+	return q.transparentEffect, nil
+}
+
+func (q *fakeQuickAccess) SetTransparentEffect(enabled bool) error {
+	q.writtenTransparent = append(q.writtenTransparent, enabled)
+	q.transparentEffect = enabled
+	return nil
+}
+
+func (q *fakeQuickAccess) AutoHideTaskbar() (bool, error) {
+	return q.autoHideTaskbar, nil
+}
+
+func (q *fakeQuickAccess) SetAutoHideTaskbar(enabled bool) error {
+	q.writtenAutoHide = append(q.writtenAutoHide, enabled)
+	q.autoHideTaskbar = enabled
+	return nil
+}
+
+func (q *fakeQuickAccess) ScreenSaver() (bool, error) {
+	return q.screenSaver, nil
+}
+
+func (q *fakeQuickAccess) SetScreenSaver(enabled bool) error {
+	q.writtenScreenSaver = append(q.writtenScreenSaver, enabled)
+	q.screenSaver = enabled
+	return nil
+}
+
+func (q *fakeQuickAccess) ScreenSaverTimeout() (int, error) {
+	return q.screenSaverTimeout, nil
+}
+
+func (q *fakeQuickAccess) SetScreenSaverTimeout(seconds int) error {
+	q.writtenTimeout = append(q.writtenTimeout, seconds)
+	q.screenSaverTimeout = seconds
 	return nil
 }
 
@@ -153,7 +237,7 @@ func TestTheSettingsOfTheServiceWithoutTheService(t *testing.T) {
 	// machine, the program has to say that it cannot answer. The session
 	// is pointed at a port that nothing listens on.
 	application := NewWithStore(mustStore(t))
-	application.quickOptions = quickaccess.Options{Address: "127.0.0.1:1"}
+	application.SetQuickAccessOptions(quickaccess.Options{Address: "127.0.0.1:1"})
 
 	if _, err := application.BlueLightShield(); err == nil {
 		t.Error("the level was read although the service is not there")

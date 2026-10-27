@@ -140,7 +140,8 @@ func TestTheSettingsPath(t *testing.T) {
 func TestTheLightingOfTheStoredSettings(t *testing.T) {
 	// The firmware reports the brightness only, the effect and the
 	// colours come from the settings of Viper.
-	application := newTestApp(t)
+	application, machine := newTestAppWith(t)
+	machine.brightness = 65
 	application.store.Update(func(s *config.Settings) {
 		s.Lighting.Effect = uint64(hardware.EffectWave)
 		s.Lighting.Speed = 6

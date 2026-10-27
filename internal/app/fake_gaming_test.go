@@ -38,6 +38,8 @@ type fakeGaming struct {
 	overclockCPU bool
 	// lighting is the lighting configuration of the machine.
 	lighting hardware.RGBConfig
+	// brightnessError is the failure of the brightness of the keyboard.
+	brightnessError error
 
 	// closed reports whether the connection was released.
 	closed bool
@@ -92,7 +94,12 @@ func (g *fakeGaming) SetGPUMode(mode hardware.GPUMode) error {
 	return nil
 }
 
-func (g *fakeGaming) LightingBrightness() (uint64, error) { return g.brightness, nil }
+func (g *fakeGaming) LightingBrightness() (uint64, error) {
+	if g.brightnessError != nil {
+		return 0, g.brightnessError
+	}
+	return g.brightness, nil
+}
 
 func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) { return g.lighting, nil }
 
@@ -120,6 +127,17 @@ func (g *fakeGaming) ResetLighting() error {
 }
 
 func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.backlight, nil }
+
+// BacklightBuffer reads the raw buffer of the keyboard backlight.
+//
+// The buffer is sixteen bytes long, the level sits in byte two and in byte
+// five.
+func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
+	buffer := make([]byte, 16)
+	buffer[2] = byte(g.brightness)
+	buffer[5] = byte(g.brightness)
+	return buffer, nil
+}
 
 func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	g.writtenBacklight = append(g.writtenBacklight, brightness)

@@ -7,8 +7,8 @@ import (
 
 func TestDefaultSettings(t *testing.T) {
 	settings := Default()
-	if settings.PowerMode != 1 {
-		t.Errorf("the power mode is %d, want 1", settings.PowerMode)
+	if settings.PowerMode != PowerBalanced {
+		t.Errorf("the power mode is %d, want %d", settings.PowerMode, PowerBalanced)
 	}
 	if settings.Lighting.Brightness > 100 {
 		t.Errorf("the brightness is %d, want at most 100", settings.Lighting.Brightness)
@@ -16,13 +16,29 @@ func TestDefaultSettings(t *testing.T) {
 	if !settings.BacklightTimeout {
 		t.Error("the backlight timeout is switched off by default")
 	}
-	if settings.Fans.CPUMode != 0 || settings.Fans.GPUMode != 0 {
-		t.Errorf("the fans start in the mode %d and %d, want 0 and 0, which is the automatic mode",
-			settings.Fans.CPUMode, settings.Fans.GPUMode)
+	if settings.Fans.CPUMode != FanAuto || settings.Fans.GPUMode != FanAuto {
+		t.Errorf("the fans start in the mode %d and %d, want %d and %d, which is the automatic mode",
+			settings.Fans.CPUMode, settings.Fans.GPUMode, FanAuto, FanAuto)
 	}
 	if settings.Fans.CPUPercent != 0 || settings.Fans.GPUPercent != 0 {
 		t.Errorf("the fans start at %d and %d percent, want zero",
 			settings.Fans.CPUPercent, settings.Fans.GPUPercent)
+	}
+}
+
+func TestTheDefaultSettingsCarryTheEnumeration(t *testing.T) {
+	// The settings carry the semantic enumeration of the hardware layer,
+	// never the codes that the firmware expects. The codes of the
+	// firmware are 0, 1, 4 and 5 for the profiles and 1, 2 and 3 for the
+	// fan behaviours.
+	settings := Default()
+	if settings.PowerMode == 4 || settings.PowerMode == 5 {
+		t.Errorf("the power mode is %d, want a value of the enumeration and not a code of the firmware",
+			settings.PowerMode)
+	}
+	if settings.Fans.CPUMode == 1 || settings.Fans.CPUMode == 2 || settings.Fans.CPUMode == 3 {
+		t.Errorf("the mode of the CPU fan is %d, want a value of the enumeration and not a code of the firmware",
+			settings.Fans.CPUMode)
 	}
 }
 
@@ -34,8 +50,8 @@ func TestSettingsRoundTrip(t *testing.T) {
 	settings.Lighting.PerZone = true
 	settings.Lighting.Zones[0] = LightingColor{R: 199, G: 0, B: 135}
 	settings.Lighting.Zones[1] = LightingColor{R: 0, G: 174, B: 199}
-	settings.PowerMode = 4
-	settings.Fans.CPUMode = 3
+	settings.PowerMode = PowerPerformance
+	settings.Fans.CPUMode = FanCustom
 	settings.Fans.CPUPercent = 60
 	settings.Fans.CoolBoost = true
 	settings.BacklightTimeout = false
@@ -62,10 +78,10 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if restored.Lighting.Zones[1] != (LightingColor{R: 0, G: 174, B: 199}) {
 		t.Errorf("the second zone is %+v, want the cyan", restored.Lighting.Zones[1])
 	}
-	if restored.PowerMode != 4 {
-		t.Errorf("the power mode is %d, want 4", restored.PowerMode)
+	if restored.PowerMode != PowerPerformance {
+		t.Errorf("the power mode is %d, want %d", restored.PowerMode, PowerPerformance)
 	}
-	if restored.Fans.CPUMode != 3 || restored.Fans.CPUPercent != 60 || !restored.Fans.CoolBoost {
+	if restored.Fans.CPUMode != FanCustom || restored.Fans.CPUPercent != 60 || !restored.Fans.CoolBoost {
 		t.Errorf("the fans are %+v, want the custom mode at 60 percent with the boost", restored.Fans)
 	}
 	if restored.BacklightTimeout {
