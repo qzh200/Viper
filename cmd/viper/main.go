@@ -47,6 +47,16 @@ func run(args []string) error {
 		return runBluelight(args[1:])
 	case "charge", "battery":
 		return runCharge(args[1:])
+	case "displaymode", "display":
+		return runDisplayMode(args[1:])
+	case "darkmode":
+		return runDarkMode(args[1:])
+	case "transparent":
+		return runTransparent(args[1:])
+	case "taskbar":
+		return runTaskbar(args[1:])
+	case "screensaver", "saver":
+		return runScreenSaver(args[1:])
 	case "bootsound", "sound":
 		return runBootSound(args[1:])
 	case "scenario", "scenes":
@@ -86,7 +96,7 @@ Usage:
   viper fan custom <cpu%> <gpu%>    run the fans at a fixed duty cycle
   viper fan coolboost <on|off>      toggle the boost fan table
   viper power                       show the performance profile
-  viper power <mode>                set quiet|balanced|performance|turbo
+  viper power <mode>                set quiet|balanced|performance|turbo|eco
   viper lighting                    show the keyboard lighting
   viper lighting reset              restore the default lighting
   viper lighting set [options]      configure the keyboard lighting
@@ -102,9 +112,24 @@ Usage:
   viper charge                      show the charging settings
   viper charge limit <percent>      set the charging limit, 10, 20 or 30
   viper charge usb <on|off>         allow or forbid charging over USB
+  viper displaymode                  show the way the machine drives the graphics
+  viper displaymode <mode>           set hybrid|discrete|auto
+  viper darkmode                     show the dark mode of the system
+  viper darkmode <on|off>            switch the dark mode on or off
+  viper transparent                  show the transparency of the windows
+  viper transparent <on|off>         switch the transparency on or off
+  viper taskbar                      show the automatic hiding of the taskbar
+  viper taskbar <on|off>             hide the taskbar on its own
+  viper screensaver                  show the screen saver
+  viper screensaver <on|off>         switch the screen saver on or off
+  viper screensaver timeout <n>      set the idle seconds before it starts
   viper bootsound                   show the sound at the start
   viper bootsound <on|off>          switch the sound at the start
   viper diag                        report the hardware capabilities
+
+The display mode, the dark mode, the transparency, the taskbar and the
+screen saver belong to the Quick Access service of the original software,
+so the command needs that service to be running.
 
 Lighting options:
   effect <name>      static|breathing|neon|wave|switch|scale|meteor|flash
@@ -364,7 +389,7 @@ func runFan(args []string) error {
 			return err
 		}
 		fmt.Println("  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
-		fmt.Println("  GPU fan    :", describeFan(state.GPUMode, state.GPUPercent))
+		fmt.Println("  GPU fan    :", describeGPUFan(state))
 		fmt.Println("  CoolBoost :", onOff(state.CoolBoost))
 		return nil
 	}
@@ -422,7 +447,7 @@ func applyFan(application *app.App, config hardware.FanConfig) error {
 		return err
 	}
 	fmt.Println("  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
-	fmt.Println("  GPU fan    :", describeFan(state.GPUMode, state.GPUPercent))
+	fmt.Println("  GPU fan    :", describeGPUFan(state))
 	return nil
 }
 
@@ -433,6 +458,22 @@ func describeFan(mode hardware.FanMode, percent int) string {
 		return fmt.Sprintf("%s (%d%%)", mode, percent)
 	}
 	return mode.String()
+}
+
+// describeGPUFan renders the mode of the group of the graphics fan.
+//
+// The firmware reports the group of the processor only, so the number of
+// the graphics fan is the one Viper wrote last. The flag of the state
+// tells the caller that this is not a reading, the line says so as well.
+//
+// 固件只报告处理器这一组，显卡这一组读不回来，所以这里显示的是 Viper
+// 最后一次写入的值，标记为不是从固件读来的。
+func describeGPUFan(state app.FanStatus) string {
+	text := describeFan(state.GPUMode, state.GPUPercent)
+	if !state.GPUModeReadable {
+		text += " (not readable from the firmware, this is the last value Viper wrote)"
+	}
+	return text
 }
 
 // runPower shows or changes the performance profile.
@@ -502,23 +543,7 @@ func runLighting(args []string) error {
 	}
 
 	if len(args) == 0 || args[0] != "set" {
-		config, err := application.Lighting()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("  brightness  : %d\n", config.Brightness)
-		fmt.Printf("  effect      : %s\n", config.Effect)
-		fmt.Printf("  speed       : %d\n", config.Speed)
-		fmt.Printf("  direction   : %d\n", config.Direction)
-		for i, zone := range config.Zones {
-			fmt.Printf("  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
-		}
-		timeout, err := application.BacklightTimeout()
-		if err == nil {
-			fmt.Println("  timeout     :", onOff(timeout))
-		}
-		fmt.Println("  settings    :", application.SettingsPath())
-		return nil
+		return showLighting(application)
 	}
 
 	options, err := parseLightingOptions(args[1:])
@@ -529,6 +554,39 @@ func runLighting(args []string) error {
 		return err
 	}
 	fmt.Println("lighting applied")
+	return nil
+}
+
+// showLighting prints the keyboard lighting of the machine.
+//
+// The firmware reports the brightness only, the effect and the colours
+// live in the settings of Viper. When the firmware cannot be reached the
+// brightness is reported as unknown and the rest is still shown, because a
+// machine whose firmware is quiet still has a lighting.
+//
+// 固件只报告亮度，灯效和颜色存在 Viper 自己的设置里。固件读不到的时候
+// 亮度显示为未知，其余的部分照常显示。
+func showLighting(application *app.App) error {
+	config, err := application.Lighting()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "viper:", err)
+		fmt.Println("  brightness  : unknown")
+		config = application.StoredLighting()
+	} else {
+		fmt.Printf("  brightness  : %d\n", config.Brightness)
+	}
+	fmt.Printf("  effect      : %s\n", config.Effect)
+	fmt.Printf("  speed       : %d\n", config.Speed)
+	fmt.Printf("  direction   : %d\n", config.Direction)
+	for i, zone := range config.Zones {
+		fmt.Printf("  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
+	}
+	timeout, err := application.BacklightTimeout()
+	if err == nil {
+		fmt.Println("  timeout     :", onOff(timeout))
+	}
+	fmt.Println("  note        : the firmware reports the brightness only, the effect and the colours come from Viper's own settings")
+	fmt.Println("  settings    :", application.SettingsPath())
 	return nil
 }
 
