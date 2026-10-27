@@ -93,6 +93,10 @@ var (
 	SWbemErrorInvalidQuery = hresult(0x80041017)
 	// SWbemErrorMethodNotFound is WBEM_E_METHOD_NOT_FOUND.
 	SWbemErrorMethodNotFound = hresult(0x8004101A)
+	// SRPCEChangedMode is RPC_E_CHANGED_MODE.
+	//
+	// 线程已经用另一种公寓方式启动了 COM，公寓的种类不能再改。
+	SRPCEChangedMode = hresult(0x80010106)
 )
 
 // Well-known COM identifiers required to reach the WMI repository.
@@ -137,6 +141,19 @@ var (
 // ptrSize is the native pointer width of the running process.
 var ptrSize = unsafe.Sizeof(uintptr(0))
 
+// pointerOf turns an address that the runtime of COM handed over as an
+// integer into an unsafe pointer.
+//
+// 接口、字符串和数组的地址都在 Go 的堆之外，垃圾回收器没有什么要保活的，
+// 地址只是被读出来。转换经过变量本身的存储，因此地址只在一处被读取，不会
+// 从别处算出来的数字重新拼出来。
+func pointerOf(addr uintptr) unsafe.Pointer {
+	if addr == 0 {
+		return nil
+	}
+	return *(*unsafe.Pointer)(unsafe.Pointer(&addr))
+}
+
 // COM apartment initialisation flags.
 const (
 	// ApartmentMultiThreaded selects a multi-threaded apartment.
@@ -168,45 +185,72 @@ const (
 )
 
 // COMObject is a raw pointer to a COM interface. The zero value is invalid.
+//
+// 地址存成整数，是因为这个类型是对外的，仓库里的工具用裸指针拼出对象。
+// 接口本身在 Go 的堆之外，垃圾回收器没有东西要保活，地址只是被读出来。
 type COMObject uintptr
 
 // IsNil reports whether the object pointer is unset.
 func (o COMObject) IsNil() bool { return o == 0 }
 
+// pointer returns the address of the object as an unsafe pointer.
+//
+// 地址从变量自己的存储里读出来，转换只在这一处发生，指针不会从别处算出来
+// 的数字重新拼出来。
+func (o COMObject) pointer() unsafe.Pointer {
+	return pointerOf(uintptr(o))
+}
+
+// NewCOMObject wraps the address of an interface as a COM object.
+//
+// 地址通常是由 COM 的运行时通过输出参数交出来的，所以在到达这里之前一直
+// 以 unsafe.Pointer 的形式保存。
+func NewCOMObject(ptr unsafe.Pointer) COMObject {
+	if ptr == nil {
+		return 0
+	}
+	return COMObject(uintptr(ptr))
+}
+
 // Valid reports whether the pointer looks like a live COM object.
 //
-// It is a cheap sanity check against out-parameters that a mis-shaped call
-// may have filled with garbage. The vtable pointer has to be a plausible
-// code address, not just a non-zero value.
+// 它是对输出参数的廉价检查：形状不对的调用可能往里面塞了垃圾。虚表指针
+// 得像一个代码地址，而不只是非零。
 func (o COMObject) Valid() bool {
-	if o == 0 {
+	p := o.pointer()
+	if p == nil {
 		return false
 	}
-	vtbl := *(*uintptr)(unsafe.Pointer(o))
-	return vtbl != 0 && vtbl < 0x00007FFFFFFFFFFF
+	vtbl := *(*unsafe.Pointer)(p)
+	if vtbl == nil {
+		return false
+	}
+	addr := uintptr(vtbl)
+	return addr != 0 && addr < 0x00007FFFFFFFFFFF
 }
 
 // vtblSlot resolves the address of the method at the given vtable index.
 //
-// A COM object is a pointer to a structure whose first member is the
-// vtable pointer, so the vtable lives at *obj and slot N lives at
-// vtable + N*ptrSize.
+// COM 对象是一个指针，它的第一项是虚表指针，所以虚表在 *obj，槽位 N 在
+// vtable + N*ptrSize。
 func (o COMObject) vtblSlot(slot int) uintptr {
-	if o == 0 {
+	p := o.pointer()
+	if p == nil {
 		return 0
 	}
-	vtbl := *(*uintptr)(unsafe.Pointer(o))
-	if vtbl == 0 {
+	vtbl := *(*unsafe.Pointer)(p)
+	if vtbl == nil {
 		return 0
 	}
-	return *(*uintptr)(unsafe.Pointer(vtbl + uintptr(slot)*ptrSize))
+	entry := (*unsafe.Pointer)(unsafe.Add(vtbl, uintptr(slot)*ptrSize))
+	return uintptr(*entry)
 }
 
 // Call dispatches to the method at the given vtable index.
 func (o COMObject) Call(slot int, args ...uintptr) (uintptr, error) {
 	fn := o.vtblSlot(slot)
 	if fn == 0 {
-		return 0, fmt.Errorf("com: vtable slot %d is nil", slot)
+		return 0, fmt.Errorf("com: 虚表槽位 %d 是空的", slot)
 	}
 	callArgs := make([]uintptr, 0, len(args)+1)
 	callArgs = append(callArgs, uintptr(o))
@@ -269,36 +313,61 @@ func FormatHRESULT(hr uint32) string {
 
 // InitCOM initialises the COM runtime for the current thread.
 //
-// The caller must invoke CoUninitialize exactly once for each successful
-// InitCOM on the same thread. Apartment choice matters: WMI's IWbemLocator
-// is apartment-threaded, so a single-threaded apartment is the safe
-// default. A multi-threaded apartment is also available for callers that
-// need it.
+// 调用者必须在同一个线程上，为每一次成功的 InitCOM 调用一次 UninitCOM。
+// 这里用的是多线程公寓：WMI 的对象会被不止一个 goroutine 使用，多线程公寓
+// 不会把一次调用绑在发起它的线程上。需要单线程公寓的调用者可以用
+// InitCOMApartment。
+//
+// 线程上已经有公寓不算错误，那个公寓照用不误。要释放公寓的调用者应该用
+// InitCOMOwned，它会说明这个公寓是不是这次调用开出来的。
 func InitCOM() error {
+	_, err := initCOM(coinitMultithreaded)
+	return err
+}
+
+// InitCOMOwned initialises the COM runtime of the current thread and
+// reports whether this call started the apartment.
+//
+// CoUninitialize 必须为这次调用开出来的每一个公寓调用一次，而为本来就
+// 已经在跑的公寓不调用，所以这个答案决定了之后要不要释放。
+func InitCOMOwned() (bool, error) {
 	return initCOM(coinitMultithreaded)
 }
 
 // InitCOMApartment initialises COM in the requested apartment.
 func InitCOMApartment(apartment uint32) error {
-	return initCOM(apartment)
+	_, err := initCOM(apartment)
+	return err
 }
 
-func initCOM(apartment uint32) error {
+// initCOM starts the COM runtime of the calling thread.
+//
+// 第一个答案说明这个公寓是不是这次调用开出来的。CoInitializeEx 的两个回答
+// 都不是错误：
+//
+//   - S_FALSE（1）表示线程上已经有同一种公寓。那个公寓照用不误，它不属于
+//     调用者。
+//   - RPC_E_CHANGED_MODE 表示线程上已经有另一种公寓。公寓的种类不能再改，
+//     但它还能用，所以这个调用被接受下来，程序继续往下走。
+func initCOM(apartment uint32) (bool, error) {
 	hr, _, _ := procCoInitializeEx.Call(0, uintptr(apartment), 0)
 	h := HRESULT(hr)
-	// S_FALSE (1) means the apartment was already initialized, which is fine.
-	if h.Failed() && h != 1 {
-		return fmt.Errorf("com: CoInitializeEx failed: %w", h)
+	switch h {
+	case hresult(1): // S_FALSE
+		return false, nil
+	case SRPCEChangedMode:
+		return false, nil
 	}
-	return nil
+	if h.Failed() {
+		return false, fmt.Errorf("com: CoInitializeEx 失败: %w", h)
+	}
+	return true, nil
 }
 
 // UninitCOM tears down the COM apartment for the current thread.
 func UninitCOM() {
 	procCoUninitialize.Call()
 }
-
-// CoCreateInstance instantiates a COM class.
 
 // InitCOMSecurity establishes the process-wide COM security settings.
 //
@@ -325,11 +394,12 @@ func InitCOMSecurity() error {
 	// builds: the security of the process is already in place and cannot
 	// be changed a second time.
 	if h.Failed() && h != hresult(0x80010119) && h != hresult(0x800401F0) {
-		return fmt.Errorf("com: CoInitializeSecurity failed: %w", h)
+		return fmt.Errorf("com: CoInitializeSecurity 失败: %w", h)
 	}
 	return nil
 }
 
+// CoCreateInstance instantiates a COM class.
 func CoCreateInstance(clsid, iid GUID, ctx uint32) (COMObject, error) {
 	var obj uintptr
 	hr, _, _ := procCoCreateInstance.Call(
@@ -341,7 +411,7 @@ func CoCreateInstance(clsid, iid GUID, ctx uint32) (COMObject, error) {
 	)
 	h := HRESULT(hr)
 	if h.Failed() {
-		return 0, fmt.Errorf("com: CoCreateInstance(%s) failed: %w", clsid, h)
+		return 0, fmt.Errorf("com: CoCreateInstance(%s) 失败: %w", clsid, h)
 	}
 	return COMObject(obj), nil
 }
@@ -369,17 +439,24 @@ type BSTR uintptr
 // IsNil reports whether the BSTR is unset.
 func (b BSTR) IsNil() bool { return b == 0 }
 
+// pointer returns the address of the string as an unsafe pointer.
+//
+// 地址从变量自己的存储里读出来，和接口的地址一个做法。字符串在 COM 运行
+// 时的堆里，不在 Go 的堆里。
+func (b BSTR) pointer() unsafe.Pointer {
+	return pointerOf(uintptr(b))
+}
+
 // String converts the BSTR to a Go string and releases it.
 func (b BSTR) String() string {
-	if b == 0 {
+	p := b.pointer()
+	if p == nil {
 		return ""
 	}
-	// A BSTR points at the first UTF-16 code unit; the length prefix sits
-	// immediately before it. Reading the length keeps us from walking the
-	// terminator, which is all we need for the null-terminated strings we
-	// allocate ourselves.
-	n := int(*(*uint32)(unsafe.Pointer(uintptr(b) - 4)))
-	buf := unsafe.Slice((*uint16)(unsafe.Pointer(uintptr(b))), n)
+	// BSTR 指向第一个 UTF-16 码元，长度前缀就紧挨在它前面。读出长度就
+	// 不用去数结尾的零，我们自己分配的字符串本来就是以零结尾的。
+	n := int(*(*uint32)(unsafe.Add(p, -4)))
+	buf := unsafe.Slice((*uint16)(p), n)
 	return windows.UTF16ToString(buf)
 }
 
@@ -401,7 +478,7 @@ func NewBSTR(s string) (BSTR, error) {
 	}
 	r, _, _ := procSysAllocString.Call(uintptr(unsafe.Pointer(p)))
 	if r == 0 {
-		return 0, fmt.Errorf("com: SysAllocString failed for %d characters", len(s))
+		return 0, fmt.Errorf("com: SysAllocString 失败，字符串有 %d 个字符", len(s))
 	}
 	return BSTR(r), nil
 }
@@ -428,4 +505,4 @@ func variantChangeType(dst *VARIANT, src *VARIANT, vt uint16) HRESULT {
 }
 
 // errNoWMI is returned when a WMI class or method cannot be found.
-var errNoWMI = errors.New("com: WMI object not found")
+var errNoWMI = errors.New("com: 找不到 WMI 对象")

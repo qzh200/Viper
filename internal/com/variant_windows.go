@@ -38,7 +38,7 @@ const (
 
 // VARIANT is the standard COM automation union.
 //
-// Layout on both x86 and x64 is 16 bytes: a 2-byte type tag, three
+// The layout on both x86 and x64 is 16 bytes: a 2-byte type tag, three
 // reserved WORDs, then an 8-byte union. We model the union as a uint64 so
 // the struct size never depends on the pointer width.
 type VARIANT struct {
@@ -124,7 +124,7 @@ func NewVariantUI1Array(data []byte) (VARIANT, error) {
 // Acer BIOS MOFs use for numeric output.
 func (v *VARIANT) AsUInt64() (uint64, error) {
 	if v == nil {
-		return 0, fmt.Errorf("com: nil variant")
+		return 0, fmt.Errorf("com: 空的 variant")
 	}
 
 	switch v.vt {
@@ -153,8 +153,8 @@ func (v *VARIANT) AsUInt64() (uint64, error) {
 		return parseBSTRToUint64(BSTR(uintptr(v.data)))
 	}
 
-	// Fall back to a coercion through oleaut32, which handles the exotic
-	// cases (for example a VT_ARRAY of UI1).
+	// 落到 oleaut32 的强制转换上，那些少见的类型（比如 UI1 的数组）由它
+	// 处理。
 	dst := VARIANT{}
 	if hr := variantChangeType(&dst, v, VTUI8); hr.Succeeded() {
 		out := dst.data
@@ -162,16 +162,16 @@ func (v *VARIANT) AsUInt64() (uint64, error) {
 		return out, nil
 	}
 	dst.Clear()
-	return 0, fmt.Errorf("com: cannot convert variant of type 0x%04X to uint64", v.vt)
+	return 0, fmt.Errorf("com: 不能把类型 0x%04X 的 variant 转成 uint64", v.vt)
 }
 
 // AsBytes extracts the bytes of a VT_ARRAY|VT_UI1 variant.
 func (v *VARIANT) AsBytes() ([]byte, error) {
 	if v == nil {
-		return nil, fmt.Errorf("com: nil variant")
+		return nil, fmt.Errorf("com: 空的 variant")
 	}
 	if v.vt&VTArray == 0 || v.vt&0xFF != VTUI1 {
-		return nil, fmt.Errorf("com: variant is not a byte array (type 0x%04X)", v.vt)
+		return nil, fmt.Errorf("com: 这个 variant 不是字节数组（类型 0x%04X）", v.vt)
 	}
 	return SafeArrayBytes(uintptr(v.data))
 }
@@ -179,10 +179,10 @@ func (v *VARIANT) AsBytes() ([]byte, error) {
 // AsString extracts a string from a VT_BSTR variant.
 func (v *VARIANT) AsString() (string, error) {
 	if v == nil {
-		return "", fmt.Errorf("com: nil variant")
+		return "", fmt.Errorf("com: 空的 variant")
 	}
 	if v.vt != VTBSTR {
-		return "", fmt.Errorf("com: variant is not a BSTR (type 0x%04X)", v.vt)
+		return "", fmt.Errorf("com: 这个 variant 不是 BSTR（类型 0x%04X）", v.vt)
 	}
 	return BSTR(uintptr(v.data)).String(), nil
 }
@@ -193,7 +193,7 @@ func (v *VARIANT) AsString() (string, error) {
 // both decimal and 0x-prefixed hexadecimal.
 func parseBSTRToUint64(b BSTR) (uint64, error) {
 	if b.IsNil() {
-		return 0, fmt.Errorf("com: null BSTR")
+		return 0, fmt.Errorf("com: 空的 BSTR")
 	}
 	s := trimSpace(b.String())
 	if s == "" {
@@ -211,7 +211,7 @@ func parseBSTRToUint64(b BSTR) (uint64, error) {
 			case c >= 'A' && c <= 'F':
 				d = uint64(c-'A') + 10
 			default:
-				return 0, fmt.Errorf("com: invalid hex BSTR %q", s)
+				return 0, fmt.Errorf("com: 不是十六进制的 BSTR %q", s)
 			}
 			out = out*16 + d
 		}
@@ -220,7 +220,7 @@ func parseBSTRToUint64(b BSTR) (uint64, error) {
 	var out uint64
 	for _, c := range s {
 		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("com: invalid numeric BSTR %q", s)
+			return 0, fmt.Errorf("com: 不是数字的 BSTR %q", s)
 		}
 		out = out*10 + uint64(c-'0')
 	}
