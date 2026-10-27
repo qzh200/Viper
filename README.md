@@ -32,10 +32,13 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | 杂项设置 | `0x02` 图形显示模式、`0x06` 开机音效可读写；`0x01` 与 `0x08` 写入后没有任何可见效果 |
 | 性能档案 | `GetGamingProfile` 与 `GetGamingProfileSetting` 能读，但语义还没解开（返回的是 1 和 2 这样的标志） |
 | 动作类热键 | 只有 **132**（键盘背光）和 **7**（CoolBoost）有反应。Windows 菜单键在 HID 层，不在 WMI 面上 |
-| 超频 | `Set/GetCPUOverclockingProfile` 未用，结构体格式还没逆出来 |
+| 超频 | `Set/GetCPUOverclockingProfile` 未用，结构体格式还没逆出来。固件的杂项表里只有 CPU 的能力位（`0x0A`），显卡与显存的超频能力**固件根本不报告** |
+| 显卡 / 显存超频 | 原厂应用有 **6 档显卡核心 + 6 档显存**的超频，但它走的不是 WMI，而是 `AcerAgentService` 的 `SOFTWARE\OEM\AcerAgentService\Overclock` 配置项。Viper 不走这一层，因此**完全不支持** |
+| Turbo Key | 原厂硬件服务用 `SetGamingLEDBehaviorFunction` 做 Turbo Key 开关（LED 与按键一起开关），Viper 没有封装 |
 
 剩下的缺口都不在 WMI 上，而是**别的层**：显卡遥测（使用率、频率）
-要 NVAPI，Windows 菜单键要 HID 特性报告，启动标志要写 EFI 分区。
+要 NVAPI，Windows 菜单键要 HID 特性报告，启动标志要写 EFI 分区，
+显卡与显存的超频要走原厂代理服务的配置项。
 
 ## 场景分区设置
 
