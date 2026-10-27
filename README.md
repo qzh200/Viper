@@ -220,8 +220,8 @@ go test ./internal/machine/... ./internal/agentservice/... -cover
 
 用例锁的是**实测得来的结论**，不是实现的复述：风扇的三个模式、灯光效果名
 与颜色的往返、性能档位的五个编码、图形显示模式的编号、杂项设置的标识符、
-颜色字与背光缓冲区的字节布局、SMBIOS 的解析、Quick Access 的加密——最后这
-一条用的是原厂服务握手时返回的真实密文，改动加密实现会立刻让用例失败。
+SMBIOS 的解析、Quick Access 的加密——最后这一条用的是原厂服务握手时返回的
+真实密文，改动加密实现会立刻让用例失败。
 
 覆盖率：`internal/machine` 84.6%、`internal/agentservice` 93.4%、
 `internal/app` 83.5%、`internal/hardware` 84.0%。
