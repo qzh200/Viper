@@ -11,18 +11,19 @@ import (
 // The provider packs the profile into the second byte of the setting, so
 // the full byte has to be read: six and seven are the two performance
 // profiles and a narrow mask would collapse them.
+//
+// 设置的最低字节是状态，只有状态为零时里面的值才是有效的。以前这里不看
+// 状态，读取失败时错误码 0x0002 会被解成 (2>>8)=0，也就是"静音模式"，
+// 而且还不报错。
 func (b *Backend) PowerMode() (PowerMode, error) {
-	outputs, err := b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(uint32(MiscOperationMode)),
-	})
+	value, ok, err := b.miscValue(MiscOperationMode)
 	if err != nil {
 		return PowerBalanced, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
-	if err != nil {
-		return PowerBalanced, err
+	if !ok {
+		return PowerBalanced, fmt.Errorf("hardware: 固件不认识性能档位这个设置，状态字节不是零")
 	}
-	return decodePowerMode((raw >> 8) & 0xFF), nil
+	return decodePowerMode(value), nil
 }
 
 // SetPowerMode applies a performance profile.
@@ -49,51 +50,39 @@ func (b *Backend) SetPowerMode(mode PowerMode) error {
 
 // DiscreteGPU reports the state of the discrete GPU switch.
 //
-// The provider encodes the state in the high byte of the setting.
+// The provider encodes the state in the high byte of the setting, the low
+// byte is the status of the setting and has to be zero.
+//
+// 状态字节也一起检查：读取失败时错误码不能被当成"独显已连接"。
 func (b *Backend) DiscreteGPU() (bool, error) {
-	outputs, err := b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(uint32(MiscDiscreteGPU)),
-	})
+	value, ok, err := b.miscValue(MiscDiscreteGPU)
 	if err != nil {
 		return false, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
-	if err != nil {
-		return false, err
+	if !ok {
+		return false, fmt.Errorf("hardware: 固件不认识独显状态这个设置，状态字节不是零")
 	}
-	return (raw & 0xFF00) == 0x0300, nil
+	return value == 3, nil
 }
 
 // OverclockCapability reports which overclocking features the machine
 // supports.
 //
-// The provider answers with a non zero value when the feature is present.
+// 杂项设置表里只有 CPU 的超频能力（0x0A），固件没有给出显卡的超频能力，
+// 所以显卡那一项只能报成不支持。
+//
+// 以前这里读的是独显状态（0x09），那是"这台机器上有没有独显"，和"显卡
+// 能不能超频"是两回事：只要机器上有独显，就恒报支持显卡超频。
 func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
-	outputs, err := b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(uint32(MiscCPUOverclock)),
-	})
+	value, ok, err := b.miscValue(MiscCPUOverclock)
 	if err != nil {
 		return false, false, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
-	if err != nil {
-		return false, false, err
+	if !ok {
+		// 固件不认识这个设置，那就不能说这台机器能超频。
+		return false, false, nil
 	}
-	cpuValue := (raw >> 8) & 0xFF
-	cpu = raw&0xFF == 0 && cpuValue > 0 && cpuValue != 0xFF
-
-	outputs, err = b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(uint32(MiscDiscreteGPU)),
-	})
-	if err != nil {
-		return false, cpu, err
-	}
-	raw, err = decodeUint(outputs["gmOutput"])
-	if err != nil {
-		return false, cpu, err
-	}
-	gpuValue := (raw >> 8) & 0xFF
-	gpu = raw&0xFF == 0 && gpuValue > 0 && gpuValue != 0xFF
-
-	return gpu, cpu, nil
+	// 固件用 0xFF 表示"不知道"。
+	cpu = value > 0 && value != 0xFF
+	return false, cpu, nil
 }

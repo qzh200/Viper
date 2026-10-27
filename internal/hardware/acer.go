@@ -133,31 +133,31 @@ func (b *Backend) callAction(method string, args map[string]wmi.Value) (map[stri
 func (b *Backend) Sensors() (Sensors, error) {
 	var out Sensors
 
-	cpuTemp, err := b.sysInfo(sysInfoCPUTemp)
+	cpuTemp, err := b.sysInfo(sysInfoCPUTemp, false)
 	if err != nil {
 		return out, err
 	}
 	out.CPUTempC = cpuTemp
 
-	cpuFan, err := b.sysInfo(sysInfoCPUFanRPM)
+	cpuFan, err := b.sysInfo(sysInfoCPUFanRPM, true)
 	if err != nil {
 		return out, err
 	}
 	out.CPUFanRPM = cpuFan
 
-	sysTemp, err := b.sysInfo(sysInfoSystemTemp)
+	sysTemp, err := b.sysInfo(sysInfoSystemTemp, false)
 	if err != nil {
 		return out, err
 	}
 	out.SystemTempC = sysTemp
 
-	gpuFan, err := b.sysInfo(sysInfoGPUFanRPM)
+	gpuFan, err := b.sysInfo(sysInfoGPUFanRPM, true)
 	if err != nil {
 		return out, err
 	}
 	out.GPUFanRPM = gpuFan
 
-	gpuTemp, err := b.sysInfo(sysInfoGPUTemp)
+	gpuTemp, err := b.sysInfo(sysInfoGPUTemp, false)
 	if err != nil {
 		return out, err
 	}
@@ -168,9 +168,14 @@ func (b *Backend) Sensors() (Sensors, error) {
 
 // sysInfo reads one value through GetGamingSysInfo.
 //
-// The provider packs the reading into the upper bits of the result, the
-// low byte carrying the status.
-func (b *Backend) sysInfo(query uint32) (int, error) {
+// The provider answers with a status in the lowest byte and the reading
+// above it. The status has to be zero, otherwise the answer does not
+// describe a reading at all.
+//
+// 转速用整个十六位，温度只用低八位。以前这里靠"高位是不是零"来分辨转速和
+// 温度：零度和零转速会落到另一个分支，把状态字节当成读数报出去，而且不看
+// 状态字节，错误码 0x0002 会被报成两度或者两转。
+func (b *Backend) sysInfo(query uint32, wide bool) (int, error) {
 	outputs, err := b.callGaming("GetGamingSysInfo", map[string]wmi.Value{
 		"gmInput": wmi.Uint32(query),
 	})
@@ -179,18 +184,20 @@ func (b *Backend) sysInfo(query uint32) (int, error) {
 	}
 	value, ok := outputs["gmOutput"]
 	if !ok {
-		return 0, fmt.Errorf("hardware: GetGamingSysInfo returned no gmOutput")
+		return 0, fmt.Errorf("hardware: GetGamingSysInfo 没有返回 gmOutput")
 	}
 
 	raw, err := decodeUint(value)
 	if err != nil {
 		return 0, err
 	}
-	if raw>>8 != 0 {
-		// Fan speeds use the full 16 bit field, temperatures the low byte.
+	if status := raw & 0xFF; status != 0 {
+		return 0, fmt.Errorf("hardware: 固件没有回答分类 0x%02X，状态字节是 %d", query>>8, status)
+	}
+	if wide {
 		return int((raw >> 8) & 0xFFFF), nil
 	}
-	return int(raw & 0xFF), nil
+	return int((raw >> 8) & 0xFF), nil
 }
 
 // decodeUint extracts a numeric value from a WMI result.
@@ -215,4 +222,35 @@ func decodeUint(value wmi.Value) (uint64, error) {
 		return n, nil
 	}
 	return value.UInt64(), nil
+}
+
+// decodeBytes extracts a byte array from a WMI result.
+//
+// The provider answers the methods that carry a buffer with an array of
+// bytes, some builds answer with the same bytes as a hexadecimal text.
+func decodeBytes(value wmi.Value) ([]byte, error) {
+	switch value.Kind {
+	case wmi.KindBytes:
+		return value.Bytes, nil
+	case wmi.KindString:
+		text := strings.TrimSpace(value.Str)
+		text = strings.NewReplacer(" ", "", "-", "", ":", "", "\t", "").Replace(text)
+		if text == "" {
+			return nil, nil
+		}
+		if len(text)%2 != 0 {
+			return nil, fmt.Errorf("hardware: %q 的位数不是偶数，不是字节数组", value.Str)
+		}
+		out := make([]byte, 0, len(text)/2)
+		for i := 0; i < len(text); i += 2 {
+			n, err := strconv.ParseUint(text[i:i+2], 16, 8)
+			if err != nil {
+				return nil, fmt.Errorf("hardware: cannot parse %q: %w", value.Str, err)
+			}
+			out = append(out, byte(n))
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("hardware: 答案不是字节数组")
+	}
 }

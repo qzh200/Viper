@@ -41,10 +41,9 @@ func (m FanMode) providerCode() uint64 {
 
 // decodeFanMode maps the provider's behaviour bits back onto a mode.
 //
-// The provider reports the behaviour in the third byte, multiplied by two
-// hundred and fifty six, and uses the same numbering as the value that is
-// written: one is automatic, two is maximum and three is a fixed duty
-// cycle.
+// 固件把行为编码乘以 256 之后放在答案的第二个字节里（也就是位 8 到位 15），
+// 所以读回来时用 (raw>>8)&0x3 取值。编码和写入时用的是同一套编号：
+// 1 是自动，2 是最大转速，3 是固定占空比。
 func decodeFanMode(bits uint64) FanMode {
 	switch bits {
 	case 1:
@@ -73,6 +72,11 @@ const (
 	PowerTurbo
 	// PowerUnknown is a profile the firmware does not describe.
 	PowerUnknown
+	// PowerEco is the profile that saves power.
+	//
+	// 它的编号固定在最后，因为 Viper 的配置文件里保存的就是性能档位的编号，
+	// 已经用过的编号不能再变动。
+	PowerEco PowerMode = 5
 )
 
 // String renders the mode for display.
@@ -86,6 +90,8 @@ func (m PowerMode) String() string {
 		return "performance"
 	case PowerTurbo:
 		return "turbo"
+	case PowerEco:
+		return "eco"
 	default:
 		return "unknown"
 	}
@@ -101,12 +107,14 @@ func (m PowerMode) String() string {
 //	1 -> balanced
 //	4 -> performance
 //	5 -> turbo
-//	6 -> a profile the firmware keeps but that behaves like quiet under
-//	     load, so it is not offered to the user
+//	6 -> eco
 //
 // Writing two or three leaves the previous profile in place, which is why
 // the values look like an ordinary enumeration to anyone who only tries
 // the obvious ones.
+//
+// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
+// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
 func (m PowerMode) providerCode() uint64 {
 	switch m {
 	case PowerQuiet:
@@ -117,6 +125,8 @@ func (m PowerMode) providerCode() uint64 {
 		return 4
 	case PowerTurbo:
 		return 5
+	case PowerEco:
+		return 6
 	default:
 		return 1
 	}
@@ -133,6 +143,8 @@ func decodePowerMode(value uint64) PowerMode {
 		return PowerPerformance
 	case 5:
 		return PowerTurbo
+	case 6:
+		return PowerEco
 	default:
 		return PowerUnknown
 	}
@@ -143,9 +155,9 @@ func decodePowerMode(value uint64) PowerMode {
 // Turbo needs a Predator, the other profiles are available everywhere.
 func AvailablePowerModes(isPredator bool) []PowerMode {
 	if isPredator {
-		return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo}
+		return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
 	}
-	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance}
+	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerEco}
 }
 
 // ParsePowerMode maps a command line word onto a power mode.
@@ -159,6 +171,8 @@ func ParsePowerMode(name string) (PowerMode, bool) {
 		return PowerPerformance, true
 	case "turbo", "extreme":
 		return PowerTurbo, true
+	case "eco", "power_saver", "saver", "energy_saver":
+		return PowerEco, true
 	default:
 		return PowerBalanced, false
 	}
@@ -289,6 +303,9 @@ type MiscSetting uint32
 //
 // Only the settings below the tenth identifier are writable, everything
 // else answers with an undefined error.
+//
+// 编号 0x01 和 0x08 也能写，但写入之后看不到任何变化，它们的含义至今没有
+// 弄清楚，所以这里不封装它们，也不去猜它们代表什么。
 const (
 	// MiscGPUMode selects the graphics switch of the machine.
 	MiscGPUMode MiscSetting = 0x02
@@ -345,4 +362,18 @@ func ParseGPUMode(name string) (GPUMode, bool) {
 	default:
 		return GPUModeHybrid, false
 	}
+}
+
+// clampUint limits a number to the given range.
+//
+// 硬件层用它把上层交过来的数值限制到固件能接受的范围内，这样写进固件的值
+// 和记在配置文件里的值才是同一个值。
+func clampUint(value, low, high uint64) uint64 {
+	if value < low {
+		return low
+	}
+	if value > high {
+		return high
+	}
+	return value
 }

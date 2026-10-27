@@ -216,7 +216,7 @@ func TestParseGPUModeOfANameThatIsNotThere(t *testing.T) {
 func TestAvailablePowerModesOfAPredator(t *testing.T) {
 	// The turbo profile is only offered on a Predator.
 	modes := AvailablePowerModes(true)
-	want := []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo}
+	want := []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
 	if len(modes) != len(want) {
 		t.Fatalf("the profiles are %v, want %v", modes, want)
 	}
@@ -234,8 +234,8 @@ func TestAvailablePowerModesOfAnotherMachine(t *testing.T) {
 			t.Errorf("the profiles are %v, want no turbo profile", modes)
 		}
 	}
-	if len(modes) != 3 {
-		t.Errorf("the profiles are %v, want three of them", modes)
+	if len(modes) != 4 {
+		t.Errorf("the profiles are %v, want four of them", modes)
 	}
 }
 
@@ -251,10 +251,10 @@ func TestDecodeFanModeOfAValueThatIsNotThere(t *testing.T) {
 }
 
 func TestDecodePowerModeOfAValueThatIsNotThere(t *testing.T) {
-	// The provider keeps a sixth value that the firmware does not
-	// describe, it decodes to the unknown profile.
-	if got := decodePowerMode(6); got != PowerUnknown {
-		t.Errorf("the value 6 decodes to %s, want the unknown profile", got)
+	// The provider keeps a sixth value, it is the profile that saves the
+	// power. Every other value is unknown.
+	if got := decodePowerMode(6); got != PowerEco {
+		t.Errorf("the value 6 decodes to %s, want the eco profile", got)
 	}
 	if got := decodePowerMode(99); got != PowerUnknown {
 		t.Errorf("the value 99 decodes to %s, want the unknown profile", got)

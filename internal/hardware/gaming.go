@@ -36,6 +36,11 @@ type Gaming interface {
 	Backlight() (BacklightState, error)
 	// SetBacklight sets the brightness of the keyboard backlight.
 	SetBacklight(brightness int, timeout bool) error
+	// BacklightBuffer reads the raw buffer of the keyboard backlight.
+	//
+	// The buffer is sixteen bytes long, the level sits in byte two and in
+	// byte five and byte eight holds the flags of the backlight.
+	BacklightBuffer() ([]byte, error)
 
 	// Fans reads the fan configuration.
 	Fans() (FanState, error)

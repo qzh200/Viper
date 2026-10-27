@@ -24,7 +24,7 @@ func TestPowerModeReadsTheProfile(t *testing.T) {
 
 func TestPowerModeOfAProfileThatIsNotThere(t *testing.T) {
 	provider := newFakeProvider()
-	// Six is a profile that the firmware keeps but that is not offered.
+	// Six is the profile that saves the power.
 	provider.output("GetGamingMiscSetting", "gmOutput", 0x0600)
 	backend := newFakeBackend(provider)
 
@@ -32,8 +32,8 @@ func TestPowerModeOfAProfileThatIsNotThere(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode != PowerUnknown {
-		t.Errorf("the profile is %s, want the unknown one", mode)
+	if mode != PowerEco {
+		t.Errorf("the profile is %s, want the eco one", mode)
 	}
 }
 
@@ -105,8 +105,9 @@ func TestDiscreteGPUOfAMachineWithoutTheSwitch(t *testing.T) {
 
 func TestOverclockCapability(t *testing.T) {
 	// The provider answers with a non zero value when the feature is
-	// there. The two settings are asked for one after the other, so the
-	// answers have to be told apart by the order of the calls.
+	// there. The setting in the table is the one of the processor, the
+	// firmware does not report an overclocking capability of the graphics
+	// card, so that one is always reported as missing.
 	provider := newFakeProvider()
 	provider.sequence("GetGamingMiscSetting", []uint64{0x0100, 0x0100})
 	backend := newFakeBackend(provider)
@@ -115,8 +116,8 @@ func TestOverclockCapability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !gpu {
-		t.Error("the overclocking of the graphics card is not reported")
+	if gpu {
+		t.Error("the overclocking of the graphics card is reported, want it to be missing")
 	}
 	if !cpu {
 		t.Error("the overclocking of the processor is not reported")

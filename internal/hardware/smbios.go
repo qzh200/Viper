@@ -2,9 +2,6 @@ package hardware
 
 import (
 	"fmt"
-	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 // rsmb is the four character code for the raw SMBIOS table.
@@ -41,12 +38,16 @@ type Identity struct {
 // This is the only reliable way to tell a Predator from a Nitro: both
 // expose the same WMI provider, but only the Predator offers the turbo
 // performance profile.
-func SystemIdentity() (model, family, product string) {
+//
+// 三个返回值分别是机器的型号（固件里的产品名，例如 "Predator PHN16-71"）、
+// 产品系列（例如 "Predator"）和厂商（例如 "Acer"）。以前第三个返回值也是
+// 产品名，等于把型号说两遍，厂商从来没有被返回过。
+func SystemIdentity() (model, family, manufacturer string) {
 	identity, err := readIdentity()
 	if err != nil {
 		return "", "", ""
 	}
-	return identity.Product, identity.Family, identity.Product
+	return identity.Product, identity.Family, identity.Manufacturer
 }
 
 // SystemInfo reads the full system information block.
@@ -69,31 +70,12 @@ func IsPredator() bool {
 	return IsPredatorModel(identity.Product, identity.Family)
 }
 
-// getSystemFirmwareTable reads a raw firmware table.
+// getSystemFirmwareTable is declared in the files of the platforms, it
+// reads a raw firmware table.
 //
 // The function is not wrapped by golang.org/x/sys/windows, so it is
-// declared here. It is part of kernel32 and only reads the tables the
-// firmware already exposes, it never writes anything.
-var (
-	kernel32                   = windows.NewLazySystemDLL("kernel32.dll")
-	procGetSystemFirmwareTable = kernel32.NewProc("GetSystemFirmwareTable")
-)
-
-// getSystemFirmwareTable returns the size of the table when buffer is nil,
-// and fills the buffer otherwise.
-func getSystemFirmwareTable(provider uint32, tableID uint32, buffer []byte) uint32 {
-	var pointer uintptr
-	if len(buffer) > 0 {
-		pointer = uintptr(unsafe.Pointer(&buffer[0]))
-	}
-	r, _, _ := procGetSystemFirmwareTable.Call(
-		uintptr(provider),
-		uintptr(tableID),
-		pointer,
-		uintptr(len(buffer)),
-	)
-	return uint32(r)
-}
+// declared in firmware_windows.go. It is part of kernel32 and only reads the
+// tables the firmware already exposes, it never writes anything.
 
 // readIdentity parses the SMBIOS table looking for the system information
 // structure.

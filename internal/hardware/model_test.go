@@ -29,7 +29,7 @@ func TestDecodePowerMode(t *testing.T) {
 		1: PowerBalanced,
 		4: PowerPerformance,
 		5: PowerTurbo,
-		6: PowerUnknown,
+		6: PowerEco,
 	}
 	for value, want := range cases {
 		if got := decodePowerMode(value); got != want {

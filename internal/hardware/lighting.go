@@ -36,7 +36,14 @@ type BacklightState struct {
 // The provider applies the effect, the speed and the direction to the whole
 // keyboard at once, while the colour is written per zone. A global setup
 // therefore writes the same colour to every zone.
+//
+// 速度、方向和亮度在这里先被限制到固件能接受的范围，和上层写进配置文件的
+// 范围一样，这样写进固件的值和记下来的值是同一个值。
 func (b *Backend) SetLighting(config RGBConfig) error {
+	speed := clampUint(config.Speed, 1, 9)
+	direction := clampUint(config.Direction, 0, 1)
+	brightness := clampUint(config.Brightness, 0, 100)
+
 	colours := config.Zones
 	if !config.PerZone {
 		for i := 1; i < LightingZones; i++ {
@@ -48,27 +55,30 @@ func (b *Backend) SetLighting(config RGBConfig) error {
 		if _, err := b.callGaming("SetGamingLEDColor", map[string]wmi.Value{
 			"gmInput": wmi.Uint64(colorWord(colours[zone], uint64(zone+1))),
 		}); err != nil {
-			return fmt.Errorf("hardware: set lighting zone %d: %w", zone+1, err)
+			return fmt.Errorf("hardware: 设置灯光分区 %d 失败: %w", zone+1, err)
 		}
 	}
 
 	behavior := (uint64(config.Effect) << 16) |
-		((config.Speed & 0xFF) << 8) |
-		(config.Direction & 0xFF)
+		(speed << 8) |
+		direction
 
 	if _, err := b.callGaming("SetGamingLEDBehavior", map[string]wmi.Value{
 		"gmInput": wmi.Uint64(behavior),
 	}); err != nil {
-		return fmt.Errorf("hardware: set lighting behaviour: %w", err)
+		return fmt.Errorf("hardware: 设置灯光行为失败: %w", err)
 	}
 
 	// The automatic switch off is a setting of its own, changing the
 	// lighting must not change it.
-	timeout := false
-	if state, err := b.Backlight(); err == nil {
-		timeout = state.Timeout
+	//
+	// 读不到这个开关的状态时不去写动作类，这样开关保持用户原来的选择，
+	// 而不是被改成关闭。
+	timeout, err := b.backlightTimeout()
+	if err != nil {
+		return b.setBacklight(int(brightness), nil)
 	}
-	return b.SetBacklight(clampPercent(int(config.Brightness)), timeout)
+	return b.setBacklight(int(brightness), &timeout)
 }
 
 // ResetLighting returns the keyboard to the default appearance.
@@ -162,41 +172,104 @@ func backlightBuffer(level int) []byte {
 // SetBacklight sets the keyboard backlight brightness.
 //
 // The provider expects the level in the generic action class and again in
-// the Acer gaming class, because the two classes drive different parts of
-// the keyboard controller.
+// the Acer gaming class, because the two classes drive different parts of the
+// keyboard controller.
 func (b *Backend) SetBacklight(brightness int, timeout bool) error {
+	return b.setBacklight(brightness, &timeout)
+}
+
+// setBacklight writes the backlight.
+//
+// timeout 为 nil 的时候不去写动作类，这样 30 秒自动熄灭的开关保持原来的
+// 状态，不会被改写成关闭。
+func (b *Backend) setBacklight(brightness int, timeout *bool) error {
 	level := clampPercent(brightness)
 
-	timeoutByte := uint64(0)
-	if timeout {
-		timeoutByte = backlightTimeoutSeconds
-	}
+	if timeout != nil {
+		timeoutByte := uint64(0)
+		if *timeout {
+			timeoutByte = backlightTimeoutSeconds
+		}
 
-	actionInput := uint64(backlightWriteBit) |
-		(uint64(backlightHotkey) << 8) |
-		backlightFlagBit |
-		(uint64(level) << 32) |
-		(timeoutByte << 40)
+		actionInput := uint64(backlightWriteBit) |
+			(uint64(backlightHotkey) << 8) |
+			backlightFlagBit |
+			(uint64(level) << 32) |
+			(timeoutByte << 40)
 
-	if _, err := b.callAction("SetFunction", map[string]wmi.Value{
-		"uiInput": wmi.Uint64(actionInput),
-	}); err != nil {
-		return fmt.Errorf("hardware: set keyboard backlight: %w", err)
+		if _, err := b.callAction("SetFunction", map[string]wmi.Value{
+			"uiInput": wmi.Uint64(actionInput),
+		}); err != nil {
+			return fmt.Errorf("hardware: 设置键盘背光失败: %w", err)
+		}
 	}
 
 	// The Acer gaming class takes the level as a sixteen byte buffer.
 	if _, err := b.callGaming("SetGamingKBBacklight", map[string]wmi.Value{
 		"gmInput": wmi.Bytes(backlightBuffer(level)),
 	}); err != nil {
-		return fmt.Errorf("hardware: set keyboard backlight buffer: %w", err)
+		return fmt.Errorf("hardware: 设置键盘背光缓冲区失败: %w", err)
+	}
+
+	// 把缓冲区读回来核对亮度，固件没有接受这个亮度就说清楚是哪一个。
+	if err := b.verifyBacklightBuffer(level); err != nil {
+		return err
 	}
 
 	if _, err := b.callGaming("SetGamingRgbKb", map[string]wmi.Value{
 		"gmInput": wmi.Uint64(1 | (uint64(level) << 8)),
 	}); err != nil {
-		return fmt.Errorf("hardware: set keyboard backlight level: %w", err)
+		return fmt.Errorf("hardware: 设置键盘背光亮度失败: %w", err)
 	}
 
+	return nil
+}
+
+// BacklightBuffer reads the raw buffer of the keyboard backlight.
+//
+// The buffer is sixteen bytes long. The level sits in byte two and in byte
+// five, byte eight holds the flags of the backlight (three means that the
+// backlight switches itself off after thirty seconds) and byte nine has to
+// be one when the buffer is written.
+//
+// 固件把缓冲区读回来的时候第九个字节是零，所以核对亮度时只看第二个和第五个
+// 字节。
+func (b *Backend) BacklightBuffer() ([]byte, error) {
+	outputs, err := b.callGaming("GetGamingKBBacklight", map[string]wmi.Value{
+		"gmInput": wmi.Uint32(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return nil, fmt.Errorf("hardware: GetGamingKBBacklight 没有返回 gmOutput")
+	}
+
+	buffer, err := decodeBytes(value)
+	if err != nil {
+		return nil, fmt.Errorf("hardware: 读回背光缓冲区失败: %w", err)
+	}
+	return buffer, nil
+}
+
+// verifyBacklightBuffer reads the backlight buffer back and compares the
+// level with the one that was written.
+//
+// 读不回缓冲区就没有可以比较的值，这种情况下跳过核对。
+func (b *Backend) verifyBacklightBuffer(level int) error {
+	buffer, err := b.BacklightBuffer()
+	if err != nil {
+		return nil
+	}
+	if len(buffer) < 6 {
+		return fmt.Errorf("hardware: 读回的背光缓冲区只有 %d 个字节，期望 16 个", len(buffer))
+	}
+	if int(buffer[2]) != level || int(buffer[5]) != level {
+		return fmt.Errorf("hardware: 固件没有接受背光亮度 %d，缓冲区里第二个字节是 %d，第五个字节是 %d",
+			level, buffer[2], buffer[5])
+	}
 	return nil
 }
 
@@ -219,6 +292,23 @@ func (b *Backend) Backlight() (BacklightState, error) {
 	}
 	state.Brightness = int(brightness)
 
+	timeout, err := b.backlightTimeout()
+	if err != nil {
+		return state, err
+	}
+	state.Timeout = timeout
+	return state, nil
+}
+
+// backlightTimeout reads the automatic switch off of the backlight.
+//
+// The switch lives in the action class, its answer keeps the number of
+// seconds in the sixth byte. The lowest byte of the answer is the status of
+// the setting, a status that is not zero means that the action class did not
+// answer this setting at all.
+//
+// 读不到这个开关时必须报错：把它当成"关闭"会把用户原来开着的自动熄灭改掉。
+func (b *Backend) backlightTimeout() (bool, error) {
 	query := uint64(backlightReadBit) |
 		(uint64(backlightHotkey) << 8) |
 		backlightFlagBit
@@ -227,14 +317,14 @@ func (b *Backend) Backlight() (BacklightState, error) {
 		"uiInput": wmi.Uint32(uint32(query)),
 	})
 	if err != nil {
-		return state, err
+		return false, err
 	}
 	raw, err := decodeUint(outputs["uiOutput"])
 	if err != nil {
-		return state, err
+		return false, err
 	}
-	if raw&0xFF == 0 && raw > 0 {
-		state.Timeout = (raw>>40)&0xFF == backlightTimeoutSeconds
+	if raw&0xFF != 0 {
+		return false, fmt.Errorf("hardware: 动作类没有回答背光的自动熄灭开关，状态字节是 %d", raw&0xFF)
 	}
-	return state, nil
+	return (raw>>40)&0xFF == backlightTimeoutSeconds, nil
 }
