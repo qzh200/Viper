@@ -148,6 +148,42 @@ Viper 报的是 **Viper 自己的**配置。Viper 顶替之后，官方应用显
 写入路径也验证过（会真实改硬件，随后还原）：写灯光 → 机器真的变成
 `METEOR / 速度 7 / 方向 1 / 亮度 33 / 四色分区`；写开机音效 → 生效。
 
+## 硬件层的新路线：原厂服务当主路
+
+硬件层现在多了一条路：**主路是原厂服务**（`AcerAgentService`，监听
+`127.0.0.1:46933`），固件那一侧只补它不管的几项。
+
+```
+原厂 AcerAgentService ──internal/agentservice（协议客户端）──▶ internal/machine
+                                                                          │
+                                            internal/hardware.Firmware ──┘
+                                            （风扇加速、超频能力、背光缓冲区、复位灯效）
+```
+
+原厂服务以系统的身份运行，**程序不需要管理员权限就能用它**。本机实测：当前
+会话没有管理员权限，固件那一侧连实例都找不到（`no AcerGamingFunction
+instance found`），原厂服务这一侧却什么都能读。
+
+原厂服务读得到的东西比固件多：
+
+| 能力 | 固件（WMI） | 原厂服务 |
+| :--- | :--- | :--- |
+| 分区颜色 | ❌ 读回来永远是全零 | ✅ 四个分区的真实颜色 |
+| 灯效 | ❌ 八个灯效的结果一模一样 | ✅ 效果名、速度、方向、亮度 |
+| 显卡风扇组的行为 | ❌ 只报告主风扇组 | ✅ 两组都报 |
+| 每核实时频率 | ❌ 性能计数器在本机初始化失败 | ✅ 32 核每一个都有 |
+| 显卡使用率、网络上下行 | ❌ | ✅ |
+| 睿频上限 | 2419（标称频率） | 5000（真实的睿频上限） |
+
+风扇的三个模式是实测出来的，写在 `internal/machine` 的注释里：`mode` 为 `0`
+是自动（2722 RPM），`1` 是全速（**7092 RPM**），`2` 是固定占空比（写成 50 时
+落在 4400 RPM）。
+
+这一层与协议层之间只有两个接口：`machine.Service` 与 `hardware.Firmware`，
+两边都不认识对方的实现。细节见 `internal/machine/README.md`。
+
+**这一层还没有接到命令行上**，命令行走的是旧的固件路线。接线是下一步的事。
+
 ## 服务自己记住的三项设置
 
 有三个设置在固件里**根本没有接口**，问不回来：
@@ -254,6 +290,8 @@ cmd/viper-service  原厂服务的替代实现
 internal/com       COM/OLE 互操作层（VARIANT、BSTR、SAFEARRAY、vtable）
 internal/wmi       WMI 客户端：实例解析、方法调用、参数类型自适应
 internal/hardware  Acer 硬件后端：传感器、风扇、电源、灯效
+internal/agentservice 原厂 AcerAgentService 的协议客户端
+internal/machine   硬件层的新路线：原厂服务当主路，固件补它不管的几项
 internal/nvidia    显卡遥测：走显卡驱动的管理库
 internal/quickaccess 原厂 Quick Access 服务客户端（蓝光灯、USB 充电）
 internal/service   原厂服务的协议实现（读写设置、监视数据）
