@@ -316,13 +316,13 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	machine.bootSound = true
 	machine.winKeyLocked = true
 	machine.lcdOverdrive = true
-	machine.coolBoost = true
 	machine.discreteGPU = true
 	// 固件根本不报告显卡的超频能力，硬件层那一项恒为不支持，替身不能
 	// 报出机器上不会出现的能力。
 	machine.overclockGPU = false
 	machine.overclockCPU = true
-	machine.fans = hardware.FanState{CPUMode: hardware.FanCustom}
+	// 加速就是全速：两个风扇都是全速的时候，加速才是开着的。
+	machine.fans = hardware.FanState{CPUMode: hardware.FanMax, GPUMode: hardware.FanMax}
 	machine.backlight = hardware.BacklightState{Timeout: true}
 
 	if value, err := application.BootSound(); err != nil || !value {
@@ -334,8 +334,12 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	if value, err := application.LCDOverdrive(); err != nil || !value {
 		t.Errorf("the overdrive is %v (%v), want it on", value, err)
 	}
-	if value, err := application.CoolBoost(); err != nil || !value {
-		t.Errorf("the boost is %v (%v), want it on", value, err)
+	fans, err := application.Fans()
+	if err != nil {
+		t.Fatalf("读取风扇失败: %v", err)
+	}
+	if !fans.CoolBoost {
+		t.Error("the boost is off, want it on")
 	}
 	if value, err := application.DiscreteGPU(); err != nil || !value {
 		t.Errorf("the graphics switch is %v (%v), want it on", value, err)
@@ -411,13 +415,16 @@ func TestCloseWithoutAMachine(t *testing.T) {
 	application.Close()
 }
 
-func TestTheLightingTakesTheBrightnessOfTheMachine(t *testing.T) {
-	// The effect and the colours come from the settings, the brightness
-	// comes from the firmware.
+func TestTheLightingComesFromTheMachine(t *testing.T) {
+	// 原厂服务读得回分区颜色与灯效，所以整个灯效都是机器的，不是设置文件里的。
 	application, machine := newTestAppWith(t)
 	machine.brightness = 80
+	machine.lighting = hardware.RGBConfig{
+		Effect: hardware.EffectBreathing,
+		Speed:  4,
+	}
 	application.store.Update(func(s *config.Settings) {
-		s.Lighting.Effect = uint64(hardware.EffectBreathing)
+		s.Lighting.Effect = uint64(hardware.EffectWave)
 		s.Lighting.Brightness = 20
 	})
 

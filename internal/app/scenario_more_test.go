@@ -151,10 +151,7 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 		s.Lighting.Zones[0] = config.LightingColor{R: 199, G: 0, B: 135}
 	})
 
-	lighting, err := application.Lighting()
-	if err != nil {
-		t.Fatal(err)
-	}
+	lighting := application.StoredLighting()
 	if lighting.Effect != hardware.EffectWave {
 		t.Errorf("the effect is %d, want %d", lighting.Effect, hardware.EffectWave)
 	}

@@ -239,7 +239,7 @@ func TestTheLightingThatIsWrittenIsTheLightingThatIsStored(t *testing.T) {
 	}
 }
 
-func TestTheLightingFailsWhenTheFirmwareCannotBeRead(t *testing.T) {
+func TestTheLightingFailsWhenTheMachineCannotBeRead(t *testing.T) {
 	// The caller has to be able to tell a firmware that cannot be read
 	// from a brightness of zero.
 	application, machine := newTestAppWith(t)

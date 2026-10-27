@@ -111,8 +111,8 @@ func TestTheSettingsOfTheMachineWithoutTheGamingProvider(t *testing.T) {
 	if _, err := application.BootSound(); err == nil {
 		t.Error("the sound was read although the gaming provider is not there")
 	}
-	if _, err := application.CoolBoost(); err == nil {
-		t.Error("the boost was read although the gaming provider is not there")
+	if _, err := application.Fans(); err == nil {
+		t.Error("the fans were read although the machine is not there")
 	}
 	if _, err := application.DiscreteGPU(); err == nil {
 		t.Error("the graphics switch was read although the gaming provider is not there")

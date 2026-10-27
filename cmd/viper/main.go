@@ -1,7 +1,9 @@
 // Command viper is the Viper control centre for Acer gaming laptops.
 //
-// Every subcommand talks to the hardware directly through the ACPI WMI
-// provider, so the process has to run with administrative rights.
+// Every subcommand talks to the services of the original software, so the
+// program does not need the rights of an administrator.
+//
+// 每一条子命令都是通过原厂程序跟机器说话的，程序不需要管理员权限。
 package main
 
 import (
@@ -175,7 +177,7 @@ func runStatus() error {
 		return err
 	}
 	fmt.Println("instance:", instance)
-	// 走的哪条路要报出来：原厂服务那一路不用管理员权限，固件那一路要。
+	// 走的哪条路要报出来：这一层只有原厂程序这一路。
 	fmt.Println("route  :", application.Route())
 
 	// The power supply comes from the kernel of Windows, it is shown
@@ -482,16 +484,16 @@ func describeFan(mode hardware.FanMode, percent int) string {
 
 // describeGPUFan renders the mode of the group of the graphics fan.
 //
-// The firmware reports the group of the processor only, so the number of
+// The original service reports both fan groups, so the number of the
 // the graphics fan is the one Viper wrote last. The flag of the state
 // tells the caller that this is not a reading, the line says so as well.
 //
-// 固件只报告处理器这一组，显卡这一组读不回来，所以这里显示的是 Viper
-// 最后一次写入的值，标记为不是从固件读来的。
+// 原厂服务两组风扇都报，所以这里显示的是机器自己的读数；读不到的时候显示的是 Viper
+// 最后一次写入的值，标记为不是从机器读来的。
 func describeGPUFan(state app.FanStatus) string {
 	text := describeFan(state.GPUMode, state.GPUPercent)
 	if !state.GPUModeReadable {
-		text += " (not readable from the firmware, this is the last value Viper wrote)"
+		text += " (not readable from the machine, this is the last value Viper wrote)"
 	}
 	return text
 }
@@ -579,18 +581,13 @@ func runLighting(args []string) error {
 
 // showLighting prints the keyboard lighting of the machine.
 //
-// The firmware reports the brightness only, the effect and the colours
-// live in the settings of Viper. When the firmware cannot be reached the
-// brightness is reported as unknown and the rest is still shown, because a
-// machine whose firmware is quiet still has a lighting.
-//
-// 固件只报告亮度，灯效和颜色存在 Viper 自己的设置里。固件读不到的时候
-// 亮度显示为未知，其余的部分照常显示。
+// 机器读不到的时候，显示的是 Viper 自己记着的那一份，并且说清楚那是它自己的
+// 记录，不是机器现在的样子——不把旧的值说成机器的样子。
 func showLighting(application *app.App) error {
 	config, err := application.Lighting()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "viper:", err)
-		fmt.Println("  brightness  : unknown")
+		fmt.Println("  machine     : not readable, showing what Viper wrote last")
 		config = application.StoredLighting()
 	} else {
 		fmt.Printf("  brightness  : %d\n", config.Brightness)
@@ -604,11 +601,6 @@ func showLighting(application *app.App) error {
 	timeout, err := application.BacklightTimeout()
 	if err == nil {
 		fmt.Println("  timeout     :", onOff(timeout))
-	}
-	if config.ColourReadable {
-		fmt.Println("  note        : the colours and the effect are the ones of the machine")
-	} else {
-		fmt.Println("  note        : the firmware reports the brightness only, the effect and the colours come from Viper's own settings")
 	}
 	fmt.Println("  settings    :", application.SettingsPath())
 	return nil
@@ -742,7 +734,7 @@ func runProfile(args []string) error {
 		}
 		fmt.Println("  LCD overdrive :", onOff(overdrive))
 
-		// 锁 Windows 键是固件档案里的一个位，原厂服务写不动它，所以这一项
+		// 锁 Windows 键原厂服务写不动它（实测它收下请求却不生效），所以这一项
 		// 要管理员权限。读不到就把话说明白，别把整条命令都拖垮。
 		locked, err := application.WinKeyLocked()
 		if err != nil {
@@ -978,7 +970,7 @@ func runBootSound(args []string) error {
 
 // runDiag reports the capabilities of the machine.
 //
-// 报告是逐项的：有几项要走固件那一侧，那一侧需要管理员权限。读不到的那几项
+// 报告是逐项的：读不到的那几项把原因写出来，不要把整份报告拖垮。
 // 把话说明白，不要把整份报告都拖垮。
 func runDiag() error {
 	application, err := app.New()

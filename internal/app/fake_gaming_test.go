@@ -103,7 +103,20 @@ func (g *fakeGaming) LightingBrightness() (uint64, error) {
 	return g.brightness, nil
 }
 
-func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) { return g.lighting, nil }
+// Lighting returns the lighting of the machine.
+//
+// 原厂服务读得回分区颜色与灯效，所以替身也读得回：灯效与颜色是替身自己记着
+// 的那一份，亮度是 brightness。机器读不到的时候这里也读不到。
+func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) {
+	if g.brightnessError != nil {
+		return hardware.RGBConfig{}, g.brightnessError
+	}
+	result := g.lighting
+	result.Brightness = g.brightness
+	result.ColourReadable = true
+	result.EffectReadable = true
+	return result, nil
+}
 
 func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
 	g.written = append(g.written, config)
@@ -158,7 +171,15 @@ func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	return nil
 }
 
-func (g *fakeGaming) Fans() (hardware.FanState, error) { return g.fans, nil }
+// Fans returns the fan configuration of the machine.
+//
+// 加速就是全速：两个风扇都是全速的时候，加速才是开着的。替身跟机器一样
+// 这样算。
+func (g *fakeGaming) Fans() (hardware.FanState, error) {
+	state := g.fans
+	state.CoolBoost = state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax
+	return state, nil
+}
 
 func (g *fakeGaming) SetFans(config hardware.FanConfig) error {
 	g.writtenFans = append(g.writtenFans, config)

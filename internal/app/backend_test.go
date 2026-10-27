@@ -41,7 +41,7 @@ func TestThatTheFirmwareIsNotAFallback(t *testing.T) {
 	if err == nil {
 		t.Fatal("原厂服务不在的时候该报错")
 	}
-	if !strings.Contains(err.Error(), "补充") {
-		t.Fatalf("错误里没有说清直接操控固件只是补充: %v", err)
+	if !strings.Contains(err.Error(), "没有第二条路") {
+		t.Fatalf("错误里没有说清没有第二条路: %v", err)
 	}
 }
