@@ -223,18 +223,6 @@ func (b *Backend) CoolBoost(enabled bool) error {
 	})
 }
 
-// FanTable reads the selected fan table.
-//
-// 原厂服务不报风扇表，所以这一项走固件那一侧。实测本机的原始答案是 1（普通
-// 的表），写不进去。
-func (b *Backend) FanTable() (uint64, error) {
-	firmware, err := b.provider()
-	if err != nil {
-		return 0, err
-	}
-	return firmware.FanTable()
-}
-
 // fans reads the fan configuration of the service.
 func (b *Backend) fans() (fanData, error) {
 	var data fanData

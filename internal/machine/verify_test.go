@@ -1,7 +1,6 @@
 package machine
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +29,7 @@ func fastVerify(t *testing.T) {
 // TestThatTheLightingIsCheckedAfterTheWrite 写完灯效要读回核对。
 func TestThatTheLightingIsCheckedAfterTheWrite(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.RGBConfig{
 		Effect:     hardware.EffectWave,
@@ -56,7 +55,7 @@ func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 
 	fastVerify(t)
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	err := backend.SetLighting(hardware.RGBConfig{Brightness: 90})
 	if err == nil {
@@ -83,7 +82,7 @@ func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 	service.stale = map[string]bool{agentservice.FunctionLighting: true}
 
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.RGBConfig{Brightness: 50, Speed: 3, PerZone: true}
 	config.Zones[0] = hardware.RGBColor{R: 255}
@@ -110,7 +109,7 @@ func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 	service.stale = map[string]bool{agentservice.FunctionLighting: true}
 
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	err := backend.SetLighting(hardware.RGBConfig{
 		Effect:     hardware.EffectWave,
@@ -135,7 +134,7 @@ func TestThatTheTimeoutThatWasNotAcceptedIsReported(t *testing.T) {
 	service.stale = map[string]bool{agentservice.FunctionBacklightTimeout: true}
 
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	err := backend.SetBacklight(50, true)
 	if err == nil {
@@ -151,7 +150,7 @@ func TestThatTheProfileThatWasNotAcceptedIsReported(t *testing.T) {
 	service.stale = map[string]bool{agentservice.FunctionOperatingMode: true}
 
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	err := backend.SetPowerMode(hardware.PowerPerformance)
 	if err == nil {
@@ -178,7 +177,7 @@ func TestThatASwitchThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 
 	fastVerify(t)
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetWinKeyLocked(true); err == nil {
 		t.Fatal("机器没有锁住 Windows 键时该报错")
@@ -201,7 +200,7 @@ func TestThatTheGraphicsModeIsNotCheckedAfterTheWrite(t *testing.T) {
 		map[string]any{"mode": 1}, agentservice.ResultOK)
 	service.stale = map[string]bool{agentservice.FunctionGPUMode: true}
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetGPUMode(hardware.GPUModeHybrid); err != nil {
 		t.Fatalf("显卡模式不该读回核对: %v", err)
@@ -211,44 +210,71 @@ func TestThatTheGraphicsModeIsNotCheckedAfterTheWrite(t *testing.T) {
 	}
 }
 
-// TestThatTheWindowsKeyGoesThroughTheFirmware Windows 键走固件那一侧。
+// TestThatTheWindowsKeyGoesThroughTheService Windows 键问的是原厂服务。
 //
-// 实测：原厂服务收下 WIN_KEY 的请求，值却一直不变，所以这一项不能问它。
-func TestThatTheWindowsKeyGoesThroughTheFirmware(t *testing.T) {
+// 实测：原厂服务收下 WIN_KEY 的请求，值却一直不变，所以写完的核对会把它
+// 报出来——不假装成功。
+func TestThatTheWindowsKeyGoesThroughTheService(t *testing.T) {
 	service := newFakeService()
-	firmware := &fakeFirmware{winKey: false}
-	backend := newBackend(t, service, firmware)
+	service.answers[agentservice.FunctionWinKey] = answer(
+		map[string]any{"status": 1}, agentservice.ResultOK)
+	// 服务收了请求却没改状态：读回来还是老样子。
+	service.stale = map[string]bool{agentservice.FunctionWinKey: true}
+	backend := newBackend(t, service)
 
 	locked, err := backend.WinKeyLocked()
 	if err != nil {
 		t.Fatalf("读取 Windows 键失败: %v", err)
 	}
 	if locked {
-		t.Error("固件报的是没有锁着")
+		t.Error("服务报的是这个键还能用")
 	}
 
-	if err := backend.SetWinKeyLocked(true); err != nil {
-		t.Fatalf("写入 Windows 键失败: %v", err)
+	// 服务的值没有跟着变，核对要报出来。
+	err = backend.SetWinKeyLocked(true)
+	if err == nil {
+		t.Error("服务没有接受这个锁，却报告成功")
 	}
-	if !firmware.winKey {
-		t.Error("锁没有写进固件那一侧")
-	}
-
-	for _, write := range service.writes {
-		if write.Function == agentservice.FunctionWinKey {
-			t.Error("Windows 键不该问原厂服务")
-		}
+	if len(service.writes) == 0 {
+		t.Error("锁没有写给服务")
 	}
 }
 
-// TestThatTheWindowsKeyNeedsTheFirmware 没有固件时要报错。
-func TestThatTheWindowsKeyNeedsTheFirmware(t *testing.T) {
-	backend := newBackend(t, newFakeService(), nil)
+// TestThatTheResetOfTheLightingIsWrittenToTheService 复位灯效走原厂服务。
+func TestThatTheResetOfTheLightingIsWrittenToTheService(t *testing.T) {
+	service := newFakeService()
+	backend := newBackend(t, service)
 
-	if _, err := backend.WinKeyLocked(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
+	if err := backend.ResetLighting(); err != nil {
+		t.Fatalf("复位灯效失败: %v", err)
 	}
-	if err := backend.SetWinKeyLocked(true); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
+	if len(service.writes) != 1 {
+		t.Fatalf("服务收到了 %d 次写入，不是 1 次", len(service.writes))
+	}
+
+	parameter := service.writes[0].Parameter
+	if effect := parameter["effect"]; effect != "STATIC" {
+		t.Errorf("复位的灯效是 %v，不是静态", effect)
+	}
+	if brightness := parameter["brightness"]; brightness != 100 {
+		t.Errorf("复位的亮度是 %v，不是 100", brightness)
+	}
+}
+
+// TestThatTheOverclockCapabilityIsNotSupported 超频能力原厂服务不实现。
+func TestThatTheOverclockCapabilityIsNotSupported(t *testing.T) {
+	service := newFakeService()
+	service.answers[agentservice.CapabilityOverclockingMode] = agentservice.Answer{
+		Request: agentservice.CapabilityOverclockingMode,
+		Result:  agentservice.ResultUnsupported,
+	}
+	backend := newBackend(t, service)
+
+	gpu, cpu, err := backend.OverclockCapability()
+	if err != nil {
+		t.Fatalf("读取超频能力失败: %v", err)
+	}
+	if gpu || cpu {
+		t.Errorf("超频能力是显卡 %v 处理器 %v，不该报成支持", gpu, cpu)
 	}
 }

@@ -231,13 +231,6 @@ func (a *App) hardware() (abilities, error) {
 func openMachine(address string) (hardware.Gaming, string, error) {
 	backend, err := machine.New(machine.Options{
 		Address: address,
-		OpenFirmware: func() (machine.Extras, error) {
-			provider, err := hardware.OpenFirmware()
-			if err != nil {
-				return nil, err
-			}
-			return provider, nil
-		},
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("%w"+

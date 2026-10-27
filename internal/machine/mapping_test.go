@@ -93,7 +93,7 @@ func TestNumbersAreLimited(t *testing.T) {
 }
 
 func TestTheNameOfTheMachine(t *testing.T) {
-	backend := newBackend(t, newFakeService(), nil)
+	backend := newBackend(t, newFakeService())
 
 	if got := backend.Instance(); got != "AcerAgentService" {
 		t.Fatalf("机器的名字是 %q，不是 AcerAgentService", got)
@@ -115,7 +115,7 @@ func TestTheBrightnessOfTheKeyboard(t *testing.T) {
 	service.answers[agentservice.FunctionLighting] = answer(
 		map[string]any{"brightness": 42}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	brightness, err := backend.LightingBrightness()
 	if err != nil {
@@ -132,7 +132,7 @@ func TestAnAnswerThatCannotBeParsed(t *testing.T) {
 		Data:   json.RawMessage(`{"CPU_TEMPERATURE": "很热"}`),
 		Result: agentservice.ResultOK,
 	}
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.Sensors(); err == nil {
 		t.Fatal("答案不是数字时该报错")
@@ -145,7 +145,7 @@ func TestAnAnswerWithoutData(t *testing.T) {
 		Request: agentservice.FunctionLighting,
 		Result:  agentservice.ResultOK,
 	}
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.Lighting(); err == nil {
 		t.Fatal("没有数据的应答不该算作读到了灯效")
@@ -155,7 +155,7 @@ func TestAnAnswerWithoutData(t *testing.T) {
 func TestAWriteThatDoesNotHappen(t *testing.T) {
 	service := newFakeService()
 	service.setErr = errors.New("服务不可达")
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetPowerMode(hardware.PowerPerformance); err == nil {
 		t.Fatal("写不进去时该报错")
@@ -165,7 +165,7 @@ func TestAWriteThatDoesNotHappen(t *testing.T) {
 func TestAReadThatDoesNotHappen(t *testing.T) {
 	service := newFakeService()
 	service.getErr = errors.New("服务不可达")
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.PowerMode(); err == nil {
 		t.Fatal("读不出来时该报错")
@@ -201,7 +201,7 @@ func TestTheFanOfTheOtherGroup(t *testing.T) {
 		},
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	state, err := backend.Fans()
 	if err != nil {

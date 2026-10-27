@@ -137,7 +137,13 @@ func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.bac
 // The buffer is built by the hardware layer, so that the stand answers
 // in the same shape as the machine does.
 func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
-	return hardware.NewBacklightBuffer(int(g.brightness)), nil
+	// 缓冲区的形状与机器一样：亮度在第二个和第五个字节，第九个字节是一。
+	buffer := make([]byte, 16)
+	buffer[2] = byte(g.brightness)
+	buffer[5] = byte(g.brightness)
+	buffer[8] = 3
+	buffer[9] = 1
+	return buffer, nil
 }
 
 func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {

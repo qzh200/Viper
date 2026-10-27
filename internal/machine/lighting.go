@@ -294,27 +294,23 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 	return b.verifyStatus(agentservice.FunctionBacklightTimeout, boolStatus(timeout))
 }
 
-// BacklightBuffer reads the raw buffer of the keyboard backlight.
-//
-// 原厂服务不报这个缓冲区，所以这一项问固件。
-func (b *Backend) BacklightBuffer() ([]byte, error) {
-	firmware, err := b.provider()
-	if err != nil {
-		return nil, err
-	}
-	return firmware.BacklightBuffer()
-}
-
 // ResetLighting restores the default keyboard lighting.
 //
-// 官方应用的复位按钮是静态白色、满亮度，这个动作在固件那一侧，所以这一项
-// 问固件。
+// 复位就是写一次灯效：静态白色、满亮度、四个分区都是白色。官方应用的复位
+// 按钮就是这个效果。
 func (b *Backend) ResetLighting() error {
-	firmware, err := b.provider()
-	if err != nil {
-		return err
+	white := hardware.RGBColor{R: 255, G: 255, B: 255}
+	config := hardware.RGBConfig{
+		Effect:     hardware.EffectStatic,
+		Speed:      3,
+		Direction:  0,
+		Brightness: 100,
+		PerZone:    true,
 	}
-	return firmware.ResetLighting()
+	for i := range config.Zones {
+		config.Zones[i] = white
+	}
+	return b.SetLighting(config)
 }
 
 // lighting reads the lighting of the service.

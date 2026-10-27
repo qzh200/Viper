@@ -20,8 +20,6 @@ package machine
 import (
 	"errors"
 	"fmt"
-	"reflect"
-	"sync"
 	"time"
 
 	"viper/internal/agentservice"
@@ -51,30 +49,6 @@ type Service interface {
 	Close() error
 }
 
-// Extras is the set of abilities the program asks the firmware for.
-//
-// 原厂程序给不了的那几项：风扇表、超频能力、背光原始缓冲区、复位灯效、锁
-// Windows 键。**别的都不问固件**——原厂程序能做的优先用它。
-//
-// 固件那一侧提供的比这多（顶替模式要更多），这一层只拿自己用得上的那几个。
-type Extras interface {
-	// FanTable reads the selected fan table.
-	FanTable() (uint64, error)
-	// OverclockCapability reports which overclocking features the machine
-	// supports.
-	OverclockCapability() (gpu bool, cpu bool, err error)
-	// BacklightBuffer reads the raw buffer of the keyboard backlight.
-	BacklightBuffer() ([]byte, error)
-	// ResetLighting restores the default keyboard lighting.
-	ResetLighting() error
-	// WinKeyLocked reports whether the Windows key is locked.
-	WinKeyLocked() (bool, error)
-	// SetWinKeyLocked locks or unlocks the Windows key.
-	SetWinKeyLocked(locked bool) error
-	// Close releases the connection.
-	Close()
-}
-
 // Options change the behaviour of a backend.
 type Options struct {
 	// Address is the address of the AcerAgentService. The default is the
@@ -82,30 +56,14 @@ type Options struct {
 	Address string
 	// Timeout limits the time of a single request.
 	Timeout time.Duration
-	// OpenFirmware opens the connection to the ACPI provider. When it is
-	// nil the provider is not used at all, and the settings that need it
-	// report that they are out of reach.
-	//
-	// 这一层不自己造固件的连接，连接由外面给进来，所以硬件层与原厂服务
-	// 这一层只通过两个接口说话，谁也不认识对方的实现。
-	OpenFirmware func() (Extras, error)
 }
 
 // Backend reaches the machine.
 //
-// The service answers the readings and the writes of the settings it owns,
-// the provider answers the few settings it does not know.
+// The service of the original software answers everything: the readings, the
+// settings, the lighting. There is no second road.
 type Backend struct {
 	service Service
-
-	// openFirmware opens the connection to the provider.
-	openFirmware func() (Extras, error)
-	// firmware is the connection to the provider, it is opened on first
-	// use.
-	firmware Extras
-	// mutex guards the opening of the provider, so that two calls that
-	// arrive at the same time do not open two connections.
-	mutex sync.Mutex
 }
 
 // New opens the connection to the AcerAgentService.
@@ -122,18 +80,15 @@ func New(options Options) (*Backend, error) {
 		return nil, err
 	}
 
-	return &Backend{
-		service:      client,
-		openFirmware: options.OpenFirmware,
-	}, nil
+	return &Backend{service: client}, nil
 }
 
 // NewWithService opens the program with the given session of the service.
 //
 // It is used by the tests, so that they do not need the service of the
 // original software.
-func NewWithService(service Service, openFirmware func() (Extras, error)) *Backend {
-	return &Backend{service: service, openFirmware: openFirmware}
+func NewWithService(service Service) *Backend {
+	return &Backend{service: service}
 }
 
 // The backend reaches the whole of the machine.
@@ -142,18 +97,10 @@ var _ hardware.Gaming = (*Backend)(nil)
 // Instance returns the name of the service that holds the machine.
 func (b *Backend) Instance() string { return "AcerAgentService" }
 
-// Close releases the connections.
+// Close releases the connection.
 func (b *Backend) Close() {
 	if b.service != nil {
 		b.service.Close()
-	}
-
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.firmware != nil {
-		b.firmware.Close()
-		b.firmware = nil
 	}
 }
 
@@ -179,49 +126,6 @@ func (b *Backend) set(function string, parameter any) error {
 		return err
 	}
 	return nil
-}
-
-// provider opens the connection to the ACPI provider on first use.
-//
-// 一个装着空指针的接口不等于 nil，所以这里要看指针本身，不然第一个需要
-// 固件的请求就会把程序打崩。
-func (b *Backend) provider() (Extras, error) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.firmware != nil {
-		return b.firmware, nil
-	}
-	if b.openFirmware == nil {
-		return nil, ErrNoProvider
-	}
-
-	firmware, err := b.openFirmware()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrNoProvider, err)
-	}
-	if !usableFirmware(firmware) {
-		return nil, ErrNoProvider
-	}
-
-	b.firmware = firmware
-	return firmware, nil
-}
-
-// usableFirmware takes a provider that cannot be used for nothing.
-func usableFirmware(firmware Extras) bool {
-	if firmware == nil {
-		return false
-	}
-
-	value := reflect.ValueOf(firmware)
-	switch value.Kind() {
-	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func:
-		if value.IsNil() {
-			return false
-		}
-	}
-	return true
 }
 
 // Sensors reads the current temperatures and fan speeds.
@@ -386,12 +290,22 @@ func (b *Backend) DiscreteGPU() (bool, error) {
 // supports.
 //
 // 原厂服务自己也不实现这一项，它的应答是失败码 3，所以这一项问固件。
+// OverclockCapability reports which overclocking features the machine supports.
+//
+// 原厂服务自己也不实现这一项（结果码 3），所以这一项报成不支持。
 func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
-	firmware, err := b.provider()
+	answer, err := b.service.Capability(agentservice.CapabilityOverclockingMode)
 	if err != nil {
+		return false, false, fmt.Errorf("machine: 读取超频能力失败: %w", err)
+	}
+	if err, failed := answer.Err(); failed {
+		// 服务不实现这一项：它报的是"不支持"，不是出错。
+		if errors.Is(err, agentservice.ErrUnsupported) {
+			return false, false, nil
+		}
 		return false, false, err
 	}
-	return firmware.OverclockCapability()
+	return false, false, nil
 }
 
 // WinKeyLocked reports whether the Windows key is locked.
@@ -400,22 +314,26 @@ func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 // 值一直是一个，写 0 写 1 都一样。所以这一项走固件那一侧（锁是固件档案里的
 // 一个位），那一边需要管理员权限。
 func (b *Backend) WinKeyLocked() (bool, error) {
-	firmware, err := b.provider()
+	status, err := b.switchStatus(agentservice.FunctionWinKey)
 	if err != nil {
 		return false, err
 	}
-	return firmware.WinKeyLocked()
+	return status == 0, nil
 }
 
 // SetWinKeyLocked locks or unlocks the Windows key.
 //
 // 这一项走固件那一侧，理由见 WinKeyLocked。
 func (b *Backend) SetWinKeyLocked(locked bool) error {
-	firmware, err := b.provider()
-	if err != nil {
+	status := 1
+	if locked {
+		status = 0
+	}
+	if err := b.set(agentservice.FunctionWinKey, map[string]any{"status": status}); err != nil {
 		return err
 	}
-	return firmware.SetWinKeyLocked(locked)
+	// 写完要读回核对：实测这台机器上服务收下请求却不生效，核对会把它报出来。
+	return b.verifyStatus(agentservice.FunctionWinKey, status)
 }
 
 // LCDOverdrive reports whether the display overdrive is active.

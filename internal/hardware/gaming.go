@@ -54,18 +54,6 @@ type LightingWriter interface {
 	SetBacklight(brightness int, timeout bool) error
 }
 
-// LightingBuffer is the raw buffer of the keyboard backlight.
-//
-// It is a part of the lighting on its own, because the layers above that
-// only report the lighting never read the raw buffer.
-type LightingBuffer interface {
-	// BacklightBuffer reads the raw buffer of the keyboard backlight.
-	//
-	// The buffer is sixteen bytes long, the level sits in byte two and in
-	// byte five and byte eight holds the flags of the backlight.
-	BacklightBuffer() ([]byte, error)
-}
-
 // LightingReset is the reset of the keyboard lighting.
 //
 // It is a part of the lighting on its own, because the layers above that
@@ -88,15 +76,6 @@ type FansReader interface {
 type FansWriter interface {
 	// SetFans applies a fan configuration.
 	SetFans(config FanConfig) error
-}
-
-// FanTableReader is the table of the fans.
-//
-// It is a part of the fan configuration on its own, because the layers
-// above read the table without changing it.
-type FanTableReader interface {
-	// FanTable reads the selected fan table.
-	FanTable() (uint64, error)
 }
 
 // CoolBoostReader is the boost of the fans.
@@ -150,10 +129,8 @@ type Gaming interface {
 	LightingConfig
 	LightingWriter
 	LightingReset
-	LightingBuffer
 	FansReader
 	FansWriter
-	FanTableReader
 	CoolBoostReader
 	SwitchesReader
 }

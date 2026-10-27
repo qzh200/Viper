@@ -115,96 +115,11 @@ func (f *fakeService) Close() error {
 	return nil
 }
 
-// fakeFirmware is a stand for the ACPI provider.
-type fakeFirmware struct {
-	coolBoost  bool
-	fanTable   uint64
-	overclock  bool
-	overclockG bool
-	buffer     []byte
-	reset      bool
-	closed     bool
-	opened     int
-	err        error
-	// winKey is the state of the lock of the Windows key.
-	winKey bool
-}
-
-func (f *fakeFirmware) WinKeyLocked() (bool, error) {
-	if f.err != nil {
-		return false, f.err
-	}
-	return f.winKey, nil
-}
-
-func (f *fakeFirmware) SetWinKeyLocked(locked bool) error {
-	if f.err != nil {
-		return f.err
-	}
-	f.winKey = locked
-	return nil
-}
-
-func (f *fakeFirmware) CoolBoostEnabled() (bool, error) {
-	if f.err != nil {
-		return false, f.err
-	}
-	return f.coolBoost, nil
-}
-
-func (f *fakeFirmware) CoolBoost(enabled bool) error {
-	if f.err != nil {
-		return f.err
-	}
-	f.coolBoost = enabled
-	return nil
-}
-
-func (f *fakeFirmware) FanTable() (uint64, error) {
-	if f.err != nil {
-		return 0, f.err
-	}
-	return f.fanTable, nil
-}
-
-func (f *fakeFirmware) OverclockCapability() (bool, bool, error) {
-	if f.err != nil {
-		return false, false, f.err
-	}
-	return f.overclockG, f.overclock, nil
-}
-
-func (f *fakeFirmware) BacklightBuffer() ([]byte, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.buffer, nil
-}
-
-func (f *fakeFirmware) ResetLighting() error {
-	if f.err != nil {
-		return f.err
-	}
-	f.reset = true
-	return nil
-}
-
-func (f *fakeFirmware) Close() { f.closed = true }
-
-// newBackend builds a backend on top of the stands.
-func newBackend(t *testing.T, service *fakeService, firmware *fakeFirmware) *Backend {
+// newBackend builds a backend on top of the stand for the service.
+func newBackend(t *testing.T, service *fakeService) *Backend {
 	t.Helper()
-
-	backend := NewWithService(service, func() (Extras, error) {
-		if firmware == nil {
-			return nil, errors.New("没有固件")
-		}
-		firmware.opened++
-		return firmware, nil
-	})
-	return backend
+	return NewWithService(service)
 }
-
 func TestSensorsComeFromTheReadingsOfTheService(t *testing.T) {
 	service := newFakeService()
 	service.monitor = answer(map[string]any{
@@ -215,7 +130,7 @@ func TestSensorsComeFromTheReadingsOfTheService(t *testing.T) {
 		"GPU1_FANSPEED":    2705,
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	sensors, err := backend.Sensors()
 	if err != nil {
@@ -242,7 +157,7 @@ func TestSensorsFailWhenTheServiceIsGone(t *testing.T) {
 	service := newFakeService()
 	service.getErr = errors.New("服务不可达")
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.Sensors(); err == nil {
 		t.Fatal("服务不可达时不该读出传感器")
@@ -254,7 +169,7 @@ func TestPowerModeIsReadFromTheService(t *testing.T) {
 	service.answers[agentservice.FunctionOperatingMode] = answer(
 		map[string]any{"mode": 4}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	mode, err := backend.PowerMode()
 	if err != nil {
@@ -267,7 +182,7 @@ func TestPowerModeIsReadFromTheService(t *testing.T) {
 
 func TestPowerModeIsWrittenWithTheNumberOfTheMachine(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetPowerMode(hardware.PowerTurbo); err != nil {
 		t.Fatalf("写入性能档位失败: %v", err)
@@ -292,7 +207,7 @@ func TestGPUModeCountsFromZeroInTheService(t *testing.T) {
 	service.answers[agentservice.FunctionGPUMode] = answer(
 		map[string]any{"mode": 1}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	mode, err := backend.GPUMode()
 	if err != nil {
@@ -313,7 +228,7 @@ func TestGPUModeCountsFromZeroInTheService(t *testing.T) {
 
 func TestGPUModeIsWrittenWithTheNumberOfTheService(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetGPUMode(hardware.GPUModeHybrid); err != nil {
 		t.Fatalf("写入显卡模式失败: %v", err)
@@ -339,7 +254,7 @@ func TestSwitchesAreReadAndWrittenWithTheirState(t *testing.T) {
 	service.answers[agentservice.FunctionBootSound] = answer(
 		map[string]any{"status": 1}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	overdrive, err := backend.LCDOverdrive()
 	if err != nil {
@@ -387,7 +302,7 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 		"direction":  1,
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	lighting, err := backend.Lighting()
 	if err != nil {
@@ -421,7 +336,7 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 
 func TestLightingIsWrittenWithTheZonesOfTheKeyboard(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.RGBConfig{
 		Effect:     hardware.EffectMeteor,
@@ -467,7 +382,7 @@ func TestLightingIsWrittenWithTheZonesOfTheKeyboard(t *testing.T) {
 
 func TestLightingIsLimitedToTheRangeOfTheMachine(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.RGBConfig{
 		Effect:     hardware.EffectStatic,
@@ -498,7 +413,7 @@ func TestBacklightIsReadFromTheService(t *testing.T) {
 	service.answers[agentservice.FunctionBacklightTimeout] = answer(
 		map[string]any{"status": 1}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	backlight, err := backend.Backlight()
 	if err != nil {
@@ -524,7 +439,7 @@ func TestBacklightIsWrittenWithoutLosingTheColours(t *testing.T) {
 		"direction":  0,
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if err := backend.SetBacklight(70, true); err != nil {
 		t.Fatalf("写入背光失败: %v", err)
@@ -562,7 +477,7 @@ func TestFansAreReadFromTheService(t *testing.T) {
 		},
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	state, err := backend.Fans()
 	if err != nil {
@@ -592,7 +507,7 @@ func TestFansInMaximumMode(t *testing.T) {
 		},
 	}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	state, err := backend.Fans()
 	if err != nil {
@@ -608,7 +523,7 @@ func TestFansInUnknownMode(t *testing.T) {
 	service.answers[agentservice.FunctionFanControl] = answer(
 		map[string]any{"mode": 7}, agentservice.ResultOK)
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.Fans(); err == nil {
 		t.Fatal("不认识的风扇模式该报错")
@@ -617,7 +532,7 @@ func TestFansInUnknownMode(t *testing.T) {
 
 func TestFansAreWrittenWithTheModeOfTheService(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.FanConfig{
 		CPUMode:    hardware.FanMax,
@@ -635,7 +550,7 @@ func TestFansAreWrittenWithTheModeOfTheService(t *testing.T) {
 
 func TestFansAreWrittenWithTheDutyCycles(t *testing.T) {
 	service := newFakeService()
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	config := hardware.FanConfig{
 		CPUMode:    hardware.FanCustom,
@@ -675,7 +590,7 @@ func TestFansAreCheckedAfterTheWrite(t *testing.T) {
 		map[string]any{"mode": fanModeAuto}, agentservice.ResultOK)
 	service.stale = map[string]bool{agentservice.FunctionFanControl: true}
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	err := backend.SetFans(hardware.FanConfig{
 		CPUMode: hardware.FanCustom,
@@ -686,131 +601,6 @@ func TestFansAreCheckedAfterTheWrite(t *testing.T) {
 	}
 }
 
-func TestFansNeedTheFirmwareForTheBoost(t *testing.T) {
-	service := newFakeService()
-	backend := newBackend(t, service, nil)
-
-	// 加速就是全速：原厂服务的风扇模式 1。所以它不碰固件。
-	err := backend.SetFans(hardware.FanConfig{
-		CPUMode:   hardware.FanAuto,
-		GPUMode:   hardware.FanAuto,
-		CoolBoost: true,
-	})
-	if err != nil {
-		t.Fatalf("写入加速失败: %v", err)
-	}
-	if len(service.writes) != 1 {
-		t.Fatalf("服务收到了 %d 次写入，不是 1 次", len(service.writes))
-	}
-	if mode := service.writes[0].Parameter["mode"]; mode != fanModeMax {
-		t.Fatalf("写的风扇模式是 %v，不是 %d", mode, fanModeMax)
-	}
-}
-
-func TestFirmwareAnswersTheSettingsTheServiceDoesNotKnow(t *testing.T) {
-	service := newFakeService()
-	firmware := &fakeFirmware{
-		coolBoost:  true,
-		fanTable:   hardware.FanTableBoost,
-		overclock:  true,
-		overclockG: false,
-		buffer:     []byte{0, 0x64, 0, 0, 0},
-	}
-	backend := newBackend(t, service, firmware)
-
-	table, err := backend.FanTable()
-	if err != nil {
-		t.Fatalf("读取风扇表失败: %v", err)
-	}
-	if table != hardware.FanTableBoost {
-		t.Errorf("风扇表是 %d，不是 %d", table, hardware.FanTableBoost)
-	}
-
-	gpu, cpu, err := backend.OverclockCapability()
-	if err != nil {
-		t.Fatalf("读取超频能力失败: %v", err)
-	}
-	if gpu || !cpu {
-		t.Errorf("超频能力是显卡 %v 处理器 %v，不是显卡假处理器真", gpu, cpu)
-	}
-
-	buffer, err := backend.BacklightBuffer()
-	if err != nil {
-		t.Fatalf("读取背光缓冲区失败: %v", err)
-	}
-	if len(buffer) != 5 {
-		t.Errorf("背光缓冲区是 %d 个字节，不是 5 个", len(buffer))
-	}
-
-	if err := backend.ResetLighting(); err != nil {
-		t.Fatalf("复位灯效失败: %v", err)
-	}
-	if !firmware.reset {
-		t.Error("灯效没有复位")
-	}
-}
-
-func TestFirmwareIsOpenedOnlyOnce(t *testing.T) {
-	service := newFakeService()
-	firmware := &fakeFirmware{}
-	backend := newBackend(t, service, firmware)
-
-	for i := 0; i < 3; i++ {
-		if _, err := backend.FanTable(); err != nil {
-			t.Fatalf("第 %d 次读取风扇表失败: %v", i+1, err)
-		}
-	}
-	if firmware.opened != 1 {
-		t.Fatalf("固件开了 %d 次，不是 1 次", firmware.opened)
-	}
-}
-
-func TestSettingsThatNeedTheFirmwareReportIt(t *testing.T) {
-	service := newFakeService()
-	backend := newBackend(t, service, nil)
-
-	if _, _, err := backend.OverclockCapability(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-	if _, err := backend.FanTable(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-	if _, err := backend.BacklightBuffer(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-	if err := backend.ResetLighting(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-	if _, err := backend.WinKeyLocked(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-}
-
-func TestAFirmwareThatIsNotThere(t *testing.T) {
-	service := newFakeService()
-	backend := NewWithService(service, func() (Extras, error) {
-		return nil, errors.New("没有实例")
-	})
-
-	if _, err := backend.FanTable(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-}
-
-func TestAFirmwareThatIsAnEmptyPointer(t *testing.T) {
-	service := newFakeService()
-	backend := NewWithService(service, func() (Extras, error) {
-		// An interface that holds an empty pointer is not equal to nil, so
-		// a guard that only asks the interface would let the call through.
-		var firmware *fakeFirmware
-		return firmware, nil
-	})
-
-	if _, err := backend.FanTable(); !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
-	}
-}
-
 func TestTheServiceThatRefusesARequest(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionStickyKey] = agentservice.Answer{
@@ -818,28 +608,20 @@ func TestTheServiceThatRefusesARequest(t *testing.T) {
 		Result:  agentservice.ResultFailed,
 	}
 
-	backend := newBackend(t, service, nil)
+	backend := newBackend(t, service)
 
 	if _, err := backend.get(agentservice.FunctionStickyKey); err == nil {
 		t.Fatal("服务没有执行这次操作时该报错")
 	}
 }
 
-func TestCloseReleasesBothConnections(t *testing.T) {
+func TestCloseEndsTheSessionWithTheService(t *testing.T) {
 	service := newFakeService()
-	firmware := &fakeFirmware{}
-	backend := newBackend(t, service, firmware)
-
-	if _, err := backend.FanTable(); err != nil {
-		t.Fatalf("读取风扇表失败: %v", err)
-	}
+	backend := newBackend(t, service)
 
 	backend.Close()
 
 	if !service.closed {
 		t.Error("与服务的会话没有结束")
-	}
-	if !firmware.closed {
-		t.Error("与固件的连接没有结束")
 	}
 }

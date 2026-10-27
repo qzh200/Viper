@@ -29,24 +29,6 @@ func (m FanMode) String() string {
 
 // providerCode maps the mode onto the bit encoding the EC expects.
 
-// decodeFanMode maps the provider's behaviour bits back onto a mode.
-//
-// 固件把行为编码乘以 256 之后放在答案的第二个字节里（也就是位 8 到位 15），
-// 所以读回来时用 (raw>>8)&0x3 取值。编码和写入时用的是同一套编号：
-// 1 是自动，2 是最大转速，3 是固定占空比。
-func decodeFanMode(bits uint64) FanMode {
-	switch bits {
-	case 1:
-		return FanAuto
-	case 2:
-		return FanMax
-	case 3:
-		return FanCustom
-	default:
-		return FanAuto
-	}
-}
-
 // PowerMode is the performance profile of the machine.
 type PowerMode int
 
@@ -320,37 +302,6 @@ func ParseLightingEffect(name string) (LightingEffect, bool) {
 	}
 }
 
-// MiscSetting identifies one of the provider's miscellaneous settings.
-//
-// The provider keeps a small table of switches. A setting is addressed by
-// its identifier and carries its value in the upper byte of the same word.
-type MiscSetting uint32
-
-// The miscellaneous settings that are known.
-//
-// Only the settings below the tenth identifier are writable, everything
-// else answers with an undefined error.
-//
-// 编号 0x01 和 0x08 也能写，但写入之后看不到任何变化，它们的含义至今没有
-// 弄清楚，所以这里不封装它们，也不去猜它们代表什么。
-const (
-	// MiscGPUMode selects the graphics switch of the machine.
-	MiscGPUMode MiscSetting = 0x02
-	// MiscBootSound switches the sound at the start of the machine.
-	MiscBootSound MiscSetting = 0x06
-	// MiscGPUModeCapability reports which graphics modes the machine
-	// supports.
-	//
-	// 这一项不是开关的状态。真机上读到的是 7，与原厂服务能力表
-	// SUPPORT_GPU_MODE_CAPABILITY 里的 7 相同，机器支持显卡模式的能力是
-	// 七。把它当成开关会让"独显已连接"永远是假的。
-	MiscGPUModeCapability MiscSetting = 0x09
-	// MiscCPUOverclock reports the CPU overclock capability.
-	MiscCPUOverclock MiscSetting = 0x0A
-	// MiscOperationMode selects the performance profile.
-	MiscOperationMode MiscSetting = 0x0B
-)
-
 // GPUMode is the way the machine drives the graphics chip.
 //
 // The numbering is the one of the original service, it describes the
@@ -408,4 +359,65 @@ func clampUint(value, low, high uint64) uint64 {
 		return high
 	}
 	return value
+}
+
+// LightingZones is the number of lighting zones the keyboard has.
+const LightingZones = 4
+
+// Sensors is a snapshot of the machine temperatures and fan speeds.
+type Sensors struct {
+	// CPUTempC is the temperature of the processor in degrees.
+	CPUTempC int
+	// CPUFanRPM is the speed of the fan of the processor.
+	CPUFanRPM int
+	// GPUTempC is the temperature of the graphics card in degrees.
+	GPUTempC int
+	// GPUFanRPM is the speed of the fan of the graphics card.
+	GPUFanRPM int
+	// SystemTempC is the temperature of the motherboard in degrees.
+	SystemTempC int
+}
+
+// FanState describes the current fan configuration.
+type FanState struct {
+	// CPUMode is the behaviour of the CPU fan.
+	CPUMode FanMode
+	// GPUMode is the behaviour of the GPU fan.
+	//
+	// 原厂服务读得回显卡风扇组的行为，所以这个字段在这条路上是有意义的。
+	GPUMode FanMode
+	// GPUModeReadable reports whether the behaviour of the graphics fan was
+	// read back from the machine.
+	GPUModeReadable bool
+	// CPUPercent is the duty cycle the CPU fan was last configured with.
+	//
+	// In automatic mode the embedded controller runs its own curve, so the
+	// value is only the last requested setting and not the current speed.
+	CPUPercent int
+	// GPUPercent is the duty cycle the GPU fan was last configured with.
+	GPUPercent int
+	// CoolBoost reports whether the fans run at full speed.
+	CoolBoost bool
+}
+
+// FanConfig describes a requested fan configuration.
+type FanConfig struct {
+	// CPUMode is the requested behaviour of the CPU fan.
+	CPUMode FanMode
+	// GPUMode is the requested behaviour of the GPU fan.
+	GPUMode FanMode
+	// CPUPercent is the requested duty cycle of the CPU fan.
+	CPUPercent int
+	// GPUPercent is the requested duty cycle of the GPU fan.
+	GPUPercent int
+	// CoolBoost requests the fans at full speed.
+	CoolBoost bool
+}
+
+// BacklightState describes the keyboard backlight.
+type BacklightState struct {
+	// Brightness is the backlight level, 0 to 100.
+	Brightness int
+	// Timeout reports whether the backlight switches off after 30 seconds.
+	Timeout bool
 }

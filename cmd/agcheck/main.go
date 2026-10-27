@@ -14,7 +14,6 @@ import (
 	"os"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
 	"viper/internal/machine"
 )
 
@@ -51,15 +50,7 @@ func main() {
 // 这一段走的是 internal/machine：原厂程序是主要依赖，固件那一侧只补原厂
 // 程序给不了的那几项。它是这一层与真机之间的验证。
 func readMachine() {
-	backend, err := machine.New(machine.Options{
-		OpenFirmware: func() (machine.Extras, error) {
-			provider, err := hardware.OpenFirmware()
-			if err != nil {
-				return nil, err
-			}
-			return provider, nil
-		},
-	})
+	backend, err := machine.New(machine.Options{})
 	if err != nil {
 		fmt.Println("打开机器失败:", err)
 		os.Exit(1)
@@ -122,13 +113,6 @@ func readMachine() {
 		fmt.Println("  读取背光失败:", err)
 	} else {
 		fmt.Printf("  背光亮度 %d，超时 %v\n", backlight.Brightness, backlight.Timeout)
-	}
-
-	// 原厂服务不管的几项走固件那一侧，这一层需要管理员权限。
-	if _, err := backend.FanTable(); err != nil {
-		fmt.Println("  读取风扇表失败:", err)
-	} else {
-		fmt.Println("  风扇表: 读到了")
 	}
 }
 

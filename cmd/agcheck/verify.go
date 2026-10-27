@@ -32,15 +32,7 @@ type step struct {
 
 // verify changes every setting and restores it.
 func verify() {
-	backend, err := machine.New(machine.Options{
-		OpenFirmware: func() (machine.Extras, error) {
-			provider, err := hardware.OpenFirmware()
-			if err != nil {
-				return nil, err
-			}
-			return provider, nil
-		},
-	})
+	backend, err := machine.New(machine.Options{})
 	if err != nil {
 		fmt.Println("打开机器失败:", err)
 		os.Exit(1)
