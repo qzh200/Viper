@@ -49,6 +49,18 @@ type Fans struct {
 	CoolBoost bool `json:"coolBoost"`
 }
 
+// Scenario is a named set of settings.
+//
+// The scenarios carry the lighting and the fans, so that every
+// performance profile can have its own look. The original software stores
+// them in the same way, it calls them scenes.
+type Scenario struct {
+	// Lighting is the keyboard lighting of the scenario.
+	Lighting Lighting `json:"lighting"`
+	// Fans is the fan configuration of the scenario.
+	Fans Fans `json:"fans"`
+}
+
 // Settings is the complete state of Viper.
 type Settings struct {
 	// Lighting is the keyboard lighting.
@@ -59,6 +71,11 @@ type Settings struct {
 	PowerMode uint64 `json:"powerMode"`
 	// BacklightTimeout reports whether the backlight switches off.
 	BacklightTimeout bool `json:"backlightTimeout"`
+	// Scenarios holds the saved scenes, indexed by their name.
+	Scenarios map[string]Scenario `json:"scenarios"`
+	// Bindings ties a performance profile to a scene, the key is the
+	// name of the profile and the value the name of the scene.
+	Bindings map[string]string `json:"bindings"`
 }
 
 // Store reads and writes the settings.
@@ -85,6 +102,8 @@ func Default() Settings {
 		},
 		PowerMode:        1,
 		BacklightTimeout: true,
+		Scenarios:        map[string]Scenario{},
+		Bindings:         map[string]string{},
 	}
 }
 
@@ -96,8 +115,13 @@ func Open() (*Store, error) {
 	if err != nil {
 		dir = os.TempDir()
 	}
-	path := filepath.Join(dir, "Viper", "config.json")
+	return OpenAt(filepath.Join(dir, "Viper", "config.json"))
+}
 
+// OpenAt loads the settings from the given file.
+//
+// A missing file is not an error, the defaults are used instead.
+func OpenAt(path string) (*Store, error) {
 	store := &Store{path: path, settings: Default()}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -109,6 +133,13 @@ func Open() (*Store, error) {
 	if err := json.Unmarshal(data, &store.settings); err != nil {
 		// A broken file must not stop the program, the defaults are used.
 		store.settings = Default()
+	}
+	// An older file has no scenes, the maps have to exist anyway.
+	if store.settings.Scenarios == nil {
+		store.settings.Scenarios = map[string]Scenario{}
+	}
+	if store.settings.Bindings == nil {
+		store.settings.Bindings = map[string]string{}
 	}
 	return store, nil
 }
