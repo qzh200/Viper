@@ -94,17 +94,17 @@ func TestTheReadingsOfTheMachine(t *testing.T) {
 	if data.RAMFrequencyMHz != 5600 {
 		t.Errorf("内存频率是 %d，不是 5600", data.RAMFrequencyMHz)
 	}
-	if data.WIFIDownload < 94 || data.WIFIDownload > 95 {
-		t.Errorf("无线下行是 %v，不是 94.7", data.WIFIDownload)
+	if data.WIFIDownloadKbps < 94 || data.WIFIDownloadKbps > 95 {
+		t.Errorf("无线下行是 %v，不是 94.7", data.WIFIDownloadKbps)
 	}
-	if data.WIFIUpload < 220 || data.WIFIUpload > 221 {
-		t.Errorf("无线上行是 %v，不是 220.5", data.WIFIUpload)
+	if data.WIFIUploadKbps < 220 || data.WIFIUploadKbps > 221 {
+		t.Errorf("无线上行是 %v，不是 220.5", data.WIFIUploadKbps)
 	}
-	if data.EthernetDownload != 1.5 {
-		t.Errorf("有线下行是 %v，不是 1.5", data.EthernetDownload)
+	if data.EthernetDownloadKbps != 1.5 {
+		t.Errorf("有线下行是 %v，不是 1.5", data.EthernetDownloadKbps)
 	}
-	if data.EthernetUpload != 2.5 {
-		t.Errorf("有线上行是 %v，不是 2.5", data.EthernetUpload)
+	if data.EthernetUploadKbps != 2.5 {
+		t.Errorf("有线上行是 %v，不是 2.5", data.EthernetUploadKbps)
 	}
 }
 

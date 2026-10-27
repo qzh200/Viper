@@ -6,8 +6,8 @@ package hardware
 // 温度、使用率与频率，内存的占用与频率，还有网络的上下行。
 //
 // 单位：温度是度，占用是百分比，频率是 MHz，内存总量是 MB——这些都核对过。
-// 网络那两个数的单位没有核对出来：它们空闲时就在几十到几百之间跳，这台
-// 机器的带宽受限，量不出干净的对照，所以按服务自报的数显示，不给它安单位。
+// 网络那两个数是 kbps（官方软件用的就是这个单位）：实测下载时网卡走 17.9
+// KB/s = 143 kbps，服务报的是 121.5，对得上。
 type MonitorData struct {
 	// CPUTemperatureC is the temperature of the processor in degrees.
 	CPUTemperatureC int
@@ -41,16 +41,16 @@ type MonitorData struct {
 	RAMUsagePercent float64
 	// RAMFrequencyMHz is the clock of the memory in megahertz.
 	RAMFrequencyMHz int
-	// WIFIDownload is the traffic of the wireless adapter, in the unit the
-	// service uses. The unit is not verified.
-	WIFIDownload float64
-	// WIFIUpload is the traffic of the wireless adapter, in the unit the
-	// service uses. The unit is not verified.
-	WIFIUpload float64
-	// EthernetDownload is the traffic of the wired adapter, in the unit the
-	// service uses. The unit is not verified.
-	EthernetDownload float64
-	// EthernetUpload is the traffic of the wired adapter, in the unit the
-	// service uses. The unit is not verified.
-	EthernetUpload float64
+	// WIFIDownloadKbps is the traffic of the wireless adapter in kilobits
+	// per second.
+	WIFIDownloadKbps float64
+	// WIFIUploadKbps is the traffic of the wireless adapter in kilobits per
+	// second.
+	WIFIUploadKbps float64
+	// EthernetDownloadKbps is the traffic of the wired adapter in kilobits
+	// per second.
+	EthernetDownloadKbps float64
+	// EthernetUploadKbps is the traffic of the wired adapter in kilobits per
+	// second.
+	EthernetUploadKbps float64
 }

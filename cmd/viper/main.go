@@ -220,8 +220,9 @@ func printTelemetry(telemetry app.Telemetry) {
 	fmt.Println("  Motherboard / VRM :", monitor.SystemTempC, "C")
 	fmt.Printf("  Memory            : %.1f %% of %.0f MB @ %d MHz\n",
 		monitor.RAMUsagePercent, monitor.RAMTotalMB, monitor.RAMFrequencyMHz)
-	fmt.Printf("  Network           : wifi down %.1f up %.1f, ethernet down %.1f up %.1f\n",
-		monitor.WIFIDownload, monitor.WIFIUpload, monitor.EthernetDownload, monitor.EthernetUpload)
+	fmt.Printf("  Network           : wifi down %.1f up %.1f kbps, ethernet down %.1f up %.1f kbps\n",
+		monitor.WIFIDownloadKbps, monitor.WIFIUploadKbps,
+		monitor.EthernetDownloadKbps, monitor.EthernetUploadKbps)
 
 	if len(monitor.CPUCoreFrequencyMHz) > 0 {
 		clocks := monitor.CPUCoreFrequencyMHz
