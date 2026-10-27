@@ -48,6 +48,8 @@ func run(args []string) error {
 		return runCharge(args[1:])
 	case "bootsound", "sound":
 		return runBootSound(args[1:])
+	case "powerstatus":
+		return runPowerStatus()
 	case "diag", "diagnostics":
 		return runDiag()
 	case "help", "-h", "--help":
@@ -65,6 +67,7 @@ func usage() {
 
 Usage:
   viper status                      live temperatures and fan speeds
+  viper powerstatus                  power supply and battery, no rights needed
   viper fans                        show the fan configuration
   viper fan auto                    hand the fans back to the controller
   viper fan max                     run the fans at full speed
@@ -129,6 +132,34 @@ func runStatus() error {
 	fmt.Println("  GPU temperature   :", sensors.GPUTempC, "C")
 	fmt.Println("  GPU fan speed     :", sensors.GPUFanRPM, "RPM")
 	fmt.Println("  Motherboard / VRM :", sensors.SystemTempC, "C")
+	return nil
+}
+
+// runPowerStatus prints the power supply of the machine.
+//
+// The information comes from the kernel of Windows, so this command works
+// without the rights of an administrator.
+func runPowerStatus() error {
+	application, err := app.New()
+	if err != nil {
+		return err
+	}
+	defer application.Close()
+
+	power, err := application.PowerStatus()
+	if err != nil {
+		return err
+	}
+	fmt.Println("  Power supply      :", power)
+	if power.OnBattery {
+		fmt.Println("  Battery           :", power.BatteryPercent, "%")
+	}
+	if power.BatteryLow {
+		fmt.Println("  The battery is running low")
+	}
+	if power.BatteryCritical {
+		fmt.Println("  The battery is almost empty")
+	}
 	return nil
 }
 

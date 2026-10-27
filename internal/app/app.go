@@ -80,6 +80,14 @@ func (a *App) Sensors() (hardware.Sensors, error) {
 	return backend.Sensors()
 }
 
+// PowerStatus reads the power supply of the machine.
+//
+// The information comes from the kernel of Windows, so it needs neither the
+// gaming provider nor the services of the original software.
+func (a *App) PowerStatus() (hardware.PowerStatus, error) {
+	return hardware.SystemPowerStatus()
+}
+
 // Lighting returns the keyboard lighting.
 //
 // The brightness comes from the firmware, the effect and the colours from
