@@ -3,6 +3,7 @@
 package wmi
 
 import (
+	"os"
 	"testing"
 )
 
@@ -10,6 +11,51 @@ import (
 // below use the standard namespace, which every machine has, so that they
 // do not need the rights of an administrator and do not depend on the
 // hardware of the vendor.
+//
+// The tests share one connection, because opening it costs a second on
+// this machine and the tests would otherwise spend most of their time
+// waiting for it.
+var shared *Client
+
+// processors holds the paths of the processors of the machine. The list
+// is asked for once, because the query of the namespace takes a second
+// on this machine.
+var processors []string
+
+func TestMain(m *testing.M) {
+	client, err := Connect(NamespaceCIM)
+	if err == nil {
+		shared = client
+		paths, err := client.Instances("Win32_Processor")
+		if err == nil {
+			processors = paths
+		}
+	}
+	code := m.Run()
+	if shared != nil {
+		shared.Close()
+	}
+	os.Exit(code)
+}
+
+// connection returns the shared connection, or skips the test when the
+// namespace is not reachable.
+func connection(t *testing.T) *Client {
+	t.Helper()
+	if shared == nil {
+		t.Skip("the namespace is not reachable")
+	}
+	return shared
+}
+
+// processorPaths returns the paths of the processors of the machine.
+func processorPaths(t *testing.T) []string {
+	t.Helper()
+	if len(processors) == 0 {
+		t.Skip("the processors cannot be listed")
+	}
+	return processors
+}
 
 func TestConnectToTheStandardNamespace(t *testing.T) {
 	client, err := Connect(NamespaceCIM)
@@ -20,11 +66,7 @@ func TestConnectToTheStandardNamespace(t *testing.T) {
 }
 
 func TestInstancesOfTheStandardNamespace(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
+	client := connection(t)
 
 	paths, err := client.Instances("Win32_Processor")
 	if err != nil {
@@ -41,16 +83,8 @@ func TestInstancesOfTheStandardNamespace(t *testing.T) {
 }
 
 func TestReadPropertyOfTheStandardNamespace(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
-
-	paths, err := client.Instances("Win32_Processor")
-	if err != nil || len(paths) == 0 {
-		t.Skipf("the processors cannot be listed: %v", err)
-	}
+	client := connection(t)
+	paths := processorPaths(t)
 
 	value, err := client.ReadProperty(paths[0], "MaxClockSpeed")
 	if err != nil {
@@ -62,16 +96,8 @@ func TestReadPropertyOfTheStandardNamespace(t *testing.T) {
 }
 
 func TestReadPropertyOfAPropertyThatIsNotThere(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
-
-	paths, err := client.Instances("Win32_Processor")
-	if err != nil || len(paths) == 0 {
-		t.Skipf("the processors cannot be listed: %v", err)
-	}
+	client := connection(t)
+	paths := processorPaths(t)
 
 	if _, err := client.ReadProperty(paths[0], "NoSuchProperty"); err == nil {
 		t.Error("a property that is not there was read")

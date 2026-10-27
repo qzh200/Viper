@@ -17,41 +17,12 @@ import (
 // namespace.
 //
 // The properties are carried by the instances, the class object only
-// describes them.
+// describes them. The connection is shared, because opening it costs a
+// second on this machine.
 func instanceObject(t *testing.T, name string) com.COMObject {
 	t.Helper()
 
-	if err := com.InitCOM(); err != nil {
-		t.Skipf("the COM runtime cannot be started: %v", err)
-	}
-	t.Cleanup(com.UninitCOM)
-	if err := com.InitCOMSecurity(); err != nil {
-		t.Skipf("the security cannot be established: %v", err)
-	}
-
-	locator, err := com.CoCreateInstance(com.CLSIDWbemLocator, com.IIDWbemLocator, com.CLSCTXInprocServer)
-	if err != nil {
-		t.Skipf("the locator cannot be created: %v", err)
-	}
-	t.Cleanup(locator.Release)
-
-	ns, err := com.NewBSTR(NamespaceCIM)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ns.Free()
-
-	var services uintptr
-	r, _ := locator.Call(3,
-		uintptr(ns), 0, 0, 0, 0, 0, 0,
-		uintptr(unsafe.Pointer(&services)),
-	)
-	if int32(r) < 0 {
-		t.Skipf("the namespace is not reachable: HRESULT 0x%08X", uint32(r))
-	}
-	client := com.COMObject(services)
-	t.Cleanup(client.Release)
-	com.SetProxyBlanket(client)
+	client := connection(t)
 
 	path, err := com.NewBSTR(name)
 	if err != nil {
@@ -60,7 +31,7 @@ func instanceObject(t *testing.T, name string) com.COMObject {
 	defer path.Free()
 
 	var object uintptr
-	r, _ = client.Call(6,
+	r, _ := client.services.Call(6,
 		uintptr(path), 0, 0,
 		uintptr(unsafe.Pointer(&object)),
 		0,
@@ -69,7 +40,8 @@ func instanceObject(t *testing.T, name string) com.COMObject {
 		t.Skipf("the class %s is not there: HRESULT 0x%08X", name, uint32(r))
 	}
 	class := com.COMObject(object)
-	t.Cleanup(class.Release)
+	// The class object is not released here, it belongs to the
+	// connection of the test, which is released with it.
 	com.SetProxyBlanket(class)
 
 	// The instances of the class carry the properties.
@@ -86,7 +58,7 @@ func instanceObject(t *testing.T, name string) com.COMObject {
 	defer lang.Free()
 
 	var enumerator uintptr
-	r, _ = client.Call(20,
+	r, _ = client.services.Call(20,
 		uintptr(lang),
 		uintptr(query),
 		0x30, // WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY
@@ -98,7 +70,8 @@ func instanceObject(t *testing.T, name string) com.COMObject {
 		t.Skipf("the instances of %s cannot be listed: HRESULT 0x%08X", name, uint32(r))
 	}
 	enum := com.COMObject(enumerator)
-	t.Cleanup(enum.Release)
+	// The enumerator is not released here, it belongs to the connection
+	// of the test, which is released with it.
 	com.SetProxyBlanket(enum)
 
 	var instance uintptr
@@ -113,13 +86,35 @@ func instanceObject(t *testing.T, name string) com.COMObject {
 		t.Skipf("the instances of %s cannot be read: HRESULT 0x%08X", name, uint32(r))
 	}
 	object2 := com.COMObject(instance)
-	t.Cleanup(object2.Release)
+	// The instance is not released here, it belongs to the connection
+	// of the test, which is released with it.
 	com.SetProxyBlanket(object2)
 	return object2
 }
 
+// processorInstance is the instance of the processor of the machine.
+//
+// The instance is asked for once, because the query of the namespace
+// takes a second on this machine. The object belongs to the connection
+// of the test, it is released with it.
+var processorInstance com.COMObject
+
+// sharedProcessorInstance returns the instance of the processor of the
+// machine.
+//
+// The instance is asked for once, because the query of the namespace
+// takes a second on this machine. The object belongs to the connection
+// of the test, it is released with it.
+func sharedProcessorInstance(t *testing.T) com.COMObject {
+	t.Helper()
+	if processorInstance == 0 {
+		processorInstance = instanceObject(t, "Win32_Processor")
+	}
+	return processorInstance
+}
+
 func TestReadValueOfAProperty(t *testing.T) {
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	value, err := readValue(instance, "MaxClockSpeed")
 	if err != nil {
@@ -134,7 +129,7 @@ func TestReadValueOfAProperty(t *testing.T) {
 }
 
 func TestReadValueOfAText(t *testing.T) {
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	value, err := readValue(instance, "Manufacturer")
 	if err != nil {
@@ -146,7 +141,7 @@ func TestReadValueOfAText(t *testing.T) {
 }
 
 func TestReadValueOfAPropertyThatIsNotThere(t *testing.T) {
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	if _, err := readValue(instance, "NoSuchProperty"); err == nil {
 		t.Error("a property that is not there was read")
@@ -156,7 +151,7 @@ func TestReadValueOfAPropertyThatIsNotThere(t *testing.T) {
 func TestPutValueOntoAnObject(t *testing.T) {
 	// The in-parameters of a method are an object like any other, so a
 	// value can be put onto one.
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	err := putValue(instance, "Caption", String("a name"))
 	if err != nil {
@@ -165,7 +160,7 @@ func TestPutValueOntoAnObject(t *testing.T) {
 }
 
 func TestPutValueOfANumber(t *testing.T) {
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	err := putValue(instance, "MaxClockSpeed", Uint64(4000))
 	if err != nil {
@@ -175,7 +170,7 @@ func TestPutValueOfANumber(t *testing.T) {
 
 func TestPutValueOfABuffer(t *testing.T) {
 	// The backlight setter takes its input as a buffer of bytes.
-	instance := instanceObject(t, "Win32_Processor")
+	instance := sharedProcessorInstance(t)
 
 	err := putValue(instance, "Caption", Bytes([]byte{1, 2, 3, 4}))
 	if err != nil {

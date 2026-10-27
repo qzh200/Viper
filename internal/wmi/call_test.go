@@ -11,16 +11,9 @@ import (
 // vendor.
 
 func TestCallOfAStandardMethod(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
+	client := connection(t)
 
-	paths, err := client.Instances("Win32_Processor")
-	if err != nil || len(paths) == 0 {
-		t.Skipf("the processors cannot be listed: %v", err)
-	}
+	paths := processorPaths(t)
 
 	// The method takes an input parameter and answers with the number of
 	// the seconds that the state was kept, so the whole path is covered:
@@ -38,16 +31,9 @@ func TestCallOfAStandardMethod(t *testing.T) {
 }
 
 func TestCallOfAMethodWithAnInputParameter(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
+	client := connection(t)
 
-	paths, err := client.Instances("Win32_Processor")
-	if err != nil || len(paths) == 0 {
-		t.Skipf("the processors cannot be listed: %v", err)
-	}
+	paths := processorPaths(t)
 
 	// The input of the method is a number, the provider accepts it as a
 	// signed integer.
@@ -61,11 +47,7 @@ func TestCallOfAMethodWithAnInputParameter(t *testing.T) {
 }
 
 func TestCallOfAMethodThatIsNotThere(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
+	client := connection(t)
 
 	if _, err := client.Call("Win32_Processor", "NoSuchMethod", "path", nil); err == nil {
 		t.Error("a method that is not there was called")
@@ -73,11 +55,7 @@ func TestCallOfAMethodThatIsNotThere(t *testing.T) {
 }
 
 func TestCallOfAClassThatIsNotThere(t *testing.T) {
-	client, err := Connect(NamespaceCIM)
-	if err != nil {
-		t.Skipf("the namespace is not reachable: %v", err)
-	}
-	defer client.Close()
+	client := connection(t)
 
 	if _, err := client.Call("NoSuchClass", "NoSuchMethod", "path", nil); err == nil {
 		t.Error("a class that is not there was called")
