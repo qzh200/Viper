@@ -1,11 +1,12 @@
 // Package hardware drives the Acer ACPI WMI provider.
 //
-// 这个包是**兜底那一侧**。硬件层的主路是原厂 AcerAgentService（见
-// internal/machine），它读得到分区颜色、灯效、两组风扇的行为、每核实时
-// 频率与显卡使用率，固件这一侧都读不到，而且它不需要管理员权限。
+// 这个包是**补充那一侧**。硬件层主要靠原厂程序：灯光、灯效、风扇、性能档位
+// 与传感器读数都问原厂服务（见 internal/machine），那一侧以系统的身份运行，
+// 不用管理员权限，而且读得到分区颜色与灯效。
 //
-// 这一侧管的是原厂服务不管的几项：风扇加速、风扇表、超频能力、背光原始
-// 缓冲区与复位灯效。它同时也是顶替模式（internal/service）的数据源。
+// 这一侧只在原厂程序给不了的那几项上用：风扇加速、风扇表、超频能力、背光
+// 原始缓冲区与锁 Windows 键。它同时也是顶替模式（internal/service）的数据
+// 源——顶替模式的前提就是原厂服务被停掉。
 //
 // The provider exposes two classes: AcerGamingFunction, which offers the
 // named getters and setters of the gaming hardware, and APGeAction, the

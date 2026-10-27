@@ -4,10 +4,9 @@
 // do not belong to the gaming hardware, such as the blue light shield, are
 // read from the service of the original software.
 //
-// 这一层现在接的还是固件那一侧（internal/hardware），所以灯光的颜色与灯效
-// 还是从设置文件里读的。硬件层的新路线（internal/machine，原厂服务当主路）
-// 已经做好，接线是下一步的事：接上之后，灯光直接读机器真正的样子，原厂服务
-// 读得到分区颜色与灯效，固件那一侧读不到。
+// 硬件层主要靠原厂程序：灯光、灯效、风扇、性能档位与传感器读数都问原厂服务，
+// 它以系统的身份运行，不用管理员权限。直接操控固件只是补充，只用在原厂
+// 程序给不了的那几项上。
 package app
 
 import (
@@ -41,13 +40,9 @@ type abilities interface {
 // The routes the program can reach the machine by.
 const (
 	// routeService goes through the service of the original software. It is
-	// the main road and it needs no rights of an administrator.
+	// the road of the command line, and it needs no rights of an
+	// administrator.
 	routeService = "原厂服务 AcerAgentService"
-
-	// routeFirmware goes through the ACPI provider. It is the road of the
-	// few settings the service does not know, and it needs the rights of
-	// an administrator.
-	routeFirmware = "固件接口 root\\wmi\\AcerGamingFunction"
 )
 
 // App is the running program.
@@ -62,6 +57,8 @@ type App struct {
 	// openBackend 打开到机器的连接。它是可变的，所以用例可以放一个替身
 	// 在真机器的位置上。
 	openBackend func() (hardware.Gaming, string, error)
+	// serviceAddress 是连原厂服务用的地址，空的就是本机默认的端口。
+	serviceAddress string
 	// route 记着程序走的是哪条路：原厂服务还是固件那一侧。
 	route string
 	// closed 记录程序是否已经关闭。关闭之后的程序不再打开硬件。
@@ -123,6 +120,17 @@ type QuickAccess interface {
 	Close() error
 }
 
+// serviceAddress 是程序连原厂服务用的地址。
+//
+// 命令行只有一个 --service 选项，它要在程序开始时就定下来，所以它放在这里。
+var serviceAddress string
+
+// SetServiceAddress changes the address of the service of the original
+// software.
+//
+// 它要在程序开始时调用，早于任何一次连接。
+func SetServiceAddress(address string) { serviceAddress = address }
+
 // New opens the stored settings.
 //
 // The connection to the gaming hardware is opened on first use, the
@@ -141,7 +149,7 @@ func New() (*App, error) {
 // It is used by the tests, so that they do not touch the settings of the
 // user.
 func NewWithStore(store *config.Store) *App {
-	return &App{store: store}
+	return &App{store: store, serviceAddress: serviceAddress}
 }
 
 // NewWithBackend opens the program with the given hardware.
@@ -195,7 +203,9 @@ func (a *App) hardware() (abilities, error) {
 	return a.connect(func() (abilities, error) {
 		open := a.openBackend
 		if open == nil {
-			open = openMachine
+			open = func() (hardware.Gaming, string, error) {
+				return openMachine(a.serviceAddress)
+			}
 		}
 
 		backend, route, err := open()
@@ -209,25 +219,25 @@ func (a *App) hardware() (abilities, error) {
 
 // openMachine opens the connection to the machine.
 //
-// 主路是原厂服务：它以系统的身份运行，程序不用管理员权限就能用它，而且它
-// 读得到分区颜色与灯效，固件那一侧读不到。原厂服务不在的时候退回固件那
-// 一侧，那一侧要管理员权限。
+// 硬件层主要靠原厂程序：这一路唯一的数据源是原厂 AcerAgentService。它不在
+// 的时候**不**直接改走固件——直接操控固件只是补充（原厂程序给不了的那几项
+// 才用得上），不是这条路兜底。两条路是互斥的两条路：客户端路线要原厂
+// 服务在跑，顶替模式是原厂服务停掉、Viper 自己顶上它的端口。
 //
-// 第二个结果是程序走的是哪条路，命令行会把它报出来，免得用的人不知道
-// 自己用的是哪一条。
-func openMachine() (hardware.Gaming, string, error) {
+// 所以原厂服务不在的时候，直接把实情报给用的人。
+//
+// 第二个结果是程序走的是哪条路，命令行会把它报出来。
+func openMachine(address string) (hardware.Gaming, string, error) {
 	backend, err := machine.New(machine.Options{
+		Address:      address,
 		OpenFirmware: hardware.OpenFirmware,
 	})
-	if err == nil {
-		return backend, routeService, nil
+	if err != nil {
+		return nil, "", fmt.Errorf("%w"+
+			"\n  直接操控固件只是补充（原厂程序给不了的那几项才用得上），不是这条路的兜底。",
+			err)
 	}
-
-	firmware, firmwareErr := hardware.NewBackend()
-	if firmwareErr != nil {
-		return nil, "", fmt.Errorf("原厂服务不可达（%v），固件接口也连不上: %w", err, firmwareErr)
-	}
-	return firmware, routeFirmware, nil
+	return backend, routeService, nil
 }
 
 // SetBackendOpener changes the way the program opens the connection to the

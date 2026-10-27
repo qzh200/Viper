@@ -48,8 +48,8 @@ func main() {
 
 // machine reads the machine through the hardware layer of the program.
 //
-// 这一段走的是 internal/machine：原厂服务是主路，固件那一侧只补原厂服务
-// 不管的几项。它是这一层与真机之间的验证。
+// 这一段走的是 internal/machine：原厂程序是主要依赖，固件那一侧只补原厂
+// 程序给不了的那几项。它是这一层与真机之间的验证。
 func readMachine() {
 	backend, err := machine.New(machine.Options{
 		OpenFirmware: hardware.OpenFirmware,

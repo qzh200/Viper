@@ -2,22 +2,26 @@
 
 Acer 游戏本硬件控制中心的 Go 重写版。
 
-它的硬件层走**原厂服务**：官方 PredatorSense 的后台服务
-（`AcerAgentService`）是这台机器上真正管着灯光、风扇、性能档位与传感器
-读数的那一路，Viper 作为它的客户端去问，**不需要管理员权限**。原厂服务不
-管的那几项（风扇加速、风扇表、超频能力、背光原始缓冲区）才走 ACPI 固件
-那一侧，那一侧需要管理员权限。
+**原厂程序是主要调用依赖。** 官方 PredatorSense 的后台服务
+（`AcerAgentService`）是这台机器上真正管着灯光、风扇、性能档位与传感器读数
+的那一路，Viper 作为它的客户端去问，**不需要管理员权限**。Quick Access 服务
+（`AcerQAAgent`）管着蓝光灯、USB 充电这些系统设置。
+
+**直接操控固件只是补充。** 只有原厂程序给不了的那几项——风扇加速、风扇表、
+超频能力、背光原始缓冲区、锁 Windows 键——才走 ACPI 固件那一侧，那一侧需
+要管理员权限。它不是主路挂了拿来顶上的备胎。
 
 ```
                  ┌────────────────────────────────────────────┐
                  │  Viper                                     │
                  │                                            │
    原厂服务 ───▶ │  internal/agentservice ─▶ internal/machine │ ──▶ 硬件层接口
- (46933, SYSTEM) │   （协议客户端）            （新硬件层）    │      ↑
+ (46933, SYSTEM) │   （协议客户端）            （硬件层）      │      ↑
                  │                                            │      │
-   固件 ───────▶ │  internal/hardware（兜底，需要管理员权限）──┘      │
- (root\wmi)      │                                            │      │
-                 │  internal/quickaccess（蓝光灯、USB 充电等）───┘      │
+   原厂 Quick ─▶ │  internal/quickaccess（蓝光灯、USB 充电等）──┘      │
+  (5141, SYSTEM) │                                            │      │
+                 │  internal/hardware（补充：要管理员权限）─────┘      │
+ (root\wmi)      │        只补原厂程序给不了的那几项                   │
                  └────────────────────────────────────────────┘
 ```
 
@@ -25,10 +29,31 @@ Acer 游戏本硬件控制中心的 Go 重写版。
 
 | 部分 | 状态 |
 | :--- | :--- |
-| 新硬件层 `internal/machine` + `internal/agentservice` | ✅ 已完成，真机验证通过 |
-| 命令行接到新硬件层 | ✅ 已接上，**不需要管理员权限** |
-| 顶替模式 `viper-service` | ✅ 保留，用固件那一侧当数据源 |
+| 硬件层 `internal/machine` + `internal/agentservice` | ✅ 已完成，真机验证通过 |
+| 命令行接到硬件层 | ✅ 已接上，**不需要管理员权限** |
+| 顶替模式 `viper-service` | ✅ 保留 |
 | 图形界面 | 🚧 以后再说 |
+
+## 两条路线
+
+两条路线是**互斥**的两条路：
+
+| | 客户端路线 | 顶替模式 |
+| :--- | :--- | :--- |
+| 谁在跑 | 原厂 `AcerAgentService` | Viper 自己（`viper-service`） |
+| 原厂服务 | 在跑 | **停掉**（它被顶掉了） |
+| 46933 端口 | 原厂服务占着 | Viper 占着 |
+| 数据从哪来 | 原厂服务 | 固件那一侧（顶替模式的前提就是原厂服务停着） |
+| 管理员权限 | 不需要 | 需要 |
+
+客户端路线要原厂服务在跑。原厂服务不在的时候，程序直接把实情报给用的人，
+**不偷偷换成固件那一侧**——直接操控固件只是补充，不是这条路兜底的：
+
+```
+$ viper --service 127.0.0.1:1 status
+viper: 原厂服务不可达: agentservice: 原厂服务不可达: 127.0.0.1:1: dial tcp ...
+  直接操控固件只是补充（原厂程序给不了的那几项才用得上），不是这条路兜底的。
+```
 
 命令行会报出自己走的是哪条路：
 
@@ -37,9 +62,6 @@ $ viper status
 instance: AcerAgentService
 route  : 原厂服务 AcerAgentService
 ```
-
-原厂服务不在的时候，它会退回固件那一侧（那一条要管理员权限，而且读不到
-灯光的颜色与灯效）。
 
 ## 原厂服务比固件多读得到什么
 
@@ -144,26 +166,31 @@ route  : 原厂服务 AcerAgentService
 
 ## 架构
 
-```
-cmd/viper          命令行入口
-cmd/viper-service  顶替模式：提供原厂服务的同一个端口
-cmd/agcheck        新客户端的真机验证：读、写、整机读
-cmd/fanproto       风扇三个模式的取证工具
-cmd/pacapture      录原厂服务的应答
-cmd/padiff         原厂服务与 Viper 服务的逐项对照
-cmd/gpucross       显卡遥测与原厂服务的读数对照
-cmd/smbiosdump     机器身份信息的原始结构
+两条路线，互斥：
 
-internal/agentservice 原厂 AcerAgentService 的协议客户端
-internal/machine      硬件层的新路线：原厂服务当主路，固件补它不管的几项
-internal/hardware     ACPI 固件那一侧（兜底 + 顶替模式的数据源）
-internal/wmi          WMI 客户端：实例解析、方法调用、参数类型自适应
-internal/com          COM/OLE 互操作层（VARIANT、BSTR、SAFEARRAY、vtable）
-internal/nvidia       显卡遥测：走显卡驱动的管理库
-internal/quickaccess  原厂 Quick Access 服务客户端（蓝光灯、USB 充电）
-internal/service      顶替模式的协议实现（读写设置、监视数据）
-internal/config       设置持久化
-internal/app          用例层
+```
+客户端路线（命令行）                      顶替模式（viper-service）
+──────────────────────                    ─────────────────────
+原厂 AcerAgentService                    Viper 自己占着 46933
+  46933，以系统的身份运行                          │
+       │                                          │
+       ▼                                          ▼
+internal/agentservice ──▶ internal/machine   internal/service
+  （协议客户端）              （硬件层）          （协议实现）
+                                     │                │
+                                     │                ▼
+                                     │        internal/hardware
+                                     │        （固件那一侧，
+                                     │          要管理员权限）
+                                     │
+                                     └──▶ hardware.Firmware
+                                          （固件那一侧，只补原厂服务
+                                            不管的那几项，要管理员权限）
+
+internal/quickaccess   Quick Access 服务客户端（蓝光灯、USB 充电等，5141）
+internal/nvidia         显卡遥测（走显卡驱动的管理库）
+internal/config        设置持久化
+internal/app           用例层
 ```
 
 规矩与 OpenPredator 项目一致：**硬件层不认识界面，界面层不直接调用 WMI，
@@ -172,6 +199,24 @@ internal/app          用例层
 新硬件层与协议层之间只有两个接口：`machine.Service`（对原厂服务）与
 `hardware.Firmware`（对固件）。两边都不认识对方的实现，所以换掉任何一边都
 不动另一边。
+
+命令行这边只有客户端路线一条：原厂服务不在的时候直接把实情报给用的人，
+**不直接改走固件**——直接操控固件只是补充，只用在原厂程序给不了的那几项上
+（见 `internal/machine/README.md`）。
+
+## 命令与工具
+
+```
+cmd/viper          命令行入口
+cmd/viper-service  顶替模式：提供原厂服务的同一个端口
+cmd/agcheck        新客户端的真机验证：读、写、整机读、逐项改一次再还原
+cmd/fanproto       风扇三个模式的取证工具
+cmd/winkey         WIN_KEY 的语义与能不能写
+cmd/pacapture      录原厂服务的应答
+cmd/padiff         原厂服务与 Viper 服务的逐项对照
+cmd/gpucross       显卡遥测与原厂服务的读数对照
+cmd/smbiosdump     机器身份信息的原始结构
+```
 
 ## 依赖哪些原厂进程
 
@@ -231,8 +276,12 @@ viper-service.exe
 ```
 
 服务默认监听 `127.0.0.1:46933`（原厂服务的端口），用 `-address` 可以换到
-别的端口。这个模式的数据源是固件那一侧（顶替模式的前提就是原厂服务已经
-停掉，客户端那条路这时不可用），所以它需要管理员权限。
+别的端口。
+
+这个模式的数据源是**固件那一侧**：顶替模式的前提就是原厂服务被停掉（它要
+占同一个端口），客户端那条路这时不可用。所以它需要管理员权限，而且它读不到
+灯光的颜色与灯效（固件不报告），官方应用看到的灯效是 Viper 自己记着的那一份。
+这是顶替模式固有的代价，不是"降级"：直接操控固件在客户端路线里只是补充。
 
 服务自己记住的设置：有三项设置**固件里根本没有接口**，服务读不到，也没法
 从机器上问出来。

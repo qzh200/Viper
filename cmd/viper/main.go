@@ -30,6 +30,24 @@ func run(args []string) error {
 		return nil
 	}
 
+	// 全局选项：--service <地址>。
+	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		switch args[0] {
+		case "--service":
+			if len(args) < 2 {
+				return fmt.Errorf("--service needs an address, for example --service 127.0.0.1:46933")
+			}
+			app.SetServiceAddress(args[1])
+			args = args[2:]
+		default:
+			return fmt.Errorf("unknown option %q", args[0])
+		}
+	}
+	if len(args) == 0 {
+		usage()
+		return nil
+	}
+
 	switch args[0] {
 	case "status":
 		return runStatus()
