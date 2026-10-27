@@ -14,6 +14,7 @@ package nvidia
 
 import (
 	"fmt"
+	"sync"
 	"syscall"
 	"unsafe"
 )
@@ -106,7 +107,13 @@ func (t Telemetry) IsIdle() bool {
 }
 
 // The state of the library.
+//
+// The service answers every connection in its own goroutine, so the state
+// is shared by all of them. It is guarded by a lock, because a reading
+// that arrives while the library is being opened would otherwise see a
+// half filled table and dereference a nil pointer.
 var (
+	mutex     sync.Mutex
 	loaded    bool
 	loadError error
 	entry     *library
@@ -117,14 +124,18 @@ var (
 // The library is opened once and kept open, because opening it again for
 // every reading would slow the dashboard down.
 func load() (*library, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if loaded {
 		return entry, loadError
 	}
-	loaded = true
 
 	handle, err := syscall.LoadLibrary("nvml.dll")
 	if err != nil {
 		loadError = fmt.Errorf("nvidia: the management library of the driver is not available: %w", err)
+		entry = nil
+		loaded = true
 		return nil, loadError
 	}
 
@@ -144,6 +155,8 @@ func load() (*library, error) {
 		devicePState:        dll.NewProc("nvmlDeviceGetPState"),
 		systemDriverVersion: dll.NewProc("nvmlSystemGetDriverVersion"),
 	}
+	loadError = nil
+	loaded = true
 	return entry, nil
 }
 
@@ -154,13 +167,20 @@ func Available() bool {
 }
 
 // Close releases the management library.
+//
+// The library is opened again by the next reading, so that the program
+// survives the driver being installed while it runs.
 func Close() {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if entry == nil || entry.handle == 0 {
 		return
 	}
 	entry.shutdown.Call()
 	syscall.FreeLibrary(entry.handle)
 	entry = nil
+	loadError = nil
 	loaded = false
 }
 
