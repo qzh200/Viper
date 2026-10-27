@@ -14,6 +14,7 @@ import (
 
 	"viper/internal/config"
 	"viper/internal/hardware"
+	"viper/internal/nvidia"
 	"viper/internal/quickaccess"
 )
 
@@ -33,7 +34,15 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{store: store}, nil
+	return NewWithStore(store), nil
+}
+
+// NewWithStore opens the program with the given settings.
+//
+// It is used by the tests, so that they do not touch the settings of the
+// user.
+func NewWithStore(store *config.Store) *App {
+	return &App{store: store}
 }
 
 // Close releases the hardware.
@@ -86,6 +95,23 @@ func (a *App) Sensors() (hardware.Sensors, error) {
 // gaming provider nor the services of the original software.
 func (a *App) PowerStatus() (hardware.PowerStatus, error) {
 	return hardware.SystemPowerStatus()
+}
+
+// GPUTelemetry reads the state of the graphics card.
+//
+// The numbers come from the driver of the card. A machine without a card
+// that offers them answers with an empty list.
+func (a *App) GPUTelemetry() ([]nvidia.Telemetry, error) {
+	cards, err := nvidia.Read()
+	if err != nil {
+		// A machine without the driver of the vendor simply has no
+		// telemetry, that is not an error.
+		if nvidia.Available() {
+			return nil, err
+		}
+		return nil, nil
+	}
+	return cards, nil
 }
 
 // Lighting returns the keyboard lighting.
@@ -255,6 +281,9 @@ func (a *App) PowerMode() (hardware.PowerMode, error) {
 }
 
 // SetPowerMode applies a performance profile and remembers it.
+//
+// When a scene is bound to the profile, the scene is applied with it, so
+// that every profile brings its own lighting and its own fans.
 func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -263,8 +292,133 @@ func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	if err := backend.SetPowerMode(mode); err != nil {
 		return err
 	}
-	return a.store.Update(func(s *config.Settings) {
+	if err := a.store.Update(func(s *config.Settings) {
 		s.PowerMode = uint64(mode)
+	}); err != nil {
+		return err
+	}
+
+	scene, ok := a.store.Settings().Bindings[mode.String()]
+	if !ok {
+		return nil
+	}
+	scenario, ok := a.store.Settings().Scenarios[scene]
+	if !ok {
+		return nil
+	}
+	return a.applyScenario(scenario)
+}
+
+// Scenarios returns the saved scenes.
+func (a *App) Scenarios() map[string]config.Scenario {
+	return a.store.Settings().Scenarios
+}
+
+// Bindings returns the scenes that are bound to a performance profile.
+func (a *App) Bindings() map[string]string {
+	return a.store.Settings().Bindings
+}
+
+// SaveScenario stores the current lighting and fans under a name.
+//
+// The fan configuration and the brightness are read from the machine, so
+// the scene holds what the hardware really does. The effect and the
+// colours cannot be read back, they are taken from the settings of Viper.
+func (a *App) SaveScenario(name string) error {
+	if name == "" {
+		return fmt.Errorf("app: the scene needs a name")
+	}
+
+	settings := a.store.Settings()
+	scenario := config.Scenario{
+		Lighting: settings.Lighting,
+		Fans:     settings.Fans,
+	}
+
+	if state, err := a.Fans(); err == nil {
+		scenario.Fans = config.Fans{
+			CPUMode:    uint64(state.CPUMode),
+			GPUMode:    uint64(state.GPUMode),
+			CPUPercent: state.CPUPercent,
+			GPUPercent: state.GPUPercent,
+			CoolBoost:  state.CoolBoost,
+		}
+	}
+
+	if backend, err := a.hardware(); err == nil {
+		// The firmware reports a level of zero while the backlight has
+		// switched itself off, so a zero is not taken for the level the
+		// user has chosen.
+		if brightness, err := backend.LightingBrightness(); err == nil && brightness > 0 {
+			scenario.Lighting.Brightness = brightness
+		}
+	}
+
+	return a.store.Update(func(s *config.Settings) {
+		s.Scenarios[name] = scenario
+	})
+}
+
+// DeleteScenario removes a scene and the bindings that point to it.
+func (a *App) DeleteScenario(name string) error {
+	return a.store.Update(func(s *config.Settings) {
+		delete(s.Scenarios, name)
+		for profile, scene := range s.Bindings {
+			if scene == name {
+				delete(s.Bindings, profile)
+			}
+		}
+	})
+}
+
+// ApplyScenario applies a scene to the machine.
+func (a *App) ApplyScenario(name string) error {
+	scenario, ok := a.store.Settings().Scenarios[name]
+	if !ok {
+		return fmt.Errorf("app: there is no scene called %q", name)
+	}
+	return a.applyScenario(scenario)
+}
+
+// applyScenario writes a scene to the machine and remembers it.
+func (a *App) applyScenario(scenario config.Scenario) error {
+	lighting := hardware.RGBConfig{
+		Effect:     hardware.LightingEffect(scenario.Lighting.Effect),
+		Speed:      scenario.Lighting.Speed,
+		Direction:  scenario.Lighting.Direction,
+		Brightness: scenario.Lighting.Brightness,
+		PerZone:    scenario.Lighting.PerZone,
+	}
+	for i, colour := range scenario.Lighting.Zones {
+		lighting.Zones[i] = hardware.RGBColor{R: colour.R, G: colour.G, B: colour.B}
+	}
+	if err := a.SetLighting(lighting); err != nil {
+		return err
+	}
+
+	return a.SetFans(hardware.FanConfig{
+		CPUMode:    hardware.FanMode(scenario.Fans.CPUMode),
+		GPUMode:    hardware.FanMode(scenario.Fans.GPUMode),
+		CPUPercent: scenario.Fans.CPUPercent,
+		GPUPercent: scenario.Fans.GPUPercent,
+		CoolBoost:  scenario.Fans.CoolBoost,
+	})
+}
+
+// BindScenario ties a performance profile to a scene.
+func (a *App) BindScenario(profile, scene string) error {
+	if _, ok := a.store.Settings().Scenarios[scene]; !ok {
+		return fmt.Errorf("app: there is no scene called %q", scene)
+	}
+	return a.store.Update(func(s *config.Settings) {
+		s.Bindings[profile] = scene
+	})
+}
+
+// UnbindScenario removes the scene of a performance profile.
+func (a *App) UnbindScenario(profile string) error {
+	return a.store.Update(func(s *config.Settings) {
+		delete(s.Bindings, profile)
 	})
 }
 
