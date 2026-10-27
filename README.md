@@ -76,6 +76,52 @@ viper telemetry
 `_v2` 版本本机驱动直接返回"不支持"；性能状态 `nvmlDeviceGetPState`
 这个版本没有导出，所以空闲状态改用使用率判断。
 
+## 顶替原厂服务
+
+官方 PredatorSense 应用**按端口号**连接本机的一个服务来读写机器状态。
+Viper 可以提供同一个服务，官方应用就会改连 Viper。
+
+```powershell
+# 先停掉原厂服务，再让 Viper 顶上它的端口
+viper-service.exe
+```
+
+服务默认监听 `127.0.0.1:46933`（原厂服务的端口），用 `-address` 可以
+换到别的端口。协议是逆向出来的：
+
+```
+请求： "ACER" + uint32(小端) 包标识 + JSON 负载
+应答： 纯 JSON 文档
+包标识：0 初始化 / 10 监视数据 / 20 读设置 / 30 设备 / 40 灯效能力 / 100 写设置
+```
+
+应答的**字节格式**与原厂服务完全一致（jsoncpp 的 StyledWriter：Tab
+缩进、成员按字节序排序、浮点用 `%.17g` 并补 `.0`），`cmd/padiff` 会把
+两个服务的应答逐项对照。
+
+对照结果（`cmd/padiff`，28 个请求）：
+
+| 结果 | 数量 |
+| :--- | :--- |
+| 结构完全一致 | 25 |
+| 字节级完全一致 | 2 |
+| 有可解释差异 | 见下 |
+
+有差异的三项：
+
+| 差异 | 原因 |
+| :--- | :--- |
+| `CPU_MAX_FREQUENCY` 报 2200 而不是 5000 | 原厂服务报的是睿频上限，Windows 的标准接口只给基频；Viper 报「基频与当前频率的较大者」，保证不会出现当前频率高于最大频率 |
+| `CPU_CORE_FREQUENCY` 是空数组 | 每核频率要靠性能计数器，Windows 的性能数据接口在本机初始化失败，Viper 不编造数字 |
+| `WIFI_/ETHERNET_` 上下行速率是 0 | Viper 没有测量网络流量 |
+
+灯效那一项两边本来就不同：原厂服务报的是**官方应用**最后写下的状态，
+Viper 报的是 **Viper 自己的**配置。Viper 顶替之后，官方应用显示的
+就会是 Viper 写的灯效，两边自动同步。
+
+写入路径也验证过（会真实改硬件，随后还原）：写灯光 → 机器真的变成
+`METEOR / 速度 7 / 方向 1 / 亮度 33 / 四色分区`；写开机音效 → 生效。
+
 ## 进程依赖
 
 **核心路径零进程依赖。** 温度、风扇、灯效、性能档位、开机音效、
@@ -156,11 +202,13 @@ instance: AcerGamingFunction.InstanceName="ACPI\\PNP0C14\\APGe_0"
 
 ```
 cmd/viper          命令行入口
+cmd/viper-service  原厂服务的替代实现
 internal/com       COM/OLE 互操作层（VARIANT、BSTR、SAFEARRAY、vtable）
 internal/wmi       WMI 客户端：实例解析、方法调用、参数类型自适应
 internal/hardware  Acer 硬件后端：传感器、风扇、电源、灯效
 internal/nvidia    显卡遥测：走显卡驱动的管理库
 internal/quickaccess 原厂 Quick Access 服务客户端（蓝光灯、USB 充电）
+internal/service   原厂服务的协议实现（读写设置、监视数据）
 internal/config    设置持久化
 internal/app       用例层
 ```
