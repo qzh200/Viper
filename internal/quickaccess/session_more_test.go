@@ -79,10 +79,10 @@ func TestTheCommandOfARequest(t *testing.T) {
 	if _, err := client.Get(CommandUSBCharge); err != nil {
 		t.Fatal(err)
 	}
-	if len(server.requests) == 0 {
+	if len(server.receivedRequests()) == 0 {
 		t.Fatal("the service received no request")
 	}
-	request := server.requests[0]
+	request := server.receivedRequests()[0]
 	if request["Command"] != CommandUSBCharge {
 		t.Errorf("the request is about %v, want %s", request["Command"], CommandUSBCharge)
 	}
@@ -104,10 +104,10 @@ func TestSetACommand(t *testing.T) {
 	if err := client.Set(CommandUSBCharge, 30); err != nil {
 		t.Fatal(err)
 	}
-	if len(server.requests) == 0 {
+	if len(server.receivedRequests()) == 0 {
 		t.Fatal("the service received no request")
 	}
-	request := server.requests[0]
+	request := server.receivedRequests()[0]
 	if request["Action"] != ActionSet {
 		t.Errorf("the action is %v, want %s", request["Action"], ActionSet)
 	}
@@ -308,8 +308,8 @@ func TestSetTheSettingsOfTheService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(server.requests) != 5 {
-		t.Errorf("the service received %d requests, want five", len(server.requests))
+	if len(server.receivedRequests()) != 5 {
+		t.Errorf("the service received %d requests, want five", len(server.receivedRequests()))
 	}
 }
 
@@ -327,8 +327,8 @@ func TestSetTheChargingLimitOfAValueThatIsNotThere(t *testing.T) {
 	if err := client.SetUSBChargeLimit(15); err == nil {
 		t.Error("a limit that the service does not offer was accepted")
 	}
-	if len(server.requests) != 0 {
-		t.Errorf("the service received %d requests, want none", len(server.requests))
+	if len(server.receivedRequests()) != 0 {
+		t.Errorf("the service received %d requests, want none", len(server.receivedRequests()))
 	}
 }
 

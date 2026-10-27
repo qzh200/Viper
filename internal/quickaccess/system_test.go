@@ -122,8 +122,8 @@ func TestTheWriteOfTheNewCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(server.requests) != 4 {
-		t.Fatalf("服务收到了 %d 个请求，想要四个", len(server.requests))
+	if len(server.receivedRequests()) != 4 {
+		t.Fatalf("服务收到了 %d 个请求，想要四个", len(server.receivedRequests()))
 	}
 
 	want := []struct {
@@ -136,7 +136,7 @@ func TestTheWriteOfTheNewCommands(t *testing.T) {
 		{CommandScreenSaverTimeout, float64(600)},
 	}
 	for i, c := range want {
-		request := server.requests[i]
+		request := server.receivedRequests()[i]
 		if request["Command"] != c.command {
 			t.Errorf("第 %d 个请求是关于 %v，想要 %s", i, request["Command"], c.command)
 		}
@@ -162,8 +162,8 @@ func TestSetTheScreenSaverTimeoutOfANegativeTime(t *testing.T) {
 	if err := client.SetScreenSaverTimeout(-1); err == nil {
 		t.Error("一个负的屏保时间被接受了")
 	}
-	if len(server.requests) != 0 {
-		t.Errorf("服务收到了 %d 个请求，想要一个都没有", len(server.requests))
+	if len(server.receivedRequests()) != 0 {
+		t.Errorf("服务收到了 %d 个请求，想要一个都没有", len(server.receivedRequests()))
 	}
 }
 

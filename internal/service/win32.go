@@ -3,6 +3,7 @@
 package service
 
 import (
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -43,7 +44,13 @@ type memoryStatus struct {
 }
 
 // processorTimes holds the times of the last reading.
+//
+// The service answers every connection in its own goroutine, so the
+// readings of the processor run side by side. The state is shared by all
+// of them and has to be guarded, otherwise a reading can see a half
+// written table and the load comes out wrong.
 var processorTimes struct {
+	mutex        sync.Mutex
 	previous     systemTimes
 	havePrevious bool
 }
@@ -76,6 +83,10 @@ func cpuUsage() float64 {
 		Kernel: times.Kernel,
 		User:   times.User,
 	}
+
+	processorTimes.mutex.Lock()
+	defer processorTimes.mutex.Unlock()
+
 	if !processorTimes.havePrevious {
 		processorTimes.previous = current
 		processorTimes.havePrevious = true

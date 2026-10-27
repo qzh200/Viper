@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -31,6 +32,10 @@ type testServer struct {
 	answers map[string]map[string]any
 	// requests records the requests that were received.
 	requests []map[string]any
+	// mutex guards the answers and the requests, because the handler
+	// runs in the goroutine of the connection and the test reads them
+	// from another one.
+	mutex sync.Mutex
 	// refuseHandshake makes the server refuse the WebSocket handshake.
 	refuseHandshake bool
 	// wrongQuestion makes the server answer the authentication with
@@ -66,6 +71,8 @@ func (s *testServer) address() string { return s.listener.Addr().String() }
 
 // answer sets the answer of a command.
 func (s *testServer) answer(command string, value any) *testServer {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	s.answers[command] = map[string]any{"Value": value}
 	return s
 }
@@ -149,13 +156,16 @@ func (s *testServer) handle(conn net.Conn) {
 		if err := json.Unmarshal(payload, &request); err != nil {
 			return
 		}
-		s.requests = append(s.requests, request)
-
 		command, _ := request["Command"].(string)
+
+		s.mutex.Lock()
+		s.requests = append(s.requests, request)
 		answer, ok := s.answers[command]
 		if !ok {
 			answer = map[string]any{"Value": nil}
 		}
+		s.mutex.Unlock()
+
 		document, err := json.Marshal(map[string]any{
 			"PacketType": packetResponse,
 			"Command":    command,
@@ -167,6 +177,15 @@ func (s *testServer) handle(conn net.Conn) {
 		}
 		conn.Write(serverFrame(document))
 	}
+}
+
+// receivedRequests returns the requests that the service received so far.
+func (s *testServer) receivedRequests() []map[string]any {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	out := make([]map[string]any, len(s.requests))
+	copy(out, s.requests)
+	return out
 }
 
 // readServerFrame reads one frame that the client sent.
