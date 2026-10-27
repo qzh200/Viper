@@ -16,17 +16,25 @@ func TestOpenInTheUserProfile(t *testing.T) {
 	// The settings live below the profile of the user. The test points
 	// the profile at a temporary directory, so that it does not touch the
 	// settings of the user.
+	//
+	// The name of the variable that holds the directory of the settings
+	// differs between the systems: Windows reads APPDATA, the others read
+	// XDG_CONFIG_HOME. All of them are set, so that the test stays in its
+	// own directory everywhere.
 	home := t.TempDir()
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("LOCALAPPDATA", home)
 	t.Setenv("APPDATA", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
 
 	store, err := Open()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if store.Path() == "" {
-		t.Error("the store has no path")
+	// The settings have to be inside the temporary directory, otherwise
+	// the test would read the settings of the user.
+	if !strings.HasPrefix(store.Path(), home) {
+		t.Errorf("the settings are at %q, want them inside %q", store.Path(), home)
 	}
 	// A missing file is not an error, the defaults are used.
 	if store.Settings().PowerMode != Default().PowerMode {
