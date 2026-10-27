@@ -150,21 +150,39 @@ func TestReadValueOfAPropertyThatIsNotThere(t *testing.T) {
 
 func TestPutValueOntoAnObject(t *testing.T) {
 	// The in-parameters of a method are an object like any other, so a
-	// value can be put onto one.
+	// value can be put onto one. The value is read back afterwards, a
+	// write that is silently dropped has to be caught.
 	instance := sharedProcessorInstance(t)
 
-	err := putValue(instance, "Caption", String("a name"))
-	if err != nil {
+	if err := putValue(instance, "Caption", String("a name")); err != nil {
 		t.Skipf("the value cannot be put onto the object on this machine: %v", err)
+	}
+
+	value, err := readValue(instance, "Caption")
+	if err != nil {
+		t.Fatalf("the value cannot be read back: %v", err)
+	}
+	if value.Kind != KindString {
+		t.Errorf("the value has the kind %d, want the text", value.Kind)
+	}
+	if value.Str != "a name" {
+		t.Errorf("the value reads back as %q, want %q", value.Str, "a name")
 	}
 }
 
 func TestPutValueOfANumber(t *testing.T) {
 	instance := sharedProcessorInstance(t)
 
-	err := putValue(instance, "MaxClockSpeed", Uint64(4000))
-	if err != nil {
+	if err := putValue(instance, "MaxClockSpeed", Uint64(4000)); err != nil {
 		t.Skipf("the value cannot be put onto the object on this machine: %v", err)
+	}
+
+	value, err := readValue(instance, "MaxClockSpeed")
+	if err != nil {
+		t.Fatalf("the value cannot be read back: %v", err)
+	}
+	if value.UInt64() != 4000 {
+		t.Errorf("the value reads back as %d, want 4000", value.UInt64())
 	}
 }
 
@@ -172,8 +190,17 @@ func TestPutValueOfABuffer(t *testing.T) {
 	// The backlight setter takes its input as a buffer of bytes.
 	instance := sharedProcessorInstance(t)
 
-	err := putValue(instance, "Caption", Bytes([]byte{1, 2, 3, 4}))
-	if err != nil {
+	if err := putValue(instance, "Caption", Bytes([]byte{1, 2, 3, 4})); err != nil {
 		t.Skipf("the buffer cannot be put onto the object on this machine: %v", err)
+	}
+}
+
+func TestPutValueOfAPropertyThatIsNotThere(t *testing.T) {
+	// A property that the object does not carry cannot be written, the
+	// provider refuses it.
+	instance := sharedProcessorInstance(t)
+
+	if err := putValue(instance, "NoSuchProperty", String("a name")); err == nil {
+		t.Error("a property that is not there was written")
 	}
 }
