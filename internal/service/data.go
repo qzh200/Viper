@@ -31,12 +31,12 @@ const (
 // needs the gaming provider is skipped when the provider is not there, so
 // the service also works without the rights of an administrator.
 type Provider struct {
-	backend *hardware.Backend
+	backend hardware.Gaming
 	store   *config.Store
 }
 
 // NewProvider builds a provider.
-func NewProvider(backend *hardware.Backend, store *config.Store) *Provider {
+func NewProvider(backend hardware.Gaming, store *config.Store) *Provider {
 	return &Provider{backend: backend, store: store}
 }
 
@@ -500,7 +500,11 @@ func (p *Provider) MonitorData() map[string]any {
 // reports the clock of the turbo boost, which Windows does not offer
 // through an interface. The clock the machine runs at is never higher than
 // the number that is reported.
-func maximumClock() int {
+//
+// The function is a variable, so that a test can put a number in place of
+// the call to the namespace, which is slow and needs the rights of an
+// administrator on some machines.
+var maximumClock = func() int {
 	clock := processorClock()
 
 	client, err := wmi.Connect(wmi.NamespaceCIM)

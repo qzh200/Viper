@@ -20,7 +20,7 @@ import (
 
 // App is the running program.
 type App struct {
-	backend *hardware.Backend
+	backend hardware.Gaming
 	store   *config.Store
 }
 
@@ -45,6 +45,14 @@ func NewWithStore(store *config.Store) *App {
 	return &App{store: store}
 }
 
+// NewWithBackend opens the program with the given hardware.
+//
+// It is used by the tests, so that they do not need the rights of an
+// administrator to talk to the firmware.
+func NewWithBackend(store *config.Store, backend hardware.Gaming) *App {
+	return &App{store: store, backend: backend}
+}
+
 // Close releases the hardware.
 func (a *App) Close() {
 	if a.backend != nil {
@@ -56,7 +64,7 @@ func (a *App) Close() {
 //
 // The provider refuses the calls without the rights of an administrator,
 // so the connection is only made when a hardware setting is used.
-func (a *App) hardware() (*hardware.Backend, error) {
+func (a *App) hardware() (hardware.Gaming, error) {
 	if a.backend != nil {
 		return a.backend, nil
 	}
