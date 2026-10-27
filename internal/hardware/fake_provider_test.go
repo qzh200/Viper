@@ -32,6 +32,9 @@ type fakeProvider struct {
 	// inputs holds the input word of every method, keyed by the name of
 	// the method.
 	inputs map[string]uint64
+	// byInput holds the answer of a method for every input word, keyed by
+	// the name of the method and then by the input word.
+	byInput map[string]map[uint64]uint64
 	// buffers holds the input buffer of every method, keyed by the name
 	// of the method.
 	buffers map[string][]byte
@@ -52,10 +55,23 @@ func newFakeProvider() *fakeProvider {
 	return &fakeProvider{
 		outputs:   map[string]map[string]wmi.Value{},
 		inputs:    map[string]uint64{},
+		byInput:   map[string]map[uint64]uint64{},
 		buffers:   map[string][]byte{},
 		sequences: map[string][]uint64{},
 		counts:    map[string]int{},
 	}
+}
+
+// answerFor sets the answer of a method for one input word.
+//
+// 固件的杂项设置表按编号回答，每一项的值都不一样。替身按输入字回答，
+// 读回校验才对编号敏感。
+func (p *fakeProvider) answerFor(method string, input uint64, value uint64) *fakeProvider {
+	if p.byInput[method] == nil {
+		p.byInput[method] = map[uint64]uint64{}
+	}
+	p.byInput[method][input] = value
+	return p
 }
 
 // answer sets the answer of a method.
@@ -121,6 +137,24 @@ func (p *fakeProvider) Call(class, method, instancePath string, args map[string]
 		return map[string]wmi.Value{
 			"gmOutput": wmi.Uint64(values[index]),
 			"uiOutput": wmi.Uint64(values[index]),
+		}, nil
+	}
+
+	// A method that is asked for several different things answers with the
+	// value of the thing that was asked for. 固件的杂项设置表按编号回答，
+	// 每一项的值都不一样，只按方法名回答的话读回校验对编号是盲的。
+	if byInput, ok := p.byInput[method]; ok {
+		if value, found := byInput[call.Input]; found {
+			return map[string]wmi.Value{
+				"gmOutput": wmi.Uint64(value),
+				"uiOutput": wmi.Uint64(value),
+			}, nil
+		}
+		// The firmware does not know this one, it answers with an error
+		// in the status byte.
+		return map[string]wmi.Value{
+			"gmOutput": wmi.Uint64(0x00000002),
+			"uiOutput": wmi.Uint64(0x00000002),
 		}, nil
 	}
 

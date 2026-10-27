@@ -33,6 +33,8 @@ type fakeGaming struct {
 
 	// written records the lighting that was applied.
 	written []hardware.RGBConfig
+	// writtenFans records the fan configuration that was applied.
+	writtenFans []hardware.FanConfig
 	// writtenPower records the profile that was applied.
 	writtenPower []hardware.PowerMode
 	// writtenGPUMode records the graphics switch that was applied.
@@ -82,6 +84,8 @@ func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) { return g.lighting,
 
 func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
 	g.written = append(g.written, config)
+	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+	g.lighting = config
 	return nil
 }
 
@@ -98,12 +102,29 @@ func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
 func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	g.writtenBacklight = append(g.writtenBacklight, brightness)
 	g.writtenTimeout = append(g.writtenTimeout, timeout)
+	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+	g.brightness = uint64(brightness)
+	g.backlight = hardware.BacklightState{
+		Brightness: brightness,
+		Timeout:    timeout,
+	}
 	return nil
 }
 
 func (g *fakeGaming) Fans() (hardware.FanState, error) { return g.fans, nil }
 
-func (g *fakeGaming) SetFans(config hardware.FanConfig) error { return nil }
+func (g *fakeGaming) SetFans(config hardware.FanConfig) error {
+	g.writtenFans = append(g.writtenFans, config)
+	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+	g.fans = hardware.FanState{
+		CPUMode:    config.CPUMode,
+		GPUMode:    config.GPUMode,
+		CPUPercent: config.CPUPercent,
+		GPUPercent: config.GPUPercent,
+		CoolBoost:  config.CoolBoost,
+	}
+	return nil
+}
 
 func (g *fakeGaming) WinKeyLocked() (bool, error) { return g.winKeyLocked, nil }
 
