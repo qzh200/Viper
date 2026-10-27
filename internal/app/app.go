@@ -131,18 +131,35 @@ func (a *App) SetLighting(value hardware.RGBConfig) error {
 }
 
 // toStoredLighting converts a lighting configuration into its stored form.
+//
+// The values are limited to the range that the firmware accepts, so that
+// the stored settings never claim more than the keyboard can do. The
+// limits come from the profile of the original software: the brightness
+// runs from zero to one hundred, the speed from one to nine and the
+// direction is a switch.
 func toStoredLighting(value hardware.RGBConfig) config.Lighting {
 	stored := config.Lighting{
 		Effect:     uint64(value.Effect),
-		Speed:      value.Speed,
-		Direction:  value.Direction,
-		Brightness: value.Brightness,
+		Speed:      clamp(value.Speed, 1, 9),
+		Direction:  clamp(value.Direction, 0, 1),
+		Brightness: clamp(value.Brightness, 0, 100),
 		PerZone:    value.PerZone,
 	}
 	for i, colour := range value.Zones {
 		stored.Zones[i] = config.LightingColor{R: colour.R, G: colour.G, B: colour.B}
 	}
 	return stored
+}
+
+// clamp limits a number to the given range.
+func clamp(value uint64, low, high uint64) uint64 {
+	if value < low {
+		return low
+	}
+	if value > high {
+		return high
+	}
+	return value
 }
 
 // ResetLighting restores the default keyboard lighting.
