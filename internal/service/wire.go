@@ -31,7 +31,7 @@ func readRequest(reader io.Reader) (Request, error) {
 		return Request{}, err
 	}
 	if string(header[:4]) != magic {
-		return Request{}, fmt.Errorf("service: the request does not start with the word %s", magic)
+		return Request{}, fmt.Errorf("service: 请求没有以 %s 开头", magic)
 	}
 
 	request := Request{Packet: binary.LittleEndian.Uint32(header[4:])}
@@ -51,7 +51,7 @@ func readRequest(reader io.Reader) (Request, error) {
 		Parameter any    `json:"Parameter"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return Request{}, fmt.Errorf("service: the request cannot be read: %w", err)
+		return Request{}, fmt.Errorf("service: 请求内容无法解析: %w", err)
 	}
 	request.Function = payload.Function
 	request.Parameter = payload.Parameter
@@ -127,6 +127,21 @@ func writeSetError(writer io.Writer, function string, code string) error {
 	document := map[string]any{
 		"request": function,
 		"result":  code,
+	}
+	_, err := writer.Write([]byte(writeJSON(document)))
+	return err
+}
+
+// writeUnsupportedResponse writes the answer to a request that the
+// original service does not implement.
+//
+// The answer carries no data field at all, only the name of the request
+// and the code of the failure. The official application reads the code and
+// stops there, it never looks for the data.
+func writeUnsupportedResponse(writer io.Writer, function string) error {
+	document := map[string]any{
+		"request": function,
+		"result":  "3",
 	}
 	_, err := writer.Write([]byte(writeJSON(document)))
 	return err

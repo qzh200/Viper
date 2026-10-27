@@ -34,12 +34,17 @@ func main() {
 
 	// The gaming provider needs the rights of an administrator. Without
 	// them the service still runs and reports what it can.
-	var backend *hardware.Backend
-	backend, err = hardware.NewBackend()
+	//
+	// The provider is kept in an interface, not in a pointer: a pointer
+	// that is nil inside an interface is not equal to nil, so the guards
+	// of the service would let the call through and the call would crash
+	// the service on the first request that needs the machine.
+	var backend hardware.Gaming
+	machine, err := hardware.NewBackend()
 	if err != nil {
-		log.Println("viper-service: the gaming provider is not available:", err)
-		backend = nil
+		log.Println("viper-service: 游戏硬件提供者不可用:", err)
 	} else {
+		backend = machine
 		defer backend.Close()
 	}
 

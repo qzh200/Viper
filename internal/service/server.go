@@ -51,7 +51,7 @@ func New(options Options) (*Server, error) {
 
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("service: the port cannot be opened: %w", err)
+		return nil, fmt.Errorf("service: 端口打不开: %w", err)
 	}
 
 	provider := options.Provider
@@ -118,13 +118,13 @@ func (s *Server) handle(conn net.Conn) {
 		request, err := readRequest(conn)
 		if err != nil {
 			if err != io.EOF {
-				log.Printf("service: the request cannot be read: %v", err)
+				log.Printf("service: 请求读取失败: %v", err)
 			}
 			return
 		}
 
 		if err := s.answer(conn, request); err != nil {
-			log.Printf("service: the answer cannot be written: %v", err)
+			log.Printf("service: 应答写入失败: %v", err)
 			return
 		}
 	}
@@ -134,6 +134,11 @@ func (s *Server) handle(conn net.Conn) {
 func (s *Server) answer(conn net.Conn, request Request) error {
 	switch request.Packet {
 	case PacketInitialization:
+		// The original service does not implement the overclocking ability,
+		// its answer carries no data at all, only the code of the failure.
+		if request.Function == capOverclockingModeCapability {
+			return writeUnsupportedResponse(conn, request.Function)
+		}
 		data, ok := s.provider.Capability(request.Function)
 		if !ok {
 			// The original service leaves out the data when it does not
@@ -162,7 +167,7 @@ func (s *Server) answer(conn net.Conn, request Request) error {
 
 	case PacketSetDeviceData:
 		if err := s.provider.Apply(request.Function, request.Parameter); err != nil {
-			log.Printf("service: %s cannot be written: %v", request.Function, err)
+			log.Printf("service: 设置 %s 写入失败: %v", request.Function, err)
 			return writeSetError(conn, request.Function, "4")
 		}
 		return writeSetResponse(conn, request.Function)

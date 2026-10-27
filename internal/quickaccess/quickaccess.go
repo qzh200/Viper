@@ -48,6 +48,9 @@ const (
 	// question is the text that both sides encrypt to prove that they
 	// share the same keys.
 	question = "AcerQuickAccessFunctionalityTests_HandshakingQuestion"
+
+	// defaultTimeout is the time that a single request may take.
+	defaultTimeout = 5 * time.Second
 )
 
 // The actions of a request packet.
@@ -63,6 +66,8 @@ type Client struct {
 	conn net.Conn
 	read *bufio.Reader
 	host string
+	// timeout limits the time of a single request.
+	timeout time.Duration
 }
 
 // Options change the behaviour of a client.
@@ -85,7 +90,7 @@ func Connect(options Options) (*Client, error) {
 	}
 	timeout := options.Timeout
 	if timeout == 0 {
-		timeout = 5 * time.Second
+		timeout = defaultTimeout
 	}
 
 	conn, err := tls.DialWithDialer(
@@ -98,7 +103,12 @@ func Connect(options Options) (*Client, error) {
 		return nil, fmt.Errorf("quickaccess: connect to %s: %w", address, err)
 	}
 
-	client := &Client{conn: conn, read: bufio.NewReader(conn), host: address}
+	client := &Client{
+		conn:    conn,
+		read:    bufio.NewReader(conn),
+		host:    address,
+		timeout: timeout,
+	}
 	if err := client.upgrade(); err != nil {
 		conn.Close()
 		return nil, err
@@ -196,6 +206,11 @@ func (c *Client) handshake() error {
 //
 // The answer carries the value in the field Result, the service describes
 // the value in the fields Text and Description.
+//
+// The service sends notifications of its own beside the answers, they are
+// skipped until the answer of the command arrives. A command that the
+// service does not know is not answered at all, the wait ends with an
+// error instead of blocking the caller forever.
 func (c *Client) Get(command string) (Result, error) {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -208,18 +223,25 @@ func (c *Client) Get(command string) (Result, error) {
 		return Result{}, err
 	}
 
-	answer, err := c.readJSON()
-	if err != nil {
-		return Result{}, fmt.Errorf("quickaccess: %s: %w", command, err)
+	deadline := c.deadline()
+	for {
+		c.conn.SetReadDeadline(deadline)
+
+		answer, err := c.readJSON()
+		if err != nil {
+			return Result{}, fmt.Errorf("quickaccess: %s: %w", command, err)
+		}
+		result, ok, err := resultOf(answer, command)
+		if err != nil {
+			return Result{}, err
+		}
+		if ok {
+			return result, nil
+		}
+		if !time.Now().Before(deadline) {
+			return Result{}, fmt.Errorf("quickaccess: %s: 服务没有回答这个请求", command)
+		}
 	}
-	result, ok, err := resultOf(answer, command)
-	if err != nil {
-		return Result{}, err
-	}
-	if !ok {
-		return Result{}, fmt.Errorf("quickaccess: %s: the service did not answer the request", command)
-	}
-	return result, nil
 }
 
 // Set changes the value of a command.
@@ -239,8 +261,10 @@ func (c *Client) Set(command string, value any) error {
 		return err
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := c.deadline()
 	for time.Now().Before(deadline) {
+		c.conn.SetReadDeadline(deadline)
+
 		answer, err := c.readJSON()
 		if err != nil {
 			return fmt.Errorf("quickaccess: %s: %w", command, err)
@@ -249,7 +273,16 @@ func (c *Client) Set(command string, value any) error {
 			return nil
 		}
 	}
-	return nil
+	return fmt.Errorf("quickaccess: %s: 服务没有回答这个写入", command)
+}
+
+// deadline returns the time until a request has to be given up.
+func (c *Client) deadline() time.Time {
+	timeout := c.timeout
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+	return time.Now().Add(timeout)
 }
 
 // answersCommand reports whether an answer belongs to a command.

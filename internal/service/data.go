@@ -2,6 +2,8 @@ package service
 
 import (
 	"fmt"
+	"reflect"
+	"sync"
 
 	"viper/internal/config"
 	"viper/internal/hardware"
@@ -33,11 +35,47 @@ const (
 type Provider struct {
 	backend hardware.Gaming
 	store   *config.Store
+
+	// mutex guards the settings that the service remembers itself.
+	mutex sync.Mutex
+	// remembered holds the settings that the firmware cannot give back.
+	remembered rememberedSettings
 }
 
 // NewProvider builds a provider.
+//
+// A gaming provider that is a nil pointer inside the interface is taken for
+// a missing one. An interface that holds a nil pointer is not equal to nil,
+// so a guard that only asks the interface would let the call through and
+// the call would crash the service.
 func NewProvider(backend hardware.Gaming, store *config.Store) *Provider {
-	return &Provider{backend: backend, store: store}
+	return &Provider{backend: usableBackend(backend), store: store}
+}
+
+// usableBackend takes a gaming provider that cannot be used for nothing.
+func usableBackend(backend hardware.Gaming) hardware.Gaming {
+	if backend == nil {
+		return nil
+	}
+
+	value := reflect.ValueOf(backend)
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func:
+		if value.IsNil() {
+			return nil
+		}
+	}
+	return backend
+}
+
+// hasBackend reports whether the gaming provider can be used.
+//
+// The interface alone does not tell: an interface that holds a nil pointer
+// is not equal to nil, so the pointer itself has to be looked at. Without
+// that look the first request that needs the machine would crash the
+// service instead of reporting that the machine is out of reach.
+func (p *Provider) hasBackend() bool {
+	return usableBackend(p.backend) != nil
 }
 
 // Capability answers a request about the abilities of the machine.
@@ -85,10 +123,15 @@ func (p *Provider) Capability(function string) (any, bool) {
 		return []any{
 			map[string]any{
 				"gpu_index":         0,
-				"gpu_max_frequency": maximumClock(),
+				"gpu_max_frequency": graphicsCardMaxClock(),
 				"gpu_name":          graphicsCardName(),
 			},
 		}, true
+	case capOverclockingModeCapability:
+		// The original service does not implement this ability either. Its
+		// answer carries no data at all, only the code of the failure, so
+		// the server writes that answer on its own.
+		return nil, false
 	default:
 		return nil, false
 	}
@@ -122,9 +165,11 @@ func (p *Provider) Setting(function string) (any, bool) {
 		}
 		return map[string]any{"mode": mode}, true
 	case "SOUND_MODE":
-		// The sound profiles belong to the sound chip of the vendor, Viper
-		// does not touch them.
-		return map[string]any{"function": "DTS", "mode": 0}, true
+		// The sound profiles belong to the sound chip of the vendor, the
+		// gaming provider has no interface for them. The service reports
+		// its own record, see the comment of rememberedSettings.
+		function, mode := p.soundModeState()
+		return map[string]any{"function": function, "mode": mode}, true
 	case "STICKY_KEY":
 		enabled, err := hardware.StickyKeys()
 		if err != nil {
@@ -164,9 +209,10 @@ func (p *Provider) Setting(function string) (any, bool) {
 		}
 		return map[string]any{"status": boolStatus(power.OnAC)}, true
 	case "BATTERY_BOOST":
-		// The battery boost lets the machine run faster on the battery,
-		// the provider of the original software reports it as on.
-		return map[string]any{"status": 1}, true
+		// The battery boost lets the machine run faster on the battery. The
+		// firmware has no interface for it, so the service reports its own
+		// record, see the comment of rememberedSettings.
+		return map[string]any{"status": p.batteryBoostState()}, true
 	case "FAN_CONTROL":
 		state, err := p.fans()
 		if err != nil {
@@ -182,7 +228,10 @@ func (p *Provider) Setting(function string) (any, bool) {
 	case "LIGHTING":
 		return p.lighting(), true
 	case "CUSTOM_BOOT_LOGO":
-		return map[string]any{"imageSource": ""}, true
+		// The boot logo is a picture that the firmware of this machine does
+		// not hold, so the service reports its own record, see the comment
+		// of rememberedSettings.
+		return map[string]any{"imageSource": p.bootLogoState()}, true
 	default:
 		return nil, false
 	}
@@ -212,8 +261,8 @@ func boolStatus(enabled bool) int {
 
 // operatingMode reads the performance profile of the machine.
 func (p *Provider) operatingMode() (int, error) {
-	if p.backend == nil {
-		return 0, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return 0, errNoBackend
 	}
 	mode, err := p.backend.PowerMode()
 	if err != nil {
@@ -228,6 +277,8 @@ func (p *Provider) operatingMode() (int, error) {
 		return 4, nil
 	case hardware.PowerTurbo:
 		return 5, nil
+	case hardware.PowerEco:
+		return 6, nil
 	default:
 		return 1, nil
 	}
@@ -238,8 +289,8 @@ func (p *Provider) operatingMode() (int, error) {
 // The service counts the modes from zero, the provider counts them from
 // one.
 func (p *Provider) gpuMode() (int, error) {
-	if p.backend == nil {
-		return 0, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return 0, errNoBackend
 	}
 	mode, err := p.backend.GPUMode()
 	if err != nil {
@@ -253,8 +304,8 @@ func (p *Provider) gpuMode() (int, error) {
 
 // backlightTimeout tells whether the backlight switches off on its own.
 func (p *Provider) backlightTimeout() (bool, error) {
-	if p.backend == nil {
-		return false, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return false, errNoBackend
 	}
 	state, err := p.backend.Backlight()
 	if err != nil {
@@ -265,32 +316,32 @@ func (p *Provider) backlightTimeout() (bool, error) {
 
 // winKeyLocked tells whether the Windows key is locked.
 func (p *Provider) winKeyLocked() (bool, error) {
-	if p.backend == nil {
-		return false, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return false, errNoBackend
 	}
 	return p.backend.WinKeyLocked()
 }
 
 // lcdOverdrive tells whether the display overdrive is active.
 func (p *Provider) lcdOverdrive() (bool, error) {
-	if p.backend == nil {
-		return false, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return false, errNoBackend
 	}
 	return p.backend.LCDOverdrive()
 }
 
 // bootSound tells whether the sound at the start of the machine is on.
 func (p *Provider) bootSound() (bool, error) {
-	if p.backend == nil {
-		return false, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return false, errNoBackend
 	}
 	return p.backend.BootSound()
 }
 
 // fans reads the state of the fans.
 func (p *Provider) fans() (hardware.FanState, error) {
-	if p.backend == nil {
-		return hardware.FanState{}, fmt.Errorf("service: the gaming provider is not available")
+	if !p.hasBackend() {
+		return hardware.FanState{}, errNoBackend
 	}
 	return p.backend.Fans()
 }
@@ -464,7 +515,7 @@ func (p *Provider) MonitorData() map[string]any {
 	data["RAM_TOTAL"] = float64(total) / (1 << 20)
 	data["RAM_USAGE"] = used
 
-	if p.backend != nil {
+	if p.hasBackend() {
 		if sensors, err := p.backend.Sensors(); err == nil {
 			data["CPU_TEMPERATURE"] = sensors.CPUTempC
 			data["CPU_FANSPEED"] = sensors.CPUFanRPM
@@ -542,4 +593,21 @@ func graphicsCardName() string {
 		return cards[0].Name
 	}
 	return ""
+}
+
+// graphicsCardMaxClock reads the highest clock of the graphics card.
+//
+// The original service fills this field with the clock of the processor,
+// which is wrong: the field belongs to the graphics card. The driver of
+// the card knows its own highest clock, so that number is used. A machine
+// without a card of the vendor reports zero.
+//
+// 原厂服务把这个字段填成处理器的频率，字段的名字却是显卡的。显卡驱动知道
+// 自己能跑多高，所以用显卡自己的数字；没有显卡的机器报零。
+func graphicsCardMaxClock() int {
+	cards, err := nvidia.Read()
+	if err != nil || len(cards) == 0 {
+		return 0
+	}
+	return cards[0].MaxGraphicsClockMHz
 }
