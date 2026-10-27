@@ -57,10 +57,10 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("=== machine identity from SMBIOS ===")
-	model, family, product := hardware.SystemIdentity()
-	fmt.Printf("  product : %s\n", product)
-	fmt.Printf("  family  : %s\n", family)
-	fmt.Printf("  model   : %s\n", model)
+	model, family, manufacturer := hardware.SystemIdentity()
+	fmt.Printf("  model      : %s\n", model)
+	fmt.Printf("  family     : %s\n", family)
+	fmt.Printf("  manufacturer: %s\n", manufacturer)
 	fmt.Printf("  isPredator: %v\n", hardware.IsPredatorModel(model, family))
 
 	fmt.Println()

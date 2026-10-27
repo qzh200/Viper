@@ -1,3 +1,5 @@
+//go:build windows
+
 // Package nvidia reads the telemetry of the graphics card from the
 // driver of the vendor.
 //

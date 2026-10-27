@@ -77,7 +77,7 @@ func validate(ptr uintptr) {
 		return
 	}
 	// Read the vtable pointer without calling anything.
-	vtbl := *(*uintptr)(unsafe.Pointer(ptr))
+	vtbl := vtableOf(ptr)
 	fmt.Printf("    vtable=%#x\n", vtbl)
 	if vtbl == 0 {
 		fmt.Println("    not a COM object (null vtable)")
@@ -89,4 +89,18 @@ func validate(ptr uintptr) {
 		return
 	}
 	fmt.Printf("    AddRef -> refcount=%d\n", addRef)
+}
+
+// vtableOf reads the vtable pointer of a COM object.
+//
+// The address comes out of an output parameter of COM, so it is not a
+// pointer that the runtime of Go knows about. The conversion therefore
+// goes through the storage of the variable itself, the same way the
+// interaction layer does it.
+func vtableOf(addr uintptr) uintptr {
+	p := *(*unsafe.Pointer)(unsafe.Pointer(&addr))
+	if p == nil {
+		return 0
+	}
+	return uintptr(*(*unsafe.Pointer)(p))
 }
