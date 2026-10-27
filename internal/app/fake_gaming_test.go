@@ -30,6 +30,8 @@ type fakeGaming struct {
 	lcdOverdrive bool
 	// coolBoost reports whether the boost fan table is selected.
 	coolBoost bool
+	// fanTable is the table of the fans that the machine uses.
+	fanTable uint64
 	// discreteGPU reports the state of the discrete GPU switch.
 	discreteGPU bool
 	// overclockGPU reports whether the card can be overclocked.
@@ -148,6 +150,8 @@ func (g *fakeGaming) SetFans(config hardware.FanConfig) error {
 	g.writtenFans = append(g.writtenFans, config)
 	return nil
 }
+
+func (g *fakeGaming) FanTable() (uint64, error) { return uint64(g.fanTable), nil }
 
 func (g *fakeGaming) CoolBoostEnabled() (bool, error) { return g.coolBoost, nil }
 

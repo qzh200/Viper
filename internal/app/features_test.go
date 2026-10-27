@@ -24,24 +24,24 @@ func TestTheHardwareIsOpenedOnlyOnce(t *testing.T) {
 
 	var mu sync.Mutex
 	opened := 0
-	machine := newFakeGaming()
+	stand := newFakeGaming()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 16; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			backend, err := application.connect(func() (hardware.Gaming, error) {
+			backend, err := application.connect(func() (machine, error) {
 				mu.Lock()
 				opened++
 				mu.Unlock()
-				return machine, nil
+				return stand, nil
 			})
 			if err != nil {
 				t.Errorf("the hardware was not opened: %v", err)
 				return
 			}
-			if backend != hardware.Gaming(machine) {
+			if backend != stand {
 				t.Error("another machine was opened")
 			}
 		}()
@@ -57,7 +57,7 @@ func TestTheHardwareIsNotOpenedAfterTheClose(t *testing.T) {
 	application := NewWithStore(mustStore(t))
 	application.Close()
 
-	if _, err := application.connect(func() (hardware.Gaming, error) {
+	if _, err := application.connect(func() (machine, error) {
 		return newFakeGaming(), nil
 	}); err == nil {
 		t.Error("the hardware was opened although the program is closed")

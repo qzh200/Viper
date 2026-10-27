@@ -27,13 +27,38 @@ const (
 	capOverclockingModeCapability = "SUPPORT_OVERCLOCKING_MODE_CAPABILITY"
 )
 
+// machine is the set of abilities of the machine that the service uses.
+//
+// The service answers the official application, and it only needs the
+// settings that the application asks for. Depending on the small
+// interfaces instead of the whole of the machine keeps the service
+// independent of the abilities it does not report, and it makes the
+// stand for the machine in the tests that much smaller.
+type machine interface {
+	hardware.PowerModeReader
+	hardware.LightingReader
+	hardware.LightingWriter
+	hardware.FansReader
+	hardware.SwitchesReader
+	// The service reports the readings of the machine, but it never asks
+	// for the path of the gaming functions.
+	Sensors() (hardware.Sensors, error)
+	// The graphics switch is read and written under the name of the
+	// display mode by the service, so it only needs those two calls of
+	// the graphics mode.
+	GPUMode() (hardware.GPUMode, error)
+	SetGPUMode(mode hardware.GPUMode) error
+	// Close releases the connection to the machine.
+	Close()
+}
+
 // Provider collects the numbers that the service reports.
 //
 // The provider is filled with what the machine can tell. Everything that
 // needs the gaming provider is skipped when the provider is not there, so
 // the service also works without the rights of an administrator.
 type Provider struct {
-	backend hardware.Gaming
+	backend machine
 	store   *config.Store
 
 	// mutex guards the settings that the service remembers itself.
@@ -48,12 +73,12 @@ type Provider struct {
 // a missing one. An interface that holds a nil pointer is not equal to nil,
 // so a guard that only asks the interface would let the call through and
 // the call would crash the service.
-func NewProvider(backend hardware.Gaming, store *config.Store) *Provider {
+func NewProvider(backend machine, store *config.Store) *Provider {
 	return &Provider{backend: usableBackend(backend), store: store}
 }
 
 // usableBackend takes a gaming provider that cannot be used for nothing.
-func usableBackend(backend hardware.Gaming) hardware.Gaming {
+func usableBackend(backend machine) machine {
 	if backend == nil {
 		return nil
 	}

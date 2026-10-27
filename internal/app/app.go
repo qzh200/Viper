@@ -19,6 +19,22 @@ import (
 	"viper/internal/quickaccess"
 )
 
+// machine is the set of abilities of the machine that the program uses.
+//
+// The program does not report the table of the fans, so it depends on the
+// small interfaces instead of the whole of the machine.
+type machine interface {
+	hardware.ReadingsReader
+	hardware.PowerModeReader
+	hardware.GraphicsModeReader
+	hardware.LightingReader
+	hardware.LightingWriter
+	hardware.LightingReset
+	hardware.FansReader
+	hardware.CoolBoostReader
+	hardware.SwitchesReader
+}
+
 // App is the running program.
 type App struct {
 	// mu 看守着程序按需打开的连接。游戏硬件和 Quick Access 服务都是
@@ -27,7 +43,7 @@ type App struct {
 	// 其中一条漏掉。
 	mu sync.Mutex
 	// backend 是到游戏硬件的连接。
-	backend hardware.Gaming
+	backend machine
 	// closed 记录程序是否已经关闭。关闭之后的程序不再打开硬件。
 	closed bool
 	// store 保存两次运行之间的设置。
@@ -112,7 +128,7 @@ func NewWithStore(store *config.Store) *App {
 //
 // It is used by the tests, so that they do not need the rights of an
 // administrator to talk to the firmware.
-func NewWithBackend(store *config.Store, backend hardware.Gaming) *App {
+func NewWithBackend(store *config.Store, backend machine) *App {
 	return &App{store: store, backend: backend}
 }
 
@@ -154,8 +170,8 @@ func (a *App) Close() {
 //
 // The provider refuses the calls without the rights of an administrator,
 // so the connection is only made when a hardware setting is used.
-func (a *App) hardware() (hardware.Gaming, error) {
-	return a.connect(func() (hardware.Gaming, error) {
+func (a *App) hardware() (machine, error) {
+	return a.connect(func() (machine, error) {
 		backend, err := hardware.NewBackend()
 		if err != nil {
 			return nil, err
@@ -167,7 +183,7 @@ func (a *App) hardware() (hardware.Gaming, error) {
 // connect opens the connection to the gaming hardware once.
 //
 // 连接由锁守着，同时到来的两次调用不会开出两条连接然后漏掉其中一条。
-func (a *App) connect(open func() (hardware.Gaming, error)) (hardware.Gaming, error) {
+func (a *App) connect(open func() (machine, error)) (machine, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.closed {

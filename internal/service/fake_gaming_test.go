@@ -22,6 +22,8 @@ type fakeGaming struct {
 	fans hardware.FanState
 	// backlight is the state of the keyboard backlight.
 	backlight hardware.BacklightState
+	// lighting is the lighting configuration of the machine.
+	lighting hardware.RGBConfig
 	// bootSound reports whether the sound at the start of the machine is on.
 	bootSound bool
 	// winKeyLocked reports whether the Windows key is locked.
@@ -56,8 +58,6 @@ func newFakeGaming() *fakeGaming {
 	}
 }
 
-func (g *fakeGaming) Instance() string { return "gaming\\instance" }
-
 func (g *fakeGaming) Sensors() (hardware.Sensors, error) { return g.sensors, nil }
 
 func (g *fakeGaming) PowerMode() (hardware.PowerMode, error) { return g.powerMode, nil }
@@ -78,14 +78,12 @@ func (g *fakeGaming) SetGPUMode(mode hardware.GPUMode) error {
 
 func (g *fakeGaming) LightingBrightness() (uint64, error) { return g.brightness, nil }
 
-func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) { return hardware.RGBConfig{}, nil }
+func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) { return g.lighting, nil }
 
 func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
 	g.written = append(g.written, config)
 	return nil
 }
-
-func (g *fakeGaming) ResetLighting() error { return nil }
 
 func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.backlight, nil }
 
@@ -106,10 +104,6 @@ func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 func (g *fakeGaming) Fans() (hardware.FanState, error) { return g.fans, nil }
 
 func (g *fakeGaming) SetFans(config hardware.FanConfig) error { return nil }
-
-func (g *fakeGaming) CoolBoostEnabled() (bool, error) { return false, nil }
-
-func (g *fakeGaming) CoolBoost(enabled bool) error { return nil }
 
 func (g *fakeGaming) WinKeyLocked() (bool, error) { return g.winKeyLocked, nil }
 
@@ -134,9 +128,5 @@ func (g *fakeGaming) SetBootSound(enabled bool) error {
 	g.bootSound = enabled
 	return nil
 }
-
-func (g *fakeGaming) DiscreteGPU() (bool, error) { return false, nil }
-
-func (g *fakeGaming) OverclockCapability() (bool, bool, error) { return false, false, nil }
 
 func (g *fakeGaming) Close() {}
