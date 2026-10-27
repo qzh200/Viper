@@ -110,7 +110,21 @@ func readIdentity() (Identity, error) {
 	if len(buffer) < 8 {
 		return identity, fmt.Errorf("hardware: the firmware table is truncated")
 	}
-	table := buffer[8:]
+
+	found, ok := parseIdentity(buffer[8:])
+	if !ok {
+		return identity, fmt.Errorf("hardware: no system information structure found")
+	}
+	return found, nil
+}
+
+// parseIdentity walks the structures of a raw SMBIOS table and returns the
+// system information structure.
+func parseIdentity(table []byte) (Identity, bool) {
+	identity := Identity{
+		Manufacturer: "Acer",
+		Product:      "Acer Gaming Laptop",
+	}
 
 	for offset := 0; offset+4 <= len(table); {
 		structType := table[offset]
@@ -128,13 +142,13 @@ func readIdentity() (Identity, error) {
 			if length >= 0x1B {
 				identity.Family = pick(strings, table[offset+0x1A])
 			}
-			return identity, nil
+			return identity, true
 		}
 
 		offset = nextStructure(table, offset, length)
 	}
 
-	return identity, fmt.Errorf("hardware: no system information structure found")
+	return identity, false
 }
 
 // nextStructure advances past the current structure and its string table.

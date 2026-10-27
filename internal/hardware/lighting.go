@@ -45,15 +45,8 @@ func (b *Backend) SetLighting(config RGBConfig) error {
 	}
 
 	for zone := 0; zone < LightingZones; zone++ {
-		color := colours[zone]
-		// The colour word is blue, green, red and the zone.
-		input := (uint64(color.B) << 24) |
-			(uint64(color.G) << 16) |
-			(uint64(color.R) << 8) |
-			uint64(zone+1)
-
 		if _, err := b.callGaming("SetGamingLEDColor", map[string]wmi.Value{
-			"gmInput": wmi.Uint64(input),
+			"gmInput": wmi.Uint64(colorWord(colours[zone], uint64(zone+1))),
 		}); err != nil {
 			return fmt.Errorf("hardware: set lighting zone %d: %w", zone+1, err)
 		}
@@ -140,6 +133,32 @@ func (b *Backend) LightingBrightness() (uint64, error) {
 	return level, nil
 }
 
+// colorWord builds the word that carries the colour of one zone.
+//
+// The word is blue, green and red from the top down and the zone number in
+// the lowest byte. The zones are counted from one.
+func colorWord(color RGBColor, zone uint64) uint64 {
+	return (uint64(color.B) << 24) |
+		(uint64(color.G) << 16) |
+		(uint64(color.R) << 8) |
+		zone
+}
+
+// backlightBuffer builds the sixteen byte buffer of the keyboard backlight.
+//
+// The layout was read back from the provider with GetGamingKBBacklight:
+// the level sits in byte two and in byte five, byte eight holds the flags
+// of the backlight and byte nine has to be one, otherwise the provider
+// drops the buffer and zeroes the level.
+func backlightBuffer(level int) []byte {
+	buffer := make([]byte, 16)
+	buffer[2] = byte(level)
+	buffer[5] = byte(level)
+	buffer[8] = backlightFlags
+	buffer[9] = 1
+	return buffer
+}
+
 // SetBacklight sets the keyboard backlight brightness.
 //
 // The provider expects the level in the generic action class and again in
@@ -166,19 +185,8 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 	}
 
 	// The Acer gaming class takes the level as a sixteen byte buffer.
-	//
-	// The layout was read back from the provider with
-	// GetGamingKBBacklight: the level sits in byte two and in byte five,
-	// byte eight holds the flags of the backlight and byte nine has to be
-	// one, otherwise the provider drops the buffer and zeroes the level.
-	buffer := make([]byte, 16)
-	buffer[2] = byte(level)
-	buffer[5] = byte(level)
-	buffer[8] = backlightFlags
-	buffer[9] = 1
-
 	if _, err := b.callGaming("SetGamingKBBacklight", map[string]wmi.Value{
-		"gmInput": wmi.Bytes(buffer),
+		"gmInput": wmi.Bytes(backlightBuffer(level)),
 	}); err != nil {
 		return fmt.Errorf("hardware: set keyboard backlight buffer: %w", err)
 	}
