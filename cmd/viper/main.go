@@ -133,6 +133,19 @@ func runStatus() error {
 	}
 	fmt.Println("instance:", instance)
 
+	// The power supply comes from the kernel of Windows, it is shown
+	// first because it is there even when the hardware needs the rights
+	// of an administrator.
+	power, err := application.PowerStatus()
+	if err != nil {
+		return err
+	}
+	fmt.Println()
+	fmt.Println("  Power supply      :", power)
+	if power.OnBattery {
+		fmt.Println("  Battery           :", power.BatteryPercent, "%")
+	}
+
 	sensors, err := application.Sensors()
 	if err != nil {
 		return err
