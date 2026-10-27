@@ -9,21 +9,27 @@ import (
 	"viper/internal/hardware"
 )
 
+// lightingLED is one zone of the lighting.
+type lightingLED struct {
+	// LEDID is the number of the zone, it starts at zero.
+	LEDID int `json:"LED_id"`
+	// Color is the colour of the zone, of the form #RRGGBB.
+	Color string `json:"color"`
+	// Status is the state of the zone.
+	Status int `json:"status"`
+}
+
 // lightingData is the shape of the lighting of the service.
 //
 // 原厂服务把四个分区的颜色、效果、速度、方向和亮度一起报回来，这是固件
 // 读不到的东西。
 type lightingData struct {
-	LEDs []struct {
-		LEDID  int    `json:"LED_id"`
-		Color  string `json:"color"`
-		Status int    `json:"status"`
-	} `json:"LEDs"`
-	Brightness int    `json:"brightness"`
-	Color      string `json:"color"`
-	Effect     string `json:"effect"`
-	Speed      int    `json:"speed"`
-	Direction  int    `json:"direction"`
+	LEDs       []lightingLED `json:"LEDs"`
+	Brightness int           `json:"brightness"`
+	Color      string        `json:"color"`
+	Effect     string        `json:"effect"`
+	Speed      int           `json:"speed"`
+	Direction  int           `json:"direction"`
 }
 
 // LightingBrightness reads the brightness of the keyboard.
@@ -73,6 +79,7 @@ func (b *Backend) Lighting() (hardware.RGBConfig, error) {
 		EffectReadable: true,
 	}
 
+	found := false
 	for _, led := range data.LEDs {
 		if led.LEDID < 0 || led.LEDID >= hardware.LightingZones {
 			continue
@@ -82,6 +89,15 @@ func (b *Backend) Lighting() (hardware.RGBConfig, error) {
 			continue
 		}
 		result.Zones[led.LEDID] = colour
+		found = true
+	}
+
+	// 服务在 "LEDs" 为空时用的是全局颜色，这时把它放进第一个分区，上层
+	// 回写的时候拿到的就是机器现在的样子。
+	if !found {
+		if colour, ok := parseColour(data.Color); ok {
+			result.Zones[0] = colour
+		}
 	}
 
 	return result, nil
@@ -89,67 +105,193 @@ func (b *Backend) Lighting() (hardware.RGBConfig, error) {
 
 // SetLighting applies a keyboard lighting configuration.
 //
-// 写入的是官方应用写给原厂服务的那一组数值：四个分区的颜色，效果、速度、
-// 方向和亮度。
+// 写入的是官方应用写给原厂服务的那一组数值：颜色，效果、速度、方向和亮度。
+//
+// 分区颜色与全局颜色是两回事：服务读回来的灯光里，"LEDs" 是四个分区各一个
+// 颜色，"color" 是全局的颜色。分区设置写 "LEDs"，全局设置只写 "color"——
+// 实测服务在 "LEDs" 为空时用的是全局颜色。
+//
+// 写完之后把配置读回来核对，机器没有接受就在错误信息里说清楚是哪一个。
 func (b *Backend) SetLighting(config hardware.RGBConfig) error {
 	speed := clamp(config.Speed, 1, 9)
 	direction := clamp(config.Direction, 0, 1)
 	brightness := clamp(config.Brightness, 0, 100)
 
-	leds := make([]any, 0, hardware.LightingZones)
-	for i := 0; i < hardware.LightingZones; i++ {
-		colour := config.Zones[i]
-		if !config.PerZone {
-			colour = config.Zones[0]
-		}
-		leds = append(leds, map[string]any{
-			"LED_id": i,
-			"color":  fmt.Sprintf("#%02x%02x%02x", colour.R, colour.G, colour.B),
-			"status": 1,
-		})
+	written := lightingData{
+		Brightness: int(brightness),
+		Effect:     effectName(config.Effect),
+		Speed:      int(speed),
+		Direction:  int(direction),
 	}
 
-	return b.set(agentservice.FunctionLighting, map[string]any{
-		"LEDs":       leds,
+	payload := map[string]any{
 		"brightness": int(brightness),
-		"effect":     effectName(config.Effect),
+		"effect":     written.Effect,
 		"speed":      int(speed),
 		"direction":  int(direction),
-	})
+	}
+
+	first := config.Zones[0]
+	if !config.PerZone {
+		// 全局设置：只写全局颜色。
+		text := fmt.Sprintf("#%02x%02x%02x", first.R, first.G, first.B)
+		written.Color = text
+		payload["color"] = text
+	} else {
+		leds := make([]any, 0, hardware.LightingZones)
+		for i := 0; i < hardware.LightingZones; i++ {
+			colour := config.Zones[i]
+			text := fmt.Sprintf("#%02x%02x%02x", colour.R, colour.G, colour.B)
+			written.LEDs = append(written.LEDs, lightingLED{LEDID: i, Color: text, Status: 1})
+			leds = append(leds, map[string]any{
+				"LED_id": i,
+				"color":  text,
+				"status": 1,
+			})
+		}
+		written.Color = written.LEDs[0].Color
+		payload["color"] = written.Color
+		payload["LEDs"] = leds
+	}
+
+	if err := b.set(agentservice.FunctionLighting, payload); err != nil {
+		return err
+	}
+
+	return b.verifyLighting(written)
+}
+
+// verifyLighting reads the lighting back and compares it with what was written.
+//
+// 原厂服务把写下的值原样报回来，所以读回来的不一样，就是机器没有接受。
+func (b *Backend) verifyLighting(written lightingData) error {
+	current := lightingData{}
+	read := func() (bool, error) {
+		data, err := b.lighting()
+		if err != nil {
+			return false, err
+		}
+		current = data
+		return lightingMatches(data, written), nil
+	}
+
+	ok, err := poll(read)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+
+	switch {
+	case current.Brightness != written.Brightness:
+		return fmt.Errorf("machine: 键盘亮度没有生效，服务报的是 %d，不是 %d",
+			current.Brightness, written.Brightness)
+	case current.Speed != written.Speed:
+		return fmt.Errorf("machine: 灯效速度没有生效，服务报的是 %d，不是 %d",
+			current.Speed, written.Speed)
+	case current.Direction != written.Direction:
+		return fmt.Errorf("machine: 灯效方向没有生效，服务报的是 %d，不是 %d",
+			current.Direction, written.Direction)
+	case !strings.EqualFold(current.Effect, written.Effect):
+		return fmt.Errorf("machine: 灯效没有生效，服务报的是 %q，不是 %q",
+			current.Effect, written.Effect)
+	case !strings.EqualFold(current.Color, written.Color):
+		return fmt.Errorf("machine: 灯光的颜色没有生效，服务报的是 %q，不是 %q",
+			current.Color, written.Color)
+	}
+
+	for _, led := range written.LEDs {
+		found, ok := findLED(current, led.LEDID)
+		if !ok {
+			return fmt.Errorf("machine: 第 %d 个分区的颜色没有生效，服务没有报这个分区", led.LEDID)
+		}
+		if !strings.EqualFold(found.Color, led.Color) {
+			return fmt.Errorf("machine: 第 %d 个分区的颜色没有生效，服务报的是 %q，不是 %q",
+				led.LEDID, found.Color, led.Color)
+		}
+	}
+
+	return fmt.Errorf("machine: 灯光没有生效，服务报的是 %#v", current)
+}
+
+// lightingMatches tells whether a reading is the lighting that was written.
+func lightingMatches(current lightingData, written lightingData) bool {
+	if current.Brightness != written.Brightness ||
+		current.Speed != written.Speed ||
+		current.Direction != written.Direction {
+		return false
+	}
+	if !strings.EqualFold(current.Effect, written.Effect) {
+		return false
+	}
+	if !strings.EqualFold(current.Color, written.Color) {
+		return false
+	}
+	for _, led := range written.LEDs {
+		found, ok := findLED(current, led.LEDID)
+		if !ok || !strings.EqualFold(found.Color, led.Color) {
+			return false
+		}
+	}
+	return true
+}
+
+// findLED finds the zone of a number.
+func findLED(data lightingData, index int) (lightingLED, bool) {
+	for _, led := range data.LEDs {
+		if led.LEDID == index {
+			return led, true
+		}
+	}
+	return lightingLED{}, false
 }
 
 // SetBacklight sets the brightness of the keyboard backlight.
 //
 // 亮度和超时是两个设置，写亮度要把当前的灯效与颜色一起写回去，否则原厂
-// 服务会把分区颜色清掉。
+// 服务会把分区颜色清掉。写完两个设置都要读回核对。
 func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 	data, err := b.lighting()
 	if err != nil {
 		return err
 	}
 
-	leds := make([]any, 0, len(data.LEDs))
-	for _, led := range data.LEDs {
-		leds = append(leds, map[string]any{
-			"LED_id": led.LEDID,
-			"color":  led.Color,
-			"status": 1,
-		})
+	written := data
+	written.Brightness = int(clamp(uint64(brightness), 0, 100))
+
+	payload := map[string]any{
+		"brightness": written.Brightness,
+		"effect":     written.Effect,
+		"speed":      written.Speed,
+		"direction":  written.Direction,
+		"color":      written.Color,
+	}
+	if len(written.LEDs) > 0 {
+		leds := make([]any, 0, len(written.LEDs))
+		for _, led := range written.LEDs {
+			leds = append(leds, map[string]any{
+				"LED_id": led.LEDID,
+				"color":  led.Color,
+				"status": 1,
+			})
+		}
+		payload["LEDs"] = leds
 	}
 
-	if err := b.set(agentservice.FunctionLighting, map[string]any{
-		"LEDs":       leds,
-		"brightness": int(clamp(uint64(brightness), 0, 100)),
-		"effect":     data.Effect,
-		"speed":      data.Speed,
-		"direction":  data.Direction,
-	}); err != nil {
+	if err := b.set(agentservice.FunctionLighting, payload); err != nil {
+		return err
+	}
+	if err := b.verifyLighting(written); err != nil {
 		return err
 	}
 
-	return b.set(agentservice.FunctionBacklightTimeout, map[string]any{
+	if err := b.set(agentservice.FunctionBacklightTimeout, map[string]any{
 		"status": boolStatus(timeout),
-	})
+	}); err != nil {
+		return err
+	}
+	return b.verifyStatus(agentservice.FunctionBacklightTimeout, boolStatus(timeout))
 }
 
 // BacklightBuffer reads the raw buffer of the keyboard backlight.

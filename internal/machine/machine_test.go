@@ -37,6 +37,10 @@ type fakeService struct {
 	getErr error
 	// setErr is the error of every write.
 	setErr error
+	// stale names the functions whose readback stays at the programmed
+	// answer even after a write. It stands for a machine that did not
+	// take the setting.
+	stale map[string]bool
 }
 
 func newFakeService() *fakeService {
@@ -61,13 +65,15 @@ func (f *fakeService) Get(function string) (agentservice.Answer, error) {
 		return agentservice.Answer{}, f.getErr
 	}
 	result, ok := f.answers[function]
+	// The service of the original software answers with the value that was
+	// written to it, so the stand does the same. A function that is marked
+	// as stale keeps the answer it was given, which stands for a machine
+	// that did not take the setting.
+	if values, written := f.written[function]; written && !f.stale[function] {
+		return answer(values, agentservice.ResultOK), nil
+	}
 	if ok {
 		return result, nil
-	}
-	// The service of the original software answers with the value that was
-	// written to it, so the stand does the same.
-	if values, ok := f.written[function]; ok {
-		return answer(values, agentservice.ResultOK), nil
 	}
 	return agentservice.Answer{Request: function, Result: agentservice.ResultFailed}, nil
 }
@@ -120,6 +126,23 @@ type fakeFirmware struct {
 	closed     bool
 	opened     int
 	err        error
+	// winKey is the state of the lock of the Windows key.
+	winKey bool
+}
+
+func (f *fakeFirmware) WinKeyLocked() (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.winKey, nil
+}
+
+func (f *fakeFirmware) SetWinKeyLocked(locked bool) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.winKey = locked
+	return nil
 }
 
 func (f *fakeFirmware) CoolBoostEnabled() (bool, error) {
@@ -318,14 +341,6 @@ func TestSwitchesAreReadAndWrittenWithTheirState(t *testing.T) {
 
 	backend := newBackend(t, service, nil)
 
-	locked, err := backend.WinKeyLocked()
-	if err != nil {
-		t.Fatalf("读取 Windows 键失败: %v", err)
-	}
-	if locked {
-		t.Fatal("编号 1 表示这个键还能用，不该报成锁着")
-	}
-
 	overdrive, err := backend.LCDOverdrive()
 	if err != nil {
 		t.Fatalf("读取屏幕超频失败: %v", err)
@@ -342,24 +357,17 @@ func TestSwitchesAreReadAndWrittenWithTheirState(t *testing.T) {
 		t.Fatal("开机音效的编号是 1，不该报成关着")
 	}
 
-	if err := backend.SetWinKeyLocked(true); err != nil {
-		t.Fatalf("写入 Windows 键失败: %v", err)
-	}
-	if status := service.writes[0].Parameter["status"]; status != 0 {
-		t.Fatalf("锁住 Windows 键时写入的编号是 %v，不是 0", status)
-	}
-
 	if err := backend.SetLCDOverdrive(true); err != nil {
 		t.Fatalf("写入屏幕超频失败: %v", err)
 	}
-	if status := service.writes[1].Parameter["status"]; status != 1 {
+	if status := service.writes[0].Parameter["status"]; status != 1 {
 		t.Fatalf("打开屏幕超频时写入的编号是 %v，不是 1", status)
 	}
 
 	if err := backend.SetBootSound(false); err != nil {
 		t.Fatalf("写入开机音效失败: %v", err)
 	}
-	if status := service.writes[2].Parameter["status"]; status != 0 {
+	if status := service.writes[1].Parameter["status"]; status != 0 {
 		t.Fatalf("关掉开机音效时写入的编号是 %v，不是 0", status)
 	}
 }
@@ -665,6 +673,7 @@ func TestFansAreCheckedAfterTheWrite(t *testing.T) {
 	// The service answers with another mode than the one that was written.
 	service.answers[agentservice.FunctionFanControl] = answer(
 		map[string]any{"mode": fanModeAuto}, agentservice.ResultOK)
+	service.stale = map[string]bool{agentservice.FunctionFanControl: true}
 
 	backend := newBackend(t, service, nil)
 

@@ -12,6 +12,13 @@ type Firmware interface {
 	CoolBoost(enabled bool) error
 	// FanTable reads the selected fan table.
 	FanTable() (uint64, error)
+	// WinKeyLocked reports whether the Windows key is locked.
+	//
+	// 这一项在原厂服务那边是写不动的（实测：服务收下请求，值一直不变），
+	// 所以它走固件。
+	WinKeyLocked() (bool, error)
+	// SetWinKeyLocked locks or unlocks the Windows key.
+	SetWinKeyLocked(locked bool) error
 	// OverclockCapability reports which overclocking features the machine
 	// supports.
 	OverclockCapability() (gpu bool, cpu bool, err error)

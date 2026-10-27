@@ -38,8 +38,10 @@ func main() {
 		write(client)
 	case "machine":
 		readMachine()
+	case "verify":
+		verify()
 	default:
-		fmt.Println("用法: agcheck read | write | machine")
+		fmt.Println("用法: agcheck read | write | machine | verify")
 		os.Exit(1)
 	}
 }

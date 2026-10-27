@@ -109,7 +109,14 @@ func (b *Backend) SetFans(config hardware.FanConfig) error {
 	mode := fanModeCustom
 	cpuAuto, cpuSpeed := fanRequest(config.CPUMode, config.CPUPercent)
 	gpuAuto, gpuSpeed := fanRequest(config.GPUMode, config.GPUPercent)
-	if config.CPUMode == hardware.FanMax && config.GPUMode == hardware.FanMax {
+	switch {
+	case config.CPUMode == hardware.FanAuto && config.GPUMode == hardware.FanAuto:
+		// 两个风扇都是自动：写服务的自动模式（模式 0）。写模式 2 的话，
+		// 服务自己的档案里记的是"自定义"（HKLM\SOFTWARE\OEM\
+		// AcerAgentService\FanControl\CurrentFanMode），官方应用看到的
+		// 也就不是自动了。
+		mode = fanModeAuto
+	case config.CPUMode == hardware.FanMax && config.GPUMode == hardware.FanMax:
 		mode = fanModeMax
 	}
 
@@ -142,6 +149,10 @@ func (b *Backend) SetFans(config hardware.FanConfig) error {
 //
 // 原厂服务把写下的值原样报回来，所以读回来的配置和写下去的不一样，就说明
 // 机器没有接受这个设置。
+//
+// 全速（模式 1）的时候服务**不看**每个风扇的数据，它只记模式，所以这一项
+// 只核对模式。实测写模式 1 之后风扇从 2722 RPM 升到 7092 RPM，而分区数据
+// 仍然是原来的自动。
 func (b *Backend) verifyFans(mode int, cpuAuto int, cpuSpeed int, gpuAuto int, gpuSpeed int) error {
 	data, err := b.fans()
 	if err != nil {
@@ -149,6 +160,9 @@ func (b *Backend) verifyFans(mode int, cpuAuto int, cpuSpeed int, gpuAuto int, g
 	}
 	if data.Mode != mode {
 		return fmt.Errorf("machine: 风扇模式没有生效，服务报的是 %d，不是 %d", data.Mode, mode)
+	}
+	if mode == fanModeMax {
+		return nil
 	}
 
 	for _, fan := range data.CustomFanData {

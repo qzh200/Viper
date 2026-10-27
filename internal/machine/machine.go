@@ -253,11 +253,48 @@ func (b *Backend) PowerMode() (hardware.PowerMode, error) {
 //
 // 原厂服务用的编号是 0 静音、1 均衡、4 性能、5 加速、6 节能，和固件那一侧
 // 的编号一样，所以两边对同一个数字的理解不会差开。
+//
+// 写完读回来核对：机器没有换档，就在错误信息里说清楚。
 func (b *Backend) SetPowerMode(mode hardware.PowerMode) error {
 	code := hardware.PowerModeCode(mode)
-	return b.set(agentservice.FunctionOperatingMode, map[string]any{
+	if err := b.set(agentservice.FunctionOperatingMode, map[string]any{
 		"mode": int(code),
-	})
+	}); err != nil {
+		return err
+	}
+	return b.verifyPowerMode(int(code))
+}
+
+// verifyPowerMode reads the performance profile back.
+//
+// 性能档位的载荷里是 mode，不是开关那几个设置共用的 status，所以它自己核对。
+func (b *Backend) verifyPowerMode(expected int) error {
+	current := -1
+	read := func() (bool, error) {
+		answer, err := b.get(agentservice.FunctionOperatingMode)
+		if err != nil {
+			return false, err
+		}
+
+		var data struct {
+			Mode int `json:"mode"`
+		}
+		if err := answer.Decode(&data); err != nil {
+			return false, err
+		}
+		current = data.Mode
+		return current == expected, nil
+	}
+
+	ok, err := poll(read)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("machine: 性能档位没有生效，服务报的是 %d，不是 %d",
+			current, expected)
+	}
+	return nil
 }
 
 // GPUMode returns the graphics switch of the machine.
@@ -282,6 +319,10 @@ func (b *Backend) GPUMode() (hardware.GPUMode, error) {
 //
 // 写入编号 0 是混合、1 是仅独显、2 是自动。切换图形模式要重启才生效，这与
 // 官方应用的行为一致。
+//
+// 这一项**不读回核对**：图形模式写进的是杂项设置表，机器要到重启才真的
+// 换过去，服务的结果码就是「收到了」的凭据。读回来的值在这一项上说明不了
+// 什么。
 func (b *Backend) SetGPUMode(mode hardware.GPUMode) error {
 	code := int(mode)
 	if code < 1 {
@@ -331,22 +372,26 @@ func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 
 // WinKeyLocked reports whether the Windows key is locked.
 //
-// 原厂服务报告的是这个键还能不能用，编号一是能用，所以锁住的时候是零。
+// 实测：原厂服务的 WIN_KEY **写不动**——它收下请求（结果码 0），但读回来的
+// 值一直是一个，写 0 写 1 都一样。所以这一项走固件那一侧（锁是固件档案里的
+// 一个位），那一边需要管理员权限。
 func (b *Backend) WinKeyLocked() (bool, error) {
-	status, err := b.switchStatus(agentservice.FunctionWinKey)
+	firmware, err := b.provider()
 	if err != nil {
 		return false, err
 	}
-	return status == 0, nil
+	return firmware.WinKeyLocked()
 }
 
 // SetWinKeyLocked locks or unlocks the Windows key.
+//
+// 这一项走固件那一侧，理由见 WinKeyLocked。
 func (b *Backend) SetWinKeyLocked(locked bool) error {
-	status := 1
-	if locked {
-		status = 0
+	firmware, err := b.provider()
+	if err != nil {
+		return err
 	}
-	return b.set(agentservice.FunctionWinKey, map[string]any{"status": status})
+	return firmware.SetWinKeyLocked(locked)
 }
 
 // LCDOverdrive reports whether the display overdrive is active.
@@ -360,9 +405,11 @@ func (b *Backend) LCDOverdrive() (bool, error) {
 
 // SetLCDOverdrive enables or disables the display overdrive.
 func (b *Backend) SetLCDOverdrive(enabled bool) error {
-	return b.set(agentservice.FunctionLCDOverdrive, map[string]any{
-		"status": boolStatus(enabled),
-	})
+	status := boolStatus(enabled)
+	if err := b.set(agentservice.FunctionLCDOverdrive, map[string]any{"status": status}); err != nil {
+		return err
+	}
+	return b.verifyStatus(agentservice.FunctionLCDOverdrive, status)
 }
 
 // BootSound reports whether the sound at the start of the machine is on.
@@ -376,10 +423,68 @@ func (b *Backend) BootSound() (bool, error) {
 
 // SetBootSound switches the sound at the start of the machine on or off.
 func (b *Backend) SetBootSound(enabled bool) error {
-	return b.set(agentservice.FunctionBootSound, map[string]any{
-		"status": boolStatus(enabled),
-	})
+	status := boolStatus(enabled)
+	if err := b.set(agentservice.FunctionBootSound, map[string]any{"status": status}); err != nil {
+		return err
+	}
+	return b.verifyStatus(agentservice.FunctionBootSound, status)
 }
+
+// verifyStatus reads a switch back and compares it with what was written.
+//
+// 原厂服务把写下的状态原样报回来，所以读回来的不一样，就是机器没有接受。
+func (b *Backend) verifyStatus(function string, expected int) error {
+	match := false
+	read := func() (bool, error) {
+		status, err := b.switchStatus(function)
+		if err != nil {
+			return false, err
+		}
+		match = status == expected
+		return match, nil
+	}
+
+	ok, err := poll(read)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		status, _ := b.switchStatus(function)
+		return fmt.Errorf("machine: %s 没有生效，服务报的是 %d，不是 %d",
+			function, status, expected)
+	}
+	return nil
+}
+
+// poll calls a reading until it agrees with what was written.
+//
+// 有的设置不是立刻生效的：服务把它交给别的服务或者写进固件，读回来的值会
+// 晚一点才变。所以读回核对要等一小会儿，而不是读一次就下结论。
+func poll(read func() (bool, error)) (bool, error) {
+	deadline := time.Now().Add(verifyTimeout)
+	for {
+		ok, err := read()
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		time.Sleep(verifyInterval)
+	}
+}
+
+// The times of the read back check.
+//
+// 写进机器的设置有的要过别的服务才生效，读回来会晚一点。这两个值是可变的，
+// 测试会把等待的时间改短。
+var (
+	verifyTimeout  = 3 * time.Second
+	verifyInterval = 100 * time.Millisecond
+)
 
 // switchStatus reads the state of a switch.
 //
