@@ -12,6 +12,7 @@ import (
 
 	"viper/internal/app"
 	"viper/internal/hardware"
+	"viper/internal/nvidia"
 	"viper/internal/quickaccess"
 )
 
@@ -48,6 +49,10 @@ func run(args []string) error {
 		return runCharge(args[1:])
 	case "bootsound", "sound":
 		return runBootSound(args[1:])
+	case "scenario", "scenes":
+		return runScenario(args[1:])
+	case "telemetry", "gpuinfo":
+		return runTelemetry()
 	case "powerstatus":
 		return runPowerStatus()
 	case "diag", "diagnostics":
@@ -68,6 +73,13 @@ func usage() {
 Usage:
   viper status                      live temperatures and fan speeds
   viper powerstatus                  power supply and battery, no rights needed
+  viper telemetry                    graphics card, no rights needed
+  viper scenario list                show the saved scenes
+  viper scenario save <name>         store the lighting and the fans
+  viper scenario apply <name>        apply a scene
+  viper scenario delete <name>       remove a scene
+  viper scenario bind <profile> <name>  tie a scene to a profile
+  viper scenario unbind <profile>    free a profile from its scene
   viper fans                        show the fan configuration
   viper fan auto                    hand the fans back to the controller
   viper fan max                     run the fans at full speed
@@ -132,6 +144,168 @@ func runStatus() error {
 	fmt.Println("  GPU temperature   :", sensors.GPUTempC, "C")
 	fmt.Println("  GPU fan speed     :", sensors.GPUFanRPM, "RPM")
 	fmt.Println("  Motherboard / VRM :", sensors.SystemTempC, "C")
+
+	cards, err := application.GPUTelemetry()
+	if err != nil {
+		return err
+	}
+	for _, card := range cards {
+		printCard(card)
+	}
+	return nil
+}
+
+// printCard shows the state of a graphics card.
+func printCard(card nvidia.Telemetry) {
+	fmt.Println()
+	fmt.Println("  Graphics card     :", card.Name)
+	fmt.Println("  Graphics usage    :", card.UsagePercent, "%")
+	fmt.Println("  Graphics clock    :", card.GraphicsClockMHz, "MHz (max", card.MaxGraphicsClockMHz, "MHz)")
+	fmt.Println("  Memory clock      :", card.MemoryClockMHz, "MHz")
+	fmt.Println("  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
+	if card.IsIdle() {
+		fmt.Println("  The card is idle")
+	}
+}
+
+// formatBytes renders a number of bytes in a readable way.
+func formatBytes(value uint64) string {
+	switch {
+	case value >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(value)/(1<<30))
+	case value >= 1<<20:
+		return fmt.Sprintf("%.0f MB", float64(value)/(1<<20))
+	case value >= 1<<10:
+		return fmt.Sprintf("%.0f kB", float64(value)/(1<<10))
+	default:
+		return fmt.Sprintf("%d bytes", value)
+	}
+}
+
+// runScenario shows or changes the scenes.
+//
+// A scene holds the lighting and the fans, it can be bound to a
+// performance profile so that the profile brings its own look.
+func runScenario(args []string) error {
+	application, err := app.New()
+	if err != nil {
+		return err
+	}
+	defer application.Close()
+
+	if len(args) == 0 {
+		return listScenarios(application)
+	}
+
+	switch args[0] {
+	case "list":
+		return listScenarios(application)
+	case "save":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: viper scenario save <name>")
+		}
+		if err := application.SaveScenario(args[1]); err != nil {
+			return err
+		}
+		fmt.Println("scene saved:", args[1])
+		return nil
+	case "apply":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: viper scenario apply <name>")
+		}
+		if err := application.ApplyScenario(args[1]); err != nil {
+			return err
+		}
+		fmt.Println("scene applied:", args[1])
+		return nil
+	case "delete", "remove":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: viper scenario delete <name>")
+		}
+		if err := application.DeleteScenario(args[1]); err != nil {
+			return err
+		}
+		fmt.Println("scene deleted:", args[1])
+		return nil
+	case "bind":
+		if len(args) < 3 {
+			return fmt.Errorf("usage: viper scenario bind <profile> <name>")
+		}
+		mode, ok := hardware.ParsePowerMode(strings.ToLower(args[1]))
+		if !ok {
+			return fmt.Errorf("unknown performance profile %q", args[1])
+		}
+		if err := application.BindScenario(mode.String(), args[2]); err != nil {
+			return err
+		}
+		fmt.Printf("scene %q is bound to the profile %s\n", args[2], mode)
+		return nil
+	case "unbind":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: viper scenario unbind <profile>")
+		}
+		mode, ok := hardware.ParsePowerMode(strings.ToLower(args[1]))
+		if !ok {
+			return fmt.Errorf("unknown performance profile %q", args[1])
+		}
+		if err := application.UnbindScenario(mode.String()); err != nil {
+			return err
+		}
+		fmt.Println("the profile", mode, "has no scene")
+		return nil
+	default:
+		return fmt.Errorf("unknown scenario command %q", args[0])
+	}
+}
+
+// listScenarios shows the saved scenes and the bindings.
+func listScenarios(application *app.App) error {
+	scenarios := application.Scenarios()
+	if len(scenarios) == 0 {
+		fmt.Println("  no scene is saved")
+	} else {
+		for name, scenario := range scenarios {
+			fmt.Printf("  %-16s lighting %s at %d%%, fans %s\n", name,
+				hardware.LightingEffect(scenario.Lighting.Effect),
+				scenario.Lighting.Brightness,
+				hardware.FanMode(scenario.Fans.CPUMode))
+		}
+	}
+
+	bindings := application.Bindings()
+	if len(bindings) == 0 {
+		return nil
+	}
+	fmt.Println()
+	fmt.Println("  bound scenes:")
+	for profile, name := range bindings {
+		fmt.Printf("    %-12s -> %s\n", profile, name)
+	}
+	return nil
+}
+
+// runTelemetry shows the state of the graphics card.
+//
+// The numbers come from the driver of the card, so this command works
+// without the rights of an administrator.
+func runTelemetry() error {
+	application, err := app.New()
+	if err != nil {
+		return err
+	}
+	defer application.Close()
+
+	cards, err := application.GPUTelemetry()
+	if err != nil {
+		return err
+	}
+	if len(cards) == 0 {
+		fmt.Println("  no graphics card offers telemetry")
+		return nil
+	}
+	for _, card := range cards {
+		printCard(card)
+	}
 	return nil
 }
 
