@@ -45,9 +45,22 @@ type Sensors struct {
 	SystemTempC int
 }
 
+// Provider calls a method of a WMI class.
+//
+// The interface keeps the backend testable: a test can hand a backend a
+// provider that answers from a table instead of from the firmware.
+type Provider interface {
+	// Call invokes a method of a class and returns its output parameters.
+	Call(class, method, instancePath string, args map[string]wmi.Value) (map[string]wmi.Value, error)
+	// Instances returns the object paths of every instance of a class.
+	Instances(class string) ([]string, error)
+	// Close releases the connection.
+	Close()
+}
+
 // Backend talks to the Acer ACPI WMI provider.
 type Backend struct {
-	client     *wmi.Client
+	client     Provider
 	gamingPath string
 	actionPath string
 }
@@ -87,6 +100,17 @@ func NewBackend() (*Backend, error) {
 	}
 
 	return backend, nil
+}
+
+// NewBackendWith builds a backend on top of the given provider.
+//
+// The paths of the instances are used as they are, so that a test can
+// tell the calls of the two classes apart.
+func NewBackendWith(provider Provider, gamingPath, actionPath string) *Backend {
+	if actionPath == "" {
+		actionPath = gamingPath
+	}
+	return &Backend{client: provider, gamingPath: gamingPath, actionPath: actionPath}
 }
 
 // Instance returns the resolved object path of the gaming functions.
