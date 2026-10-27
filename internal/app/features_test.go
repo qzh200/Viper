@@ -20,7 +20,7 @@ import (
 func TestTheHardwareIsOpenedOnlyOnce(t *testing.T) {
 	// Two calls that run at the same time must not open two connections,
 	// the second one would be left behind.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	var mu sync.Mutex
 	opened := 0
@@ -31,7 +31,7 @@ func TestTheHardwareIsOpenedOnlyOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			backend, err := application.connect(func() (machine, error) {
+			backend, err := application.connect(func() (abilities, error) {
 				mu.Lock()
 				opened++
 				mu.Unlock()
@@ -54,10 +54,10 @@ func TestTheHardwareIsOpenedOnlyOnce(t *testing.T) {
 }
 
 func TestTheHardwareIsNotOpenedAfterTheClose(t *testing.T) {
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 	application.Close()
 
-	if _, err := application.connect(func() (machine, error) {
+	if _, err := application.connect(func() (abilities, error) {
 		return newFakeGaming(), nil
 	}); err == nil {
 		t.Error("the hardware was opened although the program is closed")
@@ -254,7 +254,7 @@ func TestTheLightingFailsWhenTheFirmwareCannotBeRead(t *testing.T) {
 }
 
 func TestTheLightingFailsWithoutTheGamingProvider(t *testing.T) {
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	if _, err := application.Lighting(); err == nil {
 		t.Error("the lighting was read although the gaming provider is not there")

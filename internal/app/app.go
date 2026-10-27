@@ -16,25 +16,39 @@ import (
 
 	"viper/internal/config"
 	"viper/internal/hardware"
+	"viper/internal/machine"
 	"viper/internal/nvidia"
 	"viper/internal/quickaccess"
 )
 
-// machine is the set of abilities of the machine that the program uses.
+// abilities is the set of abilities of the machine that the program uses.
 //
 // The program does not report the table of the fans, so it depends on the
 // small interfaces instead of the whole of the machine.
-type machine interface {
+type abilities interface {
 	hardware.ReadingsReader
 	hardware.PowerModeReader
 	hardware.GraphicsModeReader
 	hardware.LightingReader
+	hardware.LightingConfig
 	hardware.LightingWriter
 	hardware.LightingReset
 	hardware.FansReader
 	hardware.CoolBoostReader
 	hardware.SwitchesReader
 }
+
+// The routes the program can reach the machine by.
+const (
+	// routeService goes through the service of the original software. It is
+	// the main road and it needs no rights of an administrator.
+	routeService = "原厂服务 AcerAgentService"
+
+	// routeFirmware goes through the ACPI provider. It is the road of the
+	// few settings the service does not know, and it needs the rights of
+	// an administrator.
+	routeFirmware = "固件接口 root\\wmi\\AcerGamingFunction"
+)
 
 // App is the running program.
 type App struct {
@@ -44,7 +58,12 @@ type App struct {
 	// 其中一条漏掉。
 	mu sync.Mutex
 	// backend 是到游戏硬件的连接。
-	backend machine
+	backend abilities
+	// openBackend 打开到机器的连接。它是可变的，所以用例可以放一个替身
+	// 在真机器的位置上。
+	openBackend func() (hardware.Gaming, string, error)
+	// route 记着程序走的是哪条路：原厂服务还是固件那一侧。
+	route string
 	// closed 记录程序是否已经关闭。关闭之后的程序不再打开硬件。
 	closed bool
 	// store 保存两次运行之间的设置。
@@ -129,7 +148,7 @@ func NewWithStore(store *config.Store) *App {
 //
 // It is used by the tests, so that they do not need the rights of an
 // administrator to talk to the firmware.
-func NewWithBackend(store *config.Store, backend machine) *App {
+func NewWithBackend(store *config.Store, backend abilities) *App {
 	return &App{store: store, backend: backend}
 }
 
@@ -169,22 +188,82 @@ func (a *App) Close() {
 
 // hardware opens the connection to the gaming hardware.
 //
-// The provider refuses the calls without the rights of an administrator,
-// so the connection is only made when a hardware setting is used.
-func (a *App) hardware() (machine, error) {
-	return a.connect(func() (machine, error) {
-		backend, err := hardware.NewBackend()
+// The connection is only made when a hardware setting is used, because
+// opening it takes a moment and the settings of the original software do
+// not need it.
+func (a *App) hardware() (abilities, error) {
+	return a.connect(func() (abilities, error) {
+		open := a.openBackend
+		if open == nil {
+			open = openMachine
+		}
+
+		backend, route, err := open()
 		if err != nil {
 			return nil, err
 		}
+		a.route = route
 		return backend, nil
 	})
+}
+
+// openMachine opens the connection to the machine.
+//
+// 主路是原厂服务：它以系统的身份运行，程序不用管理员权限就能用它，而且它
+// 读得到分区颜色与灯效，固件那一侧读不到。原厂服务不在的时候退回固件那
+// 一侧，那一侧要管理员权限。
+//
+// 第二个结果是程序走的是哪条路，命令行会把它报出来，免得用的人不知道
+// 自己用的是哪一条。
+func openMachine() (hardware.Gaming, string, error) {
+	backend, err := machine.New(machine.Options{
+		OpenFirmware: hardware.OpenFirmware,
+	})
+	if err == nil {
+		return backend, routeService, nil
+	}
+
+	firmware, firmwareErr := hardware.NewBackend()
+	if firmwareErr != nil {
+		return nil, "", fmt.Errorf("原厂服务不可达（%v），固件接口也连不上: %w", err, firmwareErr)
+	}
+	return firmware, routeFirmware, nil
+}
+
+// SetBackendOpener changes the way the program opens the connection to the
+// machine.
+//
+// It has to be called before the first connection is opened. The second
+// result is the name of the route the program is on, it is reported to the
+// user so that they know which road they are on.
+//
+// 这个入口让用例可以把一台机器的替身放在真机器的位置上，不用去碰真的
+// 机器。
+func (a *App) SetBackendOpener(open func() (hardware.Gaming, string, error)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.openBackend = open
+}
+
+// Route returns the way the program reaches the machine.
+//
+// The connection is opened on first use, so before that the answer is that
+// the route is not known yet.
+func (a *App) Route() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.route == "" {
+		return "还没连接"
+	}
+	return a.route
 }
 
 // connect opens the connection to the gaming hardware once.
 //
 // 连接由锁守着，同时到来的两次调用不会开出两条连接然后漏掉其中一条。
-func (a *App) connect(open func() (machine, error)) (machine, error) {
+func (a *App) connect(open func() (abilities, error)) (abilities, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.closed {
@@ -249,27 +328,34 @@ func (a *App) GPUTelemetry() ([]nvidia.Telemetry, error) {
 
 // Lighting returns the keyboard lighting.
 //
-// The brightness comes from the firmware, the effect and the colours from
-// the stored settings.
+// 原厂服务读得回分区颜色与灯效，所以那一路给的是机器真正的样子。固件那一
+// 侧只报亮度，颜色与灯效就只剩 Viper 自己记着的那一份了。
 //
-// 固件读不到的时候这次调用直接失败，调用方必须能分清“固件读不到”和
+// 读不到亮度的时候这次调用直接失败，调用方必须能分清“固件读不到”和
 // “亮度就是零”，所以这里不再拿设置文件里的旧亮度顶替。
 func (a *App) Lighting() (hardware.RGBConfig, error) {
-	result := a.StoredLighting()
-	// The firmware reports the brightness only.
-	result.ColourReadable = false
-	result.EffectReadable = false
-
 	backend, err := a.hardware()
 	if err != nil {
 		return hardware.RGBConfig{}, err
 	}
+
+	// 原厂服务这一路能读回颜色与灯效。
+	result, err := backend.Lighting()
+	if err == nil && result.ColourReadable && result.EffectReadable {
+		return result, nil
+	}
+
+	// 固件只报告亮度，灯效和颜色存在 Viper 自己的设置里。
+	stored := a.StoredLighting()
+	stored.ColourReadable = false
+	stored.EffectReadable = false
+
 	brightness, err := backend.LightingBrightness()
 	if err != nil {
 		return hardware.RGBConfig{}, fmt.Errorf("app: 读取键盘亮度失败: %w", err)
 	}
-	result.Brightness = brightness
-	return result, nil
+	stored.Brightness = brightness
+	return stored, nil
 }
 
 // StoredLighting returns the keyboard lighting that Viper keeps.
@@ -428,10 +514,14 @@ func (a *App) Fans() (FanStatus, error) {
 	}
 
 	status := FanStatus{FanState: state}
-	// 固件不报告显卡这一组，模式取自 Viper 最后一次写入的值，并且
-	// 标记成不是从固件读来的。
-	status.GPUMode = fanMode(a.store.Settings().Fans.GPUMode)
-	status.GPUModeReadable = false
+	// 固件不报告显卡这一组，模式取自 Viper 最后一次写入的值，并且标记成
+	// 不是从固件读来的。原厂服务读得回这一组，就用它自己的读数。
+	if !state.GPUModeReadable {
+		status.GPUMode = fanMode(a.store.Settings().Fans.GPUMode)
+		status.GPUModeReadable = false
+	} else {
+		status.GPUModeReadable = true
+	}
 	return status, nil
 }
 

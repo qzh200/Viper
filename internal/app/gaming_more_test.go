@@ -305,7 +305,7 @@ func TestSetBacklightTimeoutKeepsTheBrightness(t *testing.T) {
 
 func TestSetBacklightTimeoutOfAMachineWithoutTheKeyboard(t *testing.T) {
 	// The brightness cannot be read, so the change is not carried out.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 	if err := application.SetBacklightTimeout(true); err == nil {
 		t.Error("the change was accepted although the brightness cannot be read")
 	}
@@ -407,7 +407,7 @@ func TestCloseReleasesTheMachine(t *testing.T) {
 
 func TestCloseWithoutAMachine(t *testing.T) {
 	// A program that never touched the hardware has nothing to release.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 	application.Close()
 }
 

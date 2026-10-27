@@ -20,7 +20,7 @@ import (
 func TestThePowerStatusOfTheMachine(t *testing.T) {
 	// The information comes from the kernel of Windows, so it works
 	// without the rights that the hardware needs.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	status, err := application.PowerStatus()
 	if err != nil {
@@ -32,7 +32,7 @@ func TestThePowerStatusOfTheMachine(t *testing.T) {
 }
 
 func TestTheIdentityOfTheMachine(t *testing.T) {
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	identity, err := application.Identity()
 	if err != nil {
@@ -45,7 +45,7 @@ func TestTheIdentityOfTheMachine(t *testing.T) {
 
 func TestTheStickyKeysOfTheMachine(t *testing.T) {
 	// The sticky keys belong to the accessibility settings of the user.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	enabled, err := application.StickyKeys()
 	if err != nil {
@@ -58,7 +58,7 @@ func TestTheStickyKeysOfTheMachine(t *testing.T) {
 func TestTheGraphicsTelemetryOfTheMachine(t *testing.T) {
 	// A machine without the driver of the vendor has no telemetry, that
 	// is not an error.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	cards, err := application.GPUTelemetry()
 	if err != nil {
@@ -72,7 +72,7 @@ func TestTheGraphicsTelemetryOfTheMachine(t *testing.T) {
 }
 
 func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	modes := application.AvailablePowerModes()
 	if len(modes) == 0 {
@@ -94,7 +94,7 @@ func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
 func TestTheSettingsOfTheMachineWithoutTheGamingProvider(t *testing.T) {
 	// The provider refuses the calls without the rights of an
 	// administrator, so the program cannot read the fans.
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	if _, err := application.Fans(); err == nil {
 		t.Error("the fans were read although the gaming provider is not there")
@@ -129,7 +129,7 @@ func TestTheSettingsOfTheMachineWithoutTheGamingProvider(t *testing.T) {
 }
 
 func TestTheSettingsThatAreWrittenWithoutTheGamingProvider(t *testing.T) {
-	application := NewWithStore(mustStore(t))
+	application := newTestAppWithoutMachine(t)
 
 	if err := application.SetPowerMode(hardware.PowerTurbo); err == nil {
 		t.Error("the profile was written although the gaming provider is not there")

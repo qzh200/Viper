@@ -157,6 +157,8 @@ func runStatus() error {
 		return err
 	}
 	fmt.Println("instance:", instance)
+	// 走的哪条路要报出来：原厂服务那一路不用管理员权限，固件那一路要。
+	fmt.Println("route  :", application.Route())
 
 	// The power supply comes from the kernel of Windows, it is shown
 	// first because it is there even when the hardware needs the rights
@@ -585,7 +587,11 @@ func showLighting(application *app.App) error {
 	if err == nil {
 		fmt.Println("  timeout     :", onOff(timeout))
 	}
-	fmt.Println("  note        : the firmware reports the brightness only, the effect and the colours come from Viper's own settings")
+	if config.ColourReadable {
+		fmt.Println("  note        : the colours and the effect are the ones of the machine")
+	} else {
+		fmt.Println("  note        : the firmware reports the brightness only, the effect and the colours come from Viper's own settings")
+	}
 	fmt.Println("  settings    :", application.SettingsPath())
 	return nil
 }
@@ -716,16 +722,21 @@ func runProfile(args []string) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("  LCD overdrive :", onOff(overdrive))
+
+		// 锁 Windows 键是固件档案里的一个位，原厂服务写不动它，所以这一项
+		// 要管理员权限。读不到就把话说明白，别把整条命令都拖垮。
 		locked, err := application.WinKeyLocked()
 		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, "viper: 读不到 Windows 键的状态（需要管理员权限）:", err)
+		} else {
+			fmt.Println("  Windows key   :", onOff(locked))
 		}
+
 		sticky, err := application.StickyKeys()
 		if err != nil {
 			return err
 		}
-		fmt.Println("  LCD overdrive :", onOff(overdrive))
-		fmt.Println("  Windows key   :", onOff(locked))
 		fmt.Println("  Sticky keys   :", onOff(sticky))
 		return nil
 	}
@@ -948,6 +959,9 @@ func runBootSound(args []string) error {
 }
 
 // runDiag reports the capabilities of the machine.
+//
+// 报告是逐项的：有几项要走固件那一侧，那一侧需要管理员权限。读不到的那几项
+// 把话说明白，不要把整份报告都拖垮。
 func runDiag() error {
 	application, err := app.New()
 	if err != nil {
@@ -960,6 +974,7 @@ func runDiag() error {
 		return err
 	}
 	fmt.Println("  instance        :", instance)
+	fmt.Println("  route           :", application.Route())
 
 	identity, err := application.Identity()
 	if err != nil {
@@ -977,58 +992,62 @@ func runDiag() error {
 	fmt.Println("  profiles        :", strings.Join(modes, ", "))
 
 	mode, err := application.PowerMode()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  power profile   :", mode)
+	report("power profile", mode, err)
 
-	state, err := application.Fans()
-	if err != nil {
-		return err
+	state, fanErr := application.Fans()
+	if fanErr != nil {
+		report("fans", nil, fanErr)
+	} else {
+		fmt.Println("  CPU fan         :", describeFan(state.CPUMode, state.CPUPercent))
+		fmt.Println("  GPU fan         :", describeFan(state.GPUMode, state.GPUPercent))
+		fmt.Println("  CoolBoost       :", onOff(state.CoolBoost))
 	}
-	fmt.Println("  CPU fan         :", describeFan(state.CPUMode, state.CPUPercent))
-	fmt.Println("  GPU fan         :", describeFan(state.GPUMode, state.GPUPercent))
-	fmt.Println("  CoolBoost       :", onOff(state.CoolBoost))
 
 	discrete, err := application.DiscreteGPU()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  discrete GPU    :", onOff(discrete))
+	report("discrete GPU", onOff(discrete), err)
 
 	gpuOC, cpuOC, err := application.OverclockCapability()
 	if err != nil {
-		return err
+		report("overclock", nil, err)
+	} else {
+		fmt.Println("  GPU overclock   :", onOff(gpuOC))
+		fmt.Println("  CPU overclock   :", onOff(cpuOC))
 	}
-	fmt.Println("  GPU overclock   :", onOff(gpuOC))
-	fmt.Println("  CPU overclock   :", onOff(cpuOC))
 
 	lighting, err := application.Lighting()
 	if err != nil {
-		return err
+		report("key lighting", nil, err)
+	} else {
+		fmt.Println("  key brightness  :", lighting.Brightness)
+		fmt.Println("  key effect      :", lighting.Effect)
 	}
-	fmt.Println("  key brightness  :", lighting.Brightness)
-	fmt.Println("  key effect      :", lighting.Effect)
 
 	gpuMode, err := application.GPUMode()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  graphics mode   :", gpuMode)
+	report("graphics mode", gpuMode, err)
 
 	bootSound, err := application.BootSound()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  boot sound      :", onOff(bootSound))
+	report("boot sound", onOff(bootSound), err)
 
 	sticky, err := application.StickyKeys()
-	if err != nil {
-		return err
-	}
-	fmt.Println("  sticky keys     :", onOff(sticky))
+	report("sticky keys", onOff(sticky), err)
+
+	// 这两项要固件那一侧，也就是要管理员权限。
+	locked, err := application.WinKeyLocked()
+	report("Windows key", onOff(locked), err)
+
 	fmt.Println("  settings        :", application.SettingsPath())
 	return nil
+}
+
+// report prints one item of the report.
+//
+// 读不到的时候把原因写出来，别把整份报告都拖垮。
+func report(name string, value any, err error) {
+	if err != nil {
+		fmt.Printf("  %-16s: 读不到（%v）\n", name, err)
+		return
+	}
+	fmt.Printf("  %-16s: %v\n", name, value)
 }
 
 // parseOnOff parses an on or off argument.
