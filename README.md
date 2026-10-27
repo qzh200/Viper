@@ -60,22 +60,26 @@ viper scenario delete game           # 删除场景
 固件读不回来，取 Viper 自己的记录。固件在背光自动熄灭时会把亮度报成
 零，所以零不被当成用户选的亮度。
 
-### 分区颜色在这台机器上读不回来
+### 灯光是怎么控制的
 
-本机实测（`cmd/rgblayout`，需要管理员权限）：写完四个分区的颜色之后，
-`GetGamingLED` 读回来的字节**仍然是全零**，`GetGamingLEDColor` 与
-`GetGamingLEDBehavior` 恒答 **2**，八种灯效的结果一模一样。
+本机实测（`cmd/rgblayout`、`cmd/ledprobe`，需要管理员权限）：
 
-对照实验：让**原厂服务**自己设一次同样的四个分区颜色，它的应答里
-`LEDs` 立刻就有了四个分区的颜色 —— 但同一时刻再用 WMI 读固件，
-依然是全零。也就是说：
+- 固件里 `GetGamingLED` 读回来的字节**始终是全零**，`GetGamingLEDColor` 与
+  `GetGamingLEDBehavior` 恒答 **2**，八种灯效的结果一模一样。**分区颜色读不回来。**
+- 真正让键盘变色的是**原厂服务**（`AcerAgentService`，监听 46933）。让它设一次
+  四个分区的纯红，键盘**立刻变红**。同一次写入用 WMI 读固件依然是全零，
+  所以「读不到」不代表「没写进去」。
+- 原厂服务**不走 WMI 写灯光**，它经命名管道
+  `AcerLightingService_NamedPipe` 把设置交给 `AcerLightingService`：
+  `SetKeyboardLightingMode`（全域）、`SetKeyboardLightingPerLEDLighting`
+  （逐 LED），颜色是四个字节（`color: #%02X%02X%02X%02X`）。
 
-- **原厂软件也是自己记住的**，它的 `LEDs` 初始就是空的；
-- 固件**不通过 WMI 暴露分区颜色**；
-- Viper 与原厂行为**等价**，灯色的记录存在 Viper 自己的配置里。
+因此 Viper 的灯光**调用原厂服务下发**，不逆向命名管道，也不依赖 WMI 的
+`SetGamingLEDColor` —— 那条路原厂根本不用，写进去的东西没有验证手段。
 
-写进去的那一下到底生效没有，WMI 这条路上**无法验证**：固件既不读回
-颜色，也不给一个有意义的写回状态。键盘上的实际颜色只能靠眼睛看。
+其余设置原厂服务也都能写（`OPERATING_MODE`、`GPU_MODE`、`BACKLIGHT_30S`、
+`LCD_OVERDRIVE`、`BOOT_SOUND`、`WIN_KEY` 实测均返回 `result: "0"`），
+只有 `STICKY_KEY` 原厂自己也不支持。
 
 ## 显卡遥测
 

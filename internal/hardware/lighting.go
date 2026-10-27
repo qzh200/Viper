@@ -122,9 +122,11 @@ func (b *Backend) ResetLighting() error {
 //
 // 本机实测过：写完四个分区的颜色之后，GetGamingLED 读回来的字节仍然是
 // 全零，GetGamingLEDColor 与 GetGamingLEDBehavior 恒答 2，八种灯效的
-// 结果一模一样。让原厂服务自己设一次同样的颜色，它的应答里有四个分区，
-// 但同一时刻用 WMI 读固件依然是全零——固件不通过 WMI 暴露分区颜色，
-// 原厂软件也是自己记住的。Viper 与原厂行为等价。
+// 结果一模一样。让原厂服务自己设一次同样的颜色，键盘立刻变红，同一次
+// 写入用 WMI 读固件依然是全零 —— 所以「读不到」不代表「没写进去」。
+//
+// 真正让键盘变色的是原厂服务经命名管道交给 AcerLightingService 的那条路，
+// 原厂自己不走 WMI 的 SetGamingLEDColor。灯光因此走原厂服务下发。
 func (b *Backend) Lighting() (RGBConfig, error) {
 	var config RGBConfig
 

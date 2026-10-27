@@ -58,8 +58,19 @@ func main() {
 			fmt.Println("usage: palight set <json>")
 			return
 		}
+		// The parameter can come from a file, because the quotes of a
+		// JSON text do not survive the shell on every system.
+		text := os.Args[2]
+		if strings.HasPrefix(text, "@") {
+			data, err := os.ReadFile(text[1:])
+			if err != nil {
+				fmt.Println("the parameter file cannot be read:", err)
+				return
+			}
+			text = string(data)
+		}
 		var parameter any
-		if err := json.Unmarshal([]byte(os.Args[2]), &parameter); err != nil {
+		if err := json.Unmarshal([]byte(text), &parameter); err != nil {
 			fmt.Println("the parameter is not valid json:", err)
 			return
 		}
