@@ -95,8 +95,8 @@ func Default() Settings {
 			PerZone:    false,
 		},
 		Fans: Fans{
-			CPUMode:    1,
-			GPUMode:    1,
+			CPUMode:    0, // the automatic mode of the hardware layer
+			GPUMode:    0,
 			CPUPercent: 0,
 			GPUPercent: 0,
 		},
