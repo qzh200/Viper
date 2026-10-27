@@ -28,7 +28,7 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | :--- | :--- |
 | `GetGamingSysInfo` | 一共只有 **5 个分类**有值（`0x01` CPU 温度、`0x02` CPU 风扇、`0x03` 主板温度、`0x06` 显卡风扇、`0x0A` 显卡温度），其余 12 个分类读回来都是 0。Viper 全读了 |
 | 风扇 | 行为、转速、风扇表三个方法全部覆盖，读写都有 |
-| 灯效 | 颜色、行为、亮度、背光缓冲区全部覆盖；三个读回方法（`GetGamingLED` / `GetGamingLEDColor` / `GetGamingLEDBehavior`）在固件里恒返回错误码，拿不到东西 |
+| 灯效 | 颜色、行为、亮度、背光缓冲区全部覆盖；三个读回方法（`GetGamingLED` / `GetGamingLEDColor` / `GetGamingLEDBehavior`）在固件里**读不到颜色**：`GetGamingLED` 返回的字节全是零，`GetGamingLEDColor` 与 `GetGamingLEDBehavior` 恒答 2 |
 | 杂项设置 | `0x02` 图形显示模式、`0x06` 开机音效可读写；`0x01` 与 `0x08` 写入后没有任何可见效果 |
 | 性能档案 | `GetGamingProfile` 与 `GetGamingProfileSetting` 能读，但语义还没解开（返回的是 1 和 2 这样的标志） |
 | 动作类热键 | 只有 **132**（键盘背光）和 **7**（CoolBoost）有反应。Windows 菜单键在 HID 层，不在 WMI 面上 |
@@ -59,6 +59,23 @@ viper scenario delete game           # 删除场景
 存场景时，风扇模式与占空比、键盘亮度都**从机器上现读**，灯效与颜色
 固件读不回来，取 Viper 自己的记录。固件在背光自动熄灭时会把亮度报成
 零，所以零不被当成用户选的亮度。
+
+### 分区颜色在这台机器上读不回来
+
+本机实测（`cmd/rgblayout`，需要管理员权限）：写完四个分区的颜色之后，
+`GetGamingLED` 读回来的字节**仍然是全零**，`GetGamingLEDColor` 与
+`GetGamingLEDBehavior` 恒答 **2**，八种灯效的结果一模一样。
+
+对照实验：让**原厂服务**自己设一次同样的四个分区颜色，它的应答里
+`LEDs` 立刻就有了四个分区的颜色 —— 但同一时刻再用 WMI 读固件，
+依然是全零。也就是说：
+
+- **原厂软件也是自己记住的**，它的 `LEDs` 初始就是空的；
+- 固件**不通过 WMI 暴露分区颜色**；
+- Viper 与原厂行为**等价**，灯色的记录存在 Viper 自己的配置里。
+
+写进去的那一下到底生效没有，WMI 这条路上**无法验证**：固件既不读回
+颜色，也不给一个有意义的写回状态。键盘上的实际颜色只能靠眼睛看。
 
 ## 显卡遥测
 

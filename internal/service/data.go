@@ -375,6 +375,12 @@ func (p *Provider) fans() (hardware.FanState, error) {
 //
 // The firmware does not report the colours, so they come from the settings
 // of Viper.
+//
+// 本机实测过：写完四个分区的颜色之后，GetGamingLED 读回来的字节仍然是
+// 全零，GetGamingLEDColor 与 GetGamingLEDBehavior 恒答 2，八种灯效的
+// 结果一模一样。让原厂服务自己设一次同样的颜色，它的应答里有四个分区，
+// 但同一时刻用 WMI 读固件依然是全零——固件不通过 WMI 暴露分区颜色，
+// 原厂软件也是自己记住的。Viper 与原厂行为等价。
 func (p *Provider) lighting() map[string]any {
 	result := map[string]any{
 		"LEDs":       []any{},
