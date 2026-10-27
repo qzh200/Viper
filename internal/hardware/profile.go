@@ -27,7 +27,13 @@ func (b *Backend) LCDOverdrive() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	// 固件没有给出 gmOutput 时不能当成读到了零，那会让上层把"读不到"当成
+	// "超频是关着的"。
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return false, fmt.Errorf("hardware: 读取档位时固件没有给出 gmOutput")
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return false, err
 	}
@@ -68,7 +74,13 @@ func (b *Backend) WinKeyLocked() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	// 固件没有给出 gmOutput 时不能当成读到了零，那会让上层把"读不到"当成
+	// "Windows 键没有锁"。
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return false, fmt.Errorf("hardware: 读取档位时固件没有给出 gmOutput")
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return false, err
 	}

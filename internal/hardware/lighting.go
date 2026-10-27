@@ -132,7 +132,13 @@ func (b *Backend) LightingBrightness() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	// 固件没有给出 gmOutput 时不能当成读到了零，那会让上层把"读不到"当成
+	// "键盘是灭着的"。
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return 0, fmt.Errorf("hardware: 读取键盘亮度时固件没有给出 gmOutput")
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return 0, err
 	}

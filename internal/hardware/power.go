@@ -50,19 +50,17 @@ func (b *Backend) SetPowerMode(mode PowerMode) error {
 
 // DiscreteGPU reports the state of the discrete GPU switch.
 //
-// The provider encodes the state in the high byte of the setting, the low
-// byte is the status of the setting and has to be zero.
+// 开关的状态在杂项表的 0x02（显卡模式）里：混合、独显、自动。0x09 那一项
+// 不是开关的状态，它是这台机器支持显卡模式的能力值，真机上读到的是 7，
+// 与原厂服务能力表 SUPPORT_GPU_MODE_CAPABILITY 里的 7 相同。
 //
-// 状态字节也一起检查：读取失败时错误码不能被当成"独显已连接"。
+// 只有模式明确是独显时才报开。自动模式下由系统决定，不能从设置里读出来。
 func (b *Backend) DiscreteGPU() (bool, error) {
-	value, ok, err := b.miscValue(MiscDiscreteGPU)
+	mode, err := b.GPUMode()
 	if err != nil {
 		return false, err
 	}
-	if !ok {
-		return false, fmt.Errorf("hardware: 固件不认识独显状态这个设置，状态字节不是零")
-	}
-	return value == 3, nil
+	return mode == GPUModeDiscrete, nil
 }
 
 // OverclockCapability reports which overclocking features the machine

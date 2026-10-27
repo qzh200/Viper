@@ -175,11 +175,11 @@ func TestMiscSettingIdentifiers(t *testing.T) {
 	// The identifiers were found by writing every value of the table and
 	// reading the original service back.
 	cases := map[MiscSetting]uint32{
-		MiscGPUMode:       0x02,
-		MiscBootSound:     0x06,
-		MiscDiscreteGPU:   0x09,
-		MiscCPUOverclock:  0x0A,
-		MiscOperationMode: 0x0B,
+		MiscGPUMode:           0x02,
+		MiscBootSound:         0x06,
+		MiscGPUModeCapability: 0x09,
+		MiscCPUOverclock:      0x0A,
+		MiscOperationMode:     0x0B,
 	}
 	for setting, want := range cases {
 		if got := uint32(setting); got != want {

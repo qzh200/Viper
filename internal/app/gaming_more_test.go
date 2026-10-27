@@ -318,8 +318,10 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	machine.lcdOverdrive = true
 	machine.coolBoost = true
 	machine.discreteGPU = true
-	machine.overclockGPU = true
-	machine.overclockCPU = false
+	// 固件根本不报告显卡的超频能力，硬件层那一项恒为不支持，替身不能
+	// 报出机器上不会出现的能力。
+	machine.overclockGPU = false
+	machine.overclockCPU = true
 	machine.fans = hardware.FanState{CPUMode: hardware.FanCustom}
 	machine.backlight = hardware.BacklightState{Timeout: true}
 
@@ -346,7 +348,8 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !gpu || cpu {
+	// 固件不报告显卡的超频能力，只有处理器的那一项。
+	if gpu || !cpu {
 		t.Errorf("the overclocking of the card is %v and of the processor is %v", gpu, cpu)
 	}
 }

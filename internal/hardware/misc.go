@@ -11,6 +11,9 @@ import (
 // The provider answers with a single word. The upper byte carries the
 // value of the setting, the lower byte is a status that is zero when the
 // setting is defined.
+//
+// 固件没有给出 gmOutput 时不能当成读到了零：那会让上层把"读不到"当成
+// "值是零"，性能档位会变成静音模式，开机音效会变成关着的，而且都不报错。
 func (b *Backend) MiscSettingValue(id uint32) (uint64, error) {
 	outputs, err := b.callGaming("GetGamingMiscSetting", map[string]wmi.Value{
 		"gmInput": wmi.Uint32(id),
@@ -18,7 +21,11 @@ func (b *Backend) MiscSettingValue(id uint32) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return 0, fmt.Errorf("hardware: 读取杂项设置 0x%02X 时固件没有给出 gmOutput", id)
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return 0, err
 	}
@@ -31,6 +38,9 @@ func (b *Backend) MiscSettingValue(id uint32) (uint64, error) {
 // byte and the identifier in the lower one. The provider answers with the
 // new value rather than with a status, so the result is confirmed by
 // reading the setting back.
+//
+// 读回的时候要先看状态字节：固件不认识这个设置时会答一个非零的状态，
+// 而值恰好是零的时候，只看值就会把"固件拒绝了"当成"写成功了"。
 func (b *Backend) SetMiscSettingValue(id uint32, value uint64) error {
 	input := (value << 8) | uint64(id)
 	if _, err := b.callGaming("SetGamingMiscSetting", map[string]wmi.Value{
@@ -42,6 +52,9 @@ func (b *Backend) SetMiscSettingValue(id uint32, value uint64) error {
 	raw, err := b.MiscSettingValue(id)
 	if err != nil {
 		return err
+	}
+	if status := raw & 0xFF; status != 0 {
+		return fmt.Errorf("hardware: 固件不认识杂项设置 0x%02X，状态字节是 %d", id, status)
 	}
 	if raw>>8 != value {
 		return fmt.Errorf("hardware: the provider kept the setting 0x%02X at %d instead of %d", id, raw>>8, value)

@@ -311,8 +311,13 @@ const (
 	MiscGPUMode MiscSetting = 0x02
 	// MiscBootSound switches the sound at the start of the machine.
 	MiscBootSound MiscSetting = 0x06
-	// MiscDiscreteGPU reports the discrete GPU switch state.
-	MiscDiscreteGPU MiscSetting = 0x09
+	// MiscGPUModeCapability reports which graphics modes the machine
+	// supports.
+	//
+	// 这一项不是开关的状态。真机上读到的是 7，与原厂服务能力表
+	// SUPPORT_GPU_MODE_CAPABILITY 里的 7 相同，机器支持显卡模式的能力是
+	// 七。把它当成开关会让"独显已连接"永远是假的。
+	MiscGPUModeCapability MiscSetting = 0x09
 	// MiscCPUOverclock reports the CPU overclock capability.
 	MiscCPUOverclock MiscSetting = 0x0A
 	// MiscOperationMode selects the performance profile.

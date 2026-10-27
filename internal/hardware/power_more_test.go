@@ -75,9 +75,10 @@ func TestSetPowerModeReportsAProfileThatIsNotTaken(t *testing.T) {
 }
 
 func TestDiscreteGPU(t *testing.T) {
-	// The state of the switch sits in the high byte of the setting.
+	// 独显开关的状态在显卡模式里：混合、独显、自动。
 	provider := newFakeProvider()
-	provider.output("GetGamingMiscSetting", "gmOutput", 0x0300)
+	// 显卡模式是 2，也就是独显。
+	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000200)
 	backend := newFakeBackend(provider)
 
 	enabled, err := backend.DiscreteGPU()
@@ -86,6 +87,52 @@ func TestDiscreteGPU(t *testing.T) {
 	}
 	if !enabled {
 		t.Error("the graphics switch is off")
+	}
+}
+
+func TestDiscreteGPUOfAMachineInTheHybridMode(t *testing.T) {
+	// 混合模式下独显没有接管显示，开关是关着的。
+	provider := newFakeProvider()
+	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000100)
+	backend := newFakeBackend(provider)
+
+	enabled, err := backend.DiscreteGPU()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled {
+		t.Error("the graphics switch is on")
+	}
+}
+
+func TestDiscreteGPUOfAMachineInTheAutomaticMode(t *testing.T) {
+	// 自动模式下由系统决定，不能从设置里读出独显是不是开着。
+	provider := newFakeProvider()
+	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000300)
+	backend := newFakeBackend(provider)
+
+	enabled, err := backend.DiscreteGPU()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled {
+		t.Error("the graphics switch is on although the mode is the automatic one")
+	}
+}
+
+func TestTheGraphicsModeCapabilityIsNotTheSwitch(t *testing.T) {
+	// 0x09 那一项是能力值，不是开关的状态。真机上读到的是 7。
+	// 把它当成开关，读出来的永远是假的。
+	provider := newFakeProvider()
+	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000700)
+	backend := newFakeBackend(provider)
+
+	enabled, err := backend.DiscreteGPU()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled {
+		t.Error("the capability value was taken for the state of the switch")
 	}
 }
 

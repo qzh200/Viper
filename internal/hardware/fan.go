@@ -237,7 +237,13 @@ func (b *Backend) Fans() (FanState, error) {
 	if err != nil {
 		return state, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	// 固件没有给出 gmOutput 时不能当成读到了零，那会让上层把"读不到"当成
+	// "风扇在自动模式"。
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return state, fmt.Errorf("hardware: 读取风扇行为时固件没有给出 gmOutput")
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return state, err
 	}
@@ -269,7 +275,13 @@ func (b *Backend) FanTable() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	raw, err := decodeUint(outputs["gmOutput"])
+	// 固件没有给出 gmOutput 时不能当成读到了零，那会让上层把"读不到"当成
+	// "用的是普通的表"。
+	value, ok := outputs["gmOutput"]
+	if !ok {
+		return 0, fmt.Errorf("hardware: 读取风扇表时固件没有给出 gmOutput")
+	}
+	raw, err := decodeUint(value)
 	if err != nil {
 		return 0, err
 	}
