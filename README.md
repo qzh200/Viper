@@ -12,6 +12,24 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
   OLE 接口，处理 VARIANT、BSTR、SAFEARRAY 与 vtable 分发。
 * **Windows 专用**。当前仅支持 Windows。
 
+## 进程依赖
+
+**核心路径零进程依赖。** 温度、风扇、灯效、性能档位、开机音效、
+图形显示模式、粘滞键、LCD 超频全部走 `root\wmi` 的
+`AcerGamingFunction`。这个类是**固件动态提供**的：它不在 WMI 静态库
+里，也没有任何 `WmiPrvSE` 宿主加载 Acer 模块，只依赖 Windows 的 WMI
+子系统与管理员权限。
+
+**只有两项依赖原厂进程。** 蓝光灯与 USB 充电属于原厂 Quick Access
+服务（`AcerQAAgent.exe`，服务名 `AcerQAAgentSvis`），监听
+`127.0.0.1:5141`。实测把该服务停掉后，`viper bluelight` 与
+`viper charge` 立刻报「服务不可达」，而 `viper gpu`、`viper bootsound`
+一切正常；服务重新启动后全部恢复。
+
+原厂 PredatorSense 服务（`AcerAgentService.exe`，监听
+`127.0.0.1:46933`）与两个命名管道都**不是** Viper 的依赖，Viper 只在
+`cmd/palight` 这类探针里用到它们，用来给硬件写入做旁证。
+
 ## 已实现
 
 | 能力 | 状态 |
@@ -33,6 +51,7 @@ PredatorSense / NitroSense 的实用功能，同时不引入任何第三方程�
 | 蓝光灯档位 | ✅ 读取已通，写入接口只接受 0–4 |
 | USB 关机充电开关 | ✅ |
 | 充电限制阈值（10 / 20 / 30 %） | ✅ |
+| 键盘背光亮度与 30 秒超时 | ✅ 亮度可读回，超时可读回 |
 | 超频能力探测 | ✅ |
 | CPU / GPU 超频配置 | 🚧 读取已通，写入待确认 |
 | 配置持久化与开机还原 | 🚧 |
@@ -101,9 +120,14 @@ WMI COM 接口的 vtable 布局在不同 Windows 版本上并不一致，公开�
 | 参数 VARIANT 类型 | provider 把 UInt32 参数声明成无符号整数，却只接受 `VT_I4` 或 `VT_BSTR`，写入时按 `I4 → UI8 → UI4 → BSTR` 依次尝试 |
 | 风扇模式编码 | 写入用 `1/2/3`（自动/全速/自定义）；读回时 provider 把同一个编码乘以 256 放进第三个字节，要先右移八位再取两位 |
 | 风扇分组 | provider 只报告主风扇组的行为，显卡风扇组的行为读不回来；占空比用 `GetGamingFanSpeed` 按风扇编号读（1 是 CPU，4 和 2 是显卡） |
-| 灯效特效编码 | `0` 静态、`1` 呼吸、`2` 霓虹、`3` 波形、`4` 切换、`5` 缩放、`6` 流星雨、`7` 闪烁，与官方应用列出的顺序一致 |
-| 灯效颜色 | 每个分区一个颜色，写入时是 `0x00RRGGBB` 加分区编号，分区从 1 开始 |
-| 灯效读回 | provider 只报告亮度（`GetGamingRgbKb`，范围 0 到 100），不报告颜色与特效；这部分状态由 Viper 自己保存在 `%AppData%\Viper\config.json` |
+| 灯效特效编码 | `0` 静态、`1` 呼吸、`2` 霓虹、`3` 波形、`4` 切换、`5` 缩放、`6` 流星雨、`7` 闪烁。原厂档案 `LightingProfile.ini` 里每个模式都有一个 `value` 字段，编号与官方应用列出的顺序完全一致 |
+| 灯效颜色 | 每个分区一个颜色，写入时是 `0x00RRGGBB` 加分区编号，分区从 1 开始。原厂档案里的 `PerKeyColor` 用的是 `0xBBGGRR`，同一颜色两种写法 |
+| 灯效速度与方向 | 原厂档案写明速度范围是 `1` 到 `9`，方向是一个开关（`0` / `1`），亮度范围 `0` 到 `100` |
+| 背光缓冲区 | `SetGamingKBBacklight` 的十六字节缓冲区里，**亮度在 byte2 和 byte5**，byte8 是标志位，**byte9 必须为 1**，否则固件直接丢弃缓冲区并把亮度清零 |
+| 亮度读回 | `GetGamingRgbKb(1)` 返回的第二个字节就是亮度（`0x6400` 表示 100） |
+| 30 秒超时 | 由动作类 `APGeAction.SetFunction` 控制，超时秒数放在第 40 位；读回用 `GetFunction(0x00088401)`，第六个字节是 `30` 即表示开启 |
+| 灯效读回 | provider **不报告颜色与特效**（`GetGamingLEDColor` 与 `GetGamingLEDBehavior` 恒返回错误码 2，`GetGamingLED` 只回一个全零数组），这部分状态由 Viper 自己保存在 `%AppData%\Viper\config.json` |
+| 原厂服务的灯光状态 | `AcerAgentService` 返回的 `LIGHTING` 是它**自己的缓存档案**，不跟随固件变化，因此不能用来判断一次写入是否生效；判断写入只能看 `GetGamingRgbKb` |
 | Setter 的输出参数 | 回显新值而不是状态码，所以不能拿它判断成败，改为设置后读回验证 |
 | 性能档位编码 | **不是** MOF 暗示的 `0/1/2/3`。实测可用值只有 `0` 静音、`1` 均衡、`4` 性能、`5` 加速；写 `2`/`3` 会被静默钳制回均衡。`6` 是固件保留档，满载时风扇反而降到静音水平，不对用户开放。原厂服务返回的 `SUPPORT_OPERATING_MODE_CAPABILITY` 同样是 `[0,1,4,5,6]` |
 | 权限 | 枚举实例与调用方法都需要管理员权限 |
@@ -171,6 +195,12 @@ int32 长度 + 原始字节`），其中 `cmd 0` 是回显参数。管道需要�
 * GPU 风扇组的行为读不回来，Viper 如实呈现而不伪造。
 * 蓝光灯、USB 充电需要原厂的 Acer Quick Access 服务在运行；
   这些设置无法只靠 WMI 完成。
+* 灯效的颜色与特效无法从固件读回，Viper 用自己的配置记住它们，
+  因此与官方应用**不会自动同步**：在官方应用里改灯效，Viper 读到的
+  仍是上次由 Viper 写入的那一份。
+* 官方应用自己保存的灯效档案在
+  `C:\ProgramData\OEM\AcerLightingService\LightingProfile\LightingProfile.ini`，
+  它与固件是两条独立的路径，Viper 不去改它。
 
 ## 参考
 
