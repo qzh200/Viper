@@ -94,5 +94,25 @@ if (-not $hasAdmin) {
     Report '读回这个键' (Invoke-Viper profile) 'Windows key   : off'
 }
 
+# 四、固件那一侧能读的几项：风扇表、超频能力、背光缓冲区。
+Write-Host ''
+Write-Host '四、固件那一侧能读的几项' -ForegroundColor Cyan
+if (-not $hasAdmin) {
+    Write-Host '  读不到固件那一侧，跳过' -ForegroundColor Yellow
+} else {
+    Write-Host '  （在 viper diag 的报告里：GPU overclock、CPU overclock、Windows key）' -ForegroundColor DarkGray
+    Write-Host '  风扇表与背光缓冲区用固件自己的接口读：' -ForegroundColor DarkGray
+    $cim = Get-CimInstance -Namespace root\wmi -ClassName AcerGamingFunction -ErrorAction SilentlyContinue
+    if ($null -eq $cim) {
+        Write-Host '  读不到固件那一侧的类' -ForegroundColor Yellow
+    } else {
+        $table = (Invoke-CimMethod -InputObject $cim -MethodName GetGamingFanTable).gmOutput
+        Write-Host ("  风扇表: {0}（1 是普通的表，3 是加速的表；本机的加速表写不进去）" -f $table)
+        $buffer = (Invoke-CimMethod -InputObject $cim -MethodName GetGamingKBBacklight -Arguments @{ gmInput = 1 }).gmOutput
+        $text = ($buffer | ForEach-Object { '{0:X2}' -f $_ }) -join ' '
+        Write-Host ("  背光缓冲区: {0}（第 3 个字节是亮度，第 9 个是标志位）" -f $text)
+    }
+}
+
 Write-Host ''
 Write-Host '跑完了。机器上的状态和跑之前是一样的。' -ForegroundColor Cyan
