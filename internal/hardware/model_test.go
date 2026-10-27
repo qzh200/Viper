@@ -63,19 +63,6 @@ func TestParsePowerMode(t *testing.T) {
 	}
 }
 
-func TestFanModeProviderCode(t *testing.T) {
-	cases := map[FanMode]uint64{
-		FanAuto:   1,
-		FanMax:    2,
-		FanCustom: 3,
-	}
-	for mode, want := range cases {
-		if got := mode.providerCode(); got != want {
-			t.Errorf("%s encodes to %d, want %d", mode, got, want)
-		}
-	}
-}
-
 func TestDecodeFanMode(t *testing.T) {
 	cases := map[uint64]FanMode{
 		1: FanAuto,

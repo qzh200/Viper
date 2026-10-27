@@ -51,6 +51,30 @@ type Service interface {
 	Close() error
 }
 
+// Extras is the set of abilities the program asks the firmware for.
+//
+// 原厂程序给不了的那几项：风扇表、超频能力、背光原始缓冲区、复位灯效、锁
+// Windows 键。**别的都不问固件**——原厂程序能做的优先用它。
+//
+// 固件那一侧提供的比这多（顶替模式要更多），这一层只拿自己用得上的那几个。
+type Extras interface {
+	// FanTable reads the selected fan table.
+	FanTable() (uint64, error)
+	// OverclockCapability reports which overclocking features the machine
+	// supports.
+	OverclockCapability() (gpu bool, cpu bool, err error)
+	// BacklightBuffer reads the raw buffer of the keyboard backlight.
+	BacklightBuffer() ([]byte, error)
+	// ResetLighting restores the default keyboard lighting.
+	ResetLighting() error
+	// WinKeyLocked reports whether the Windows key is locked.
+	WinKeyLocked() (bool, error)
+	// SetWinKeyLocked locks or unlocks the Windows key.
+	SetWinKeyLocked(locked bool) error
+	// Close releases the connection.
+	Close()
+}
+
 // Options change the behaviour of a backend.
 type Options struct {
 	// Address is the address of the AcerAgentService. The default is the
@@ -64,7 +88,7 @@ type Options struct {
 	//
 	// 这一层不自己造固件的连接，连接由外面给进来，所以硬件层与原厂服务
 	// 这一层只通过两个接口说话，谁也不认识对方的实现。
-	OpenFirmware func() (hardware.Firmware, error)
+	OpenFirmware func() (Extras, error)
 }
 
 // Backend reaches the machine.
@@ -75,10 +99,10 @@ type Backend struct {
 	service Service
 
 	// openFirmware opens the connection to the provider.
-	openFirmware func() (hardware.Firmware, error)
+	openFirmware func() (Extras, error)
 	// firmware is the connection to the provider, it is opened on first
 	// use.
-	firmware hardware.Firmware
+	firmware Extras
 	// mutex guards the opening of the provider, so that two calls that
 	// arrive at the same time do not open two connections.
 	mutex sync.Mutex
@@ -108,7 +132,7 @@ func New(options Options) (*Backend, error) {
 //
 // It is used by the tests, so that they do not need the service of the
 // original software.
-func NewWithService(service Service, openFirmware func() (hardware.Firmware, error)) *Backend {
+func NewWithService(service Service, openFirmware func() (Extras, error)) *Backend {
 	return &Backend{service: service, openFirmware: openFirmware}
 }
 
@@ -161,7 +185,7 @@ func (b *Backend) set(function string, parameter any) error {
 //
 // 一个装着空指针的接口不等于 nil，所以这里要看指针本身，不然第一个需要
 // 固件的请求就会把程序打崩。
-func (b *Backend) provider() (hardware.Firmware, error) {
+func (b *Backend) provider() (Extras, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -185,7 +209,7 @@ func (b *Backend) provider() (hardware.Firmware, error) {
 }
 
 // usableFirmware takes a provider that cannot be used for nothing.
-func usableFirmware(firmware hardware.Firmware) bool {
+func usableFirmware(firmware Extras) bool {
 	if firmware == nil {
 		return false
 	}

@@ -64,31 +64,6 @@ func TestIsPredator(t *testing.T) {
 	}
 }
 
-func TestProcessorClocks(t *testing.T) {
-	speed, err := ProcessorClocks()
-	if err != nil {
-		t.Skipf("the clocks of the processor cannot be read on this system: %v", err)
-	}
-	if speed.MaxSpeedMHz == 0 {
-		t.Error("the processor reports the highest clock as zero")
-	}
-	if speed.CurrentSpeedMHz == 0 {
-		t.Error("the processor reports the clock as zero")
-	}
-}
-
-func TestMemoryFrequency(t *testing.T) {
-	// A machine without a memory module does not answer, a machine with
-	// one reports a clock in megahertz.
-	speed, err := MemoryFrequency()
-	if err != nil {
-		t.Skipf("the clock of the memory cannot be read on this system: %v", err)
-	}
-	if speed <= 0 {
-		t.Errorf("the memory reports the clock %d, want a number above zero", speed)
-	}
-}
-
 func TestTheFirmwareTableIsAvailable(t *testing.T) {
 	// The table is read by the system, it has to be there on a machine
 	// that runs Windows.

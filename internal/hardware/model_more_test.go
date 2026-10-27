@@ -261,17 +261,6 @@ func TestDecodePowerModeOfAValueThatIsNotThere(t *testing.T) {
 	}
 }
 
-func TestProviderCodeOfAnUnknownMode(t *testing.T) {
-	// An unknown profile is written as the balanced one, the provider
-	// rejects everything else.
-	if got := PowerUnknown.providerCode(); got != 1 {
-		t.Errorf("the unknown profile is encoded as %d, want 1", got)
-	}
-	if got := FanMode(99).providerCode(); got != 1 {
-		t.Errorf("an unknown fan mode is encoded as %d, want 1", got)
-	}
-}
-
 func TestIsPredatorModelOfTheOtherMachines(t *testing.T) {
 	// Only the Predator carries the turbo profile, so the family of the
 	// machine decides what the program offers.

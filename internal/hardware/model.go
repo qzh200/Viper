@@ -28,16 +28,6 @@ func (m FanMode) String() string {
 }
 
 // providerCode maps the mode onto the bit encoding the EC expects.
-func (m FanMode) providerCode() uint64 {
-	switch m {
-	case FanMax:
-		return 2
-	case FanCustom:
-		return 3
-	default:
-		return 1
-	}
-}
 
 // decodeFanMode maps the provider's behaviour bits back onto a mode.
 //
@@ -115,22 +105,6 @@ func (m PowerMode) String() string {
 //
 // 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
 // SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
-func (m PowerMode) providerCode() uint64 {
-	switch m {
-	case PowerQuiet:
-		return 0
-	case PowerBalanced:
-		return 1
-	case PowerPerformance:
-		return 4
-	case PowerTurbo:
-		return 5
-	case PowerEco:
-		return 6
-	default:
-		return 1
-	}
-}
 
 // decodePowerMode maps the provider's value back onto a mode.
 func decodePowerMode(value uint64) PowerMode {
@@ -161,6 +135,41 @@ func decodePowerMode(value uint64) PowerMode {
 // SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
 func PowerModeCode(mode PowerMode) uint64 {
 	return mode.providerCode()
+}
+
+// providerCode maps the mode onto the encoding the provider expects.
+//
+// The encoding is not a plain enumeration and it is not the one the MOF
+// suggests. Measured on a Predator Helios Neo 16, the provider keeps five
+// values and rejects everything else:
+//
+//	0 -> quiet
+//	1 -> balanced
+//	4 -> performance
+//	5 -> turbo
+//	6 -> eco
+//
+// Writing two or three leaves the previous profile in place, which is why
+// the values look like an ordinary enumeration to anyone who only tries the
+// obvious ones.
+//
+// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
+// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
+func (m PowerMode) providerCode() uint64 {
+	switch m {
+	case PowerQuiet:
+		return 0
+	case PowerBalanced:
+		return 1
+	case PowerPerformance:
+		return 4
+	case PowerTurbo:
+		return 5
+	case PowerEco:
+		return 6
+	default:
+		return 1
+	}
 }
 
 // DecodePowerMode maps a number of the machine back onto a profile.

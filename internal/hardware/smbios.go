@@ -153,96 +153,11 @@ type ProcessorSpeed struct {
 //
 // The firmware table carries the speeds of the processor, the highest one
 // is not stored anywhere else in a way that Windows keeps up to date.
-func ProcessorClocks() (ProcessorSpeed, error) {
-	var speed ProcessorSpeed
-
-	size := getSystemFirmwareTable(rsmb, 0, nil)
-	if size == 0 {
-		return speed, fmt.Errorf("hardware: the firmware table is not available")
-	}
-
-	buffer := make([]byte, size)
-	if getSystemFirmwareTable(rsmb, 0, buffer) == 0 {
-		return speed, fmt.Errorf("hardware: the firmware table could not be read")
-	}
-	if len(buffer) < 8 {
-		return speed, fmt.Errorf("hardware: the firmware table is truncated")
-	}
-
-	table := buffer[8:]
-	for offset := 0; offset+4 <= len(table); {
-		structType := table[offset]
-		length := int(table[offset+1])
-		if length < 4 || offset+length > len(table) {
-			break
-		}
-
-		if structType == processorInformationType && length >= 0x18 {
-			speed.CurrentSpeedMHz = int(table[offset+0x16]) | int(table[offset+0x17])<<8
-			maxSpeed := int(table[offset+0x10]) | int(table[offset+0x11])<<8
-			if maxSpeed == 0xFFFF && length >= 0x32 {
-				// The speed does not fit into the small field, the wide
-				// one behind it carries it.
-				wide := uint32(table[offset+0x2E]) |
-					uint32(table[offset+0x2F])<<8 |
-					uint32(table[offset+0x30])<<16 |
-					uint32(table[offset+0x31])<<24
-				maxSpeed = int(wide & 0xFFFF)
-			}
-			speed.MaxSpeedMHz = maxSpeed
-			return speed, nil
-		}
-
-		offset = nextStructure(table, offset, length)
-	}
-
-	return speed, fmt.Errorf("hardware: no processor information found")
-}
 
 // MemoryFrequency reads the clock of the memory in megahertz.
 //
 // The firmware table carries the speed of the memory modules, the first
 // module of the machine is enough.
-func MemoryFrequency() (int, error) {
-	size := getSystemFirmwareTable(rsmb, 0, nil)
-	if size == 0 {
-		return 0, fmt.Errorf("hardware: the firmware table is not available")
-	}
-
-	buffer := make([]byte, size)
-	if getSystemFirmwareTable(rsmb, 0, buffer) == 0 {
-		return 0, fmt.Errorf("hardware: the firmware table could not be read")
-	}
-	if len(buffer) < 8 {
-		return 0, fmt.Errorf("hardware: the firmware table is truncated")
-	}
-
-	table := buffer[8:]
-	for offset := 0; offset+4 <= len(table); {
-		structType := table[offset]
-		length := int(table[offset+1])
-		if length < 4 || offset+length > len(table) {
-			break
-		}
-
-		// The structure of a memory device carries the speed. The place
-		// of the field depends on the version of the standard, both are
-		// read.
-		if structType == memoryDeviceType && length >= 0x17 {
-			speed := int(table[offset+0x15]) | int(table[offset+0x16])<<8
-			if speed == 0 && length >= 0x1D {
-				speed = int(table[offset+0x1B]) | int(table[offset+0x1C])<<8
-			}
-			if speed > 0 {
-				return speed, nil
-			}
-		}
-
-		offset = nextStructure(table, offset, length)
-	}
-
-	return 0, fmt.Errorf("hardware: no memory device found")
-}
 
 // nextStructure advances past the current structure and its string table.
 func nextStructure(table []byte, offset, length int) int {

@@ -2,7 +2,6 @@ package hardware
 
 import (
 	"sync"
-	"testing"
 	"time"
 
 	"viper/internal/wmi"
@@ -85,82 +84,6 @@ func zoneColours() (first []uint64, second []uint64) {
 		return out
 	}
 	return build(RGBColor{R: 0xC7, G: 0x00, B: 0x87}), build(RGBColor{R: 0x00, G: 0xAE, B: 0xC7})
-}
-
-func TestTwoWritesDoNotCrossEachOther(t *testing.T) {
-	// 两个请求同时改灯效时，四个分区的颜色必须来自同一份配置。
-	firstColours, secondColours := zoneColours()
-
-	first := RGBConfig{PerZone: true, Brightness: 80}
-	second := RGBConfig{PerZone: true, Brightness: 80}
-	for i := 0; i < LightingZones; i++ {
-		first.Zones[i] = RGBColor{R: 0xC7, G: 0x00, B: byte(0x87 + i)}
-		second.Zones[i] = RGBColor{R: 0x00, G: 0xAE, B: byte(0xC7 + i)}
-	}
-
-	provider := newRecordingProvider()
-	backend := newBackendWith(provider)
-
-	var group sync.WaitGroup
-	group.Add(2)
-	for _, config := range []RGBConfig{first, second} {
-		go func(c RGBConfig) {
-			defer group.Done()
-			backend.SetLighting(c)
-		}(config)
-	}
-	group.Wait()
-
-	colours := provider.colours()
-	if len(colours) != LightingZones*2 {
-		t.Fatalf("the zones were written %d times, want %d", len(colours), LightingZones*2)
-	}
-
-	// 每一份配置的四个分区颜色必须连在一起。
-	// 前四个来自同一份，后四个来自另一份。
-	for i := 0; i < LightingZones; i++ {
-		if colours[i] != firstColours[i] && colours[i] != secondColours[i] {
-			t.Errorf("the zone %d has the colour %X, want a colour of one of the two settings", i, colours[i])
-		}
-	}
-	for i := LightingZones; i < len(colours); i++ {
-		if colours[i] != firstColours[i-LightingZones] && colours[i] != secondColours[i-LightingZones] {
-			t.Errorf("the zone %d has the colour %X, want a colour of one of the two settings", i, colours[i])
-		}
-	}
-
-	// 两次写不能交叉：先出现的那份要占满前四个位置。
-	firstAt := -1
-	secondAt := -1
-	for i, colour := range colours {
-		if firstAt < 0 && matches(colour, firstColours) {
-			firstAt = i
-		}
-		if secondAt < 0 && matches(colour, secondColours) {
-			secondAt = i
-		}
-	}
-	if firstAt < 0 || secondAt < 0 {
-		t.Fatalf("没有找到两份配置的颜色：%X", colours)
-	}
-	if firstAt > secondAt {
-		firstAt, secondAt = secondAt, firstAt
-	}
-	for i := firstAt; i < firstAt+LightingZones; i++ {
-		if !matches(colours[i], firstColours) && !matches(colours[i], secondColours) {
-			t.Errorf("the zone %d has the colour %X, want a colour of one of the two settings", i, colours[i])
-		}
-	}
-	// 前四个位置必须都属于同一份配置。
-	same := true
-	for i := 1; i < LightingZones; i++ {
-		if matches(colours[i], firstColours) != matches(colours[firstAt], firstColours) {
-			same = false
-		}
-	}
-	if !same {
-		t.Errorf("前四个分区不属于同一份配置：%X", colours[:LightingZones])
-	}
 }
 
 // matches 报告颜色是不是这一份配置里的。

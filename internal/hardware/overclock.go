@@ -19,3 +19,23 @@ package hardware
 //
 // SetGamingProfileSetting 也没有封装：这个字里还带着别的开关，写它有可能
 // 顺手改掉用户没有要求改的东西。
+// OverclockCapability reports which overclocking features the machine
+// supports.
+//
+// 杂项设置表里只有 CPU 的超频能力（0x0A），固件没有给出显卡的超频能力，
+// 所以显卡那一项只能报成不支持。
+//
+// 原厂服务自己也不实现这一项（结果码 3），所以这一项问固件。
+func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
+	value, ok, err := b.miscValue(MiscCPUOverclock)
+	if err != nil {
+		return false, false, err
+	}
+	if !ok {
+		// 固件不认识这个设置，那就不能说这台机器能超频。
+		return false, false, nil
+	}
+	// 固件用 0xFF 表示"不知道"。
+	cpu = value > 0 && value != 0xFF
+	return false, cpu, nil
+}

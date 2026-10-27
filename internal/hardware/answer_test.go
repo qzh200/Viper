@@ -9,8 +9,9 @@ import (
 
 // 固件没有给出 gmOutput 时，读到的不能是零。
 //
-// 少了这个检查，"读不到"会被当成"值是零"：性能档位会变成静音模式，开机
-// 音效会变成关着的，而且上层拿不到任何错误。
+// 少了这个检查，"读不到"会被当成"值是零"，而且上层拿不到任何错误。
+//
+// 这一层现在只管原厂程序给不了的那几项，所以要守的读取也只有这几项。
 
 func TestTheReadsThatNeedAnAnswer(t *testing.T) {
 	// 每个读取都要在固件不给答案时报告错误。
@@ -18,25 +19,19 @@ func TestTheReadsThatNeedAnAnswer(t *testing.T) {
 		name string
 		read func(b *Backend) error
 	}{
-		{"性能档位", func(b *Backend) error { _, err := b.PowerMode(); return err }},
-		{"显卡模式", func(b *Backend) error { _, err := b.GPUMode(); return err }},
-		{"开机音效", func(b *Backend) error { _, err := b.BootSound(); return err }},
-		{"独显状态", func(b *Backend) error { _, err := b.DiscreteGPU(); return err }},
-		{"键盘亮度", func(b *Backend) error { _, err := b.LightingBrightness(); return err }},
 		{"风扇表", func(b *Backend) error { _, err := b.FanTable(); return err }},
-		{"风扇行为", func(b *Backend) error { _, err := b.Fans(); return err }},
-		{"档位（超频）", func(b *Backend) error { _, err := b.LCDOverdrive(); return err }},
 		{"档位（Windows 键）", func(b *Backend) error { _, err := b.WinKeyLocked(); return err }},
+		{"背光缓冲区", func(b *Backend) error { _, err := b.BacklightBuffer(); return err }},
+		{"超频能力", func(b *Backend) error { _, _, err := b.OverclockCapability(); return err }},
 	}
 
 	for _, c := range cases {
 		provider := newFakeProvider()
 		// 固件回了空应答，没有 gmOutput。
-		provider.answer("GetGamingMiscSetting", map[string]wmi.Value{})
-		provider.answer("GetGamingRgbKb", map[string]wmi.Value{})
 		provider.answer("GetGamingFanTable", map[string]wmi.Value{})
-		provider.answer("GetGamingFanBehavior", map[string]wmi.Value{})
 		provider.answer("GetGamingProfile", map[string]wmi.Value{})
+		provider.answer("GetGamingKBBacklight", map[string]wmi.Value{})
+		provider.answer("GetGamingMiscSetting", map[string]wmi.Value{})
 		backend := newFakeBackend(provider)
 
 		err := c.read(backend)
@@ -50,43 +45,18 @@ func TestTheReadsThatNeedAnAnswer(t *testing.T) {
 	}
 }
 
-func TestTheWriteThatReadsBackAStatus(t *testing.T) {
-	// 固件不认识这个设置时会答一个非零的状态，值恰好是零的时候，
-	// 只看值就会把"固件拒绝了"当成"写成功了"。
+func TestTheOverclockThatIsNotTaken(t *testing.T) {
+	// 固件不认识这个设置（状态字节是 2），超频能力只能报成不支持，不能当成
+	// 支持，也不能当成出错。
 	provider := newFakeProvider()
-	// 状态字节是 2，值是 0。
 	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000002)
 	backend := newFakeBackend(provider)
 
-	err := backend.SetBootSound(false)
-	if err == nil {
-		t.Fatal("固件拒绝了这次写入，却报告成功")
+	gpu, cpu, err := backend.OverclockCapability()
+	if err != nil {
+		t.Fatalf("读取超频能力失败: %v", err)
 	}
-	if !strings.Contains(err.Error(), "状态") {
-		t.Errorf("报错没有说明状态字节，是 %v", err)
-	}
-}
-
-func TestTheWriteThatReadsBackAnotherValue(t *testing.T) {
-	// 固件把值保持在了别的地方，这也要报错。
-	provider := newFakeProvider()
-	provider.output("GetGamingMiscSetting", "gmOutput", 0x00010100)
-	backend := newFakeBackend(provider)
-
-	err := backend.SetBootSound(false)
-	if err == nil {
-		t.Fatal("固件没有接受这次写入，却报告成功")
-	}
-}
-
-func TestTheWriteThatTheFirmwareAccepts(t *testing.T) {
-	// 固件接受了写入时不能报错。
-	provider := newFakeProvider()
-	// 状态字节是 0，值是 1。
-	provider.output("GetGamingMiscSetting", "gmOutput", 0x00000100)
-	backend := newFakeBackend(provider)
-
-	if err := backend.SetBootSound(true); err != nil {
-		t.Errorf("固件接受了这次写入，却报错：%v", err)
+	if gpu || cpu {
+		t.Errorf("超频能力是显卡 %v 处理器 %v，不该报成支持", gpu, cpu)
 	}
 }

@@ -76,13 +76,8 @@ func (b *Backend) Fans() (hardware.FanState, error) {
 		return hardware.FanState{}, fmt.Errorf("machine: 原厂服务报了不认识的风扇模式 %d", data.Mode)
 	}
 
-	// 加速标记在固件那一侧，问不到的时候不编造，单独的加速命令会给出
-	// 确切的错误。
-	if firmware, err := b.provider(); err == nil {
-		if enabled, err := firmware.CoolBoostEnabled(); err == nil {
-			state.CoolBoost = enabled
-		}
-	}
+	// 加速标记在原厂服务那边：它的风扇模式 1 就是全速。
+	state.CoolBoost = state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax
 
 	return state, nil
 }
@@ -95,15 +90,11 @@ func (b *Backend) Fans() (hardware.FanState, error) {
 // 写完之后把配置读回来核对，固件没有接受哪一个设置就在错误信息里说清楚是
 // 哪一个。
 func (b *Backend) SetFans(config hardware.FanConfig) error {
-	// 加速要用固件那一侧，先问一次，够不到就不改风扇。
+	// 加速就是全速：原厂服务的风扇模式 1（实测 2722 RPM 升到 7092 RPM）。固件
+	// 那一侧的加速表在本机是死的通道，所以这一项不碰固件。
 	if config.CoolBoost {
-		firmware, err := b.provider()
-		if err != nil {
-			return err
-		}
-		if err := firmware.CoolBoost(true); err != nil {
-			return fmt.Errorf("machine: 打开风扇加速失败: %w", err)
-		}
+		config.CPUMode = hardware.FanMax
+		config.GPUMode = hardware.FanMax
 	}
 
 	mode := fanModeCustom
@@ -202,35 +193,46 @@ func fanRequest(mode hardware.FanMode, percent int) (auto int, speed int) {
 	}
 }
 
+// CoolBoostEnabled reports whether the fans run at full speed.
+//
+// 加速走**原厂服务**：它的风扇模式 1 就是全速（实测 2722 RPM 升到 7092 RPM）。
+// 固件那一侧也有一个加速表，但实测在本机是死的通道——动作类读回来是 0，写了
+// 状态也不变，风扇表恒是 1（普通的表）。原厂程序能做的事优先用它。
+func (b *Backend) CoolBoostEnabled() (bool, error) {
+	state, err := b.Fans()
+	if err != nil {
+		return false, err
+	}
+	return state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax, nil
+}
+
+// CoolBoost turns the fans to full speed, and hands them back to the
+// controller.
+//
+// 它走原厂服务的风扇模式，理由见 CoolBoostEnabled。
+func (b *Backend) CoolBoost(enabled bool) error {
+	if enabled {
+		return b.SetFans(hardware.FanConfig{
+			CPUMode: hardware.FanMax,
+			GPUMode: hardware.FanMax,
+		})
+	}
+	return b.SetFans(hardware.FanConfig{
+		CPUMode: hardware.FanAuto,
+		GPUMode: hardware.FanAuto,
+	})
+}
+
 // FanTable reads the selected fan table.
 //
-// 原厂服务不报风扇表，所以这一项问固件。
+// 原厂服务不报风扇表，所以这一项走固件那一侧。实测本机的原始答案是 1（普通
+// 的表），写不进去。
 func (b *Backend) FanTable() (uint64, error) {
 	firmware, err := b.provider()
 	if err != nil {
 		return 0, err
 	}
 	return firmware.FanTable()
-}
-
-// CoolBoostEnabled reports whether the boost fan table is selected.
-//
-// 加速在固件那一侧，原厂服务不报它，所以这一项问固件。
-func (b *Backend) CoolBoostEnabled() (bool, error) {
-	firmware, err := b.provider()
-	if err != nil {
-		return false, err
-	}
-	return firmware.CoolBoostEnabled()
-}
-
-// CoolBoost switches the boost fan table.
-func (b *Backend) CoolBoost(enabled bool) error {
-	firmware, err := b.provider()
-	if err != nil {
-		return err
-	}
-	return firmware.CoolBoost(enabled)
 }
 
 // fans reads the fan configuration of the service.

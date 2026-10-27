@@ -195,7 +195,7 @@ func (f *fakeFirmware) Close() { f.closed = true }
 func newBackend(t *testing.T, service *fakeService, firmware *fakeFirmware) *Backend {
 	t.Helper()
 
-	backend := NewWithService(service, func() (hardware.Firmware, error) {
+	backend := NewWithService(service, func() (Extras, error) {
 		if firmware == nil {
 			return nil, errors.New("没有固件")
 		}
@@ -690,19 +690,20 @@ func TestFansNeedTheFirmwareForTheBoost(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service, nil)
 
+	// 加速就是全速：原厂服务的风扇模式 1。所以它不碰固件。
 	err := backend.SetFans(hardware.FanConfig{
 		CPUMode:   hardware.FanAuto,
 		GPUMode:   hardware.FanAuto,
 		CoolBoost: true,
 	})
-	if err == nil {
-		t.Fatal("加速要固件那一侧，够不到时该报错")
+	if err != nil {
+		t.Fatalf("写入加速失败: %v", err)
 	}
-	if !errors.Is(err, ErrNoProvider) {
-		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
+	if len(service.writes) != 1 {
+		t.Fatalf("服务收到了 %d 次写入，不是 1 次", len(service.writes))
 	}
-	if len(service.writes) != 0 {
-		t.Fatal("够不到固件时不该改风扇")
+	if mode := service.writes[0].Parameter["mode"]; mode != fanModeMax {
+		t.Fatalf("写的风扇模式是 %v，不是 %d", mode, fanModeMax)
 	}
 }
 
@@ -716,21 +717,6 @@ func TestFirmwareAnswersTheSettingsTheServiceDoesNotKnow(t *testing.T) {
 		buffer:     []byte{0, 0x64, 0, 0, 0},
 	}
 	backend := newBackend(t, service, firmware)
-
-	boost, err := backend.CoolBoostEnabled()
-	if err != nil {
-		t.Fatalf("读取加速失败: %v", err)
-	}
-	if !boost {
-		t.Error("加速是打开着的")
-	}
-
-	if err := backend.CoolBoost(false); err != nil {
-		t.Fatalf("写入加速失败: %v", err)
-	}
-	if firmware.coolBoost {
-		t.Error("加速没有写进去")
-	}
 
 	table, err := backend.FanTable()
 	if err != nil {
@@ -770,8 +756,8 @@ func TestFirmwareIsOpenedOnlyOnce(t *testing.T) {
 	backend := newBackend(t, service, firmware)
 
 	for i := 0; i < 3; i++ {
-		if _, err := backend.CoolBoostEnabled(); err != nil {
-			t.Fatalf("第 %d 次读取加速失败: %v", i+1, err)
+		if _, err := backend.FanTable(); err != nil {
+			t.Fatalf("第 %d 次读取风扇表失败: %v", i+1, err)
 		}
 	}
 	if firmware.opened != 1 {
@@ -795,32 +781,32 @@ func TestSettingsThatNeedTheFirmwareReportIt(t *testing.T) {
 	if err := backend.ResetLighting(); !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
 	}
-	if _, err := backend.CoolBoostEnabled(); !errors.Is(err, ErrNoProvider) {
+	if _, err := backend.WinKeyLocked(); !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
 	}
 }
 
 func TestAFirmwareThatIsNotThere(t *testing.T) {
 	service := newFakeService()
-	backend := NewWithService(service, func() (hardware.Firmware, error) {
+	backend := NewWithService(service, func() (Extras, error) {
 		return nil, errors.New("没有实例")
 	})
 
-	if _, err := backend.CoolBoostEnabled(); !errors.Is(err, ErrNoProvider) {
+	if _, err := backend.FanTable(); !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
 	}
 }
 
 func TestAFirmwareThatIsAnEmptyPointer(t *testing.T) {
 	service := newFakeService()
-	backend := NewWithService(service, func() (hardware.Firmware, error) {
+	backend := NewWithService(service, func() (Extras, error) {
 		// An interface that holds an empty pointer is not equal to nil, so
 		// a guard that only asks the interface would let the call through.
 		var firmware *fakeFirmware
 		return firmware, nil
 	})
 
-	if _, err := backend.CoolBoostEnabled(); !errors.Is(err, ErrNoProvider) {
+	if _, err := backend.FanTable(); !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("错误是 %v，不是 %v", err, ErrNoProvider)
 	}
 }
@@ -844,8 +830,8 @@ func TestCloseReleasesBothConnections(t *testing.T) {
 	firmware := &fakeFirmware{}
 	backend := newBackend(t, service, firmware)
 
-	if _, err := backend.CoolBoostEnabled(); err != nil {
-		t.Fatalf("读取加速失败: %v", err)
+	if _, err := backend.FanTable(); err != nil {
+		t.Fatalf("读取风扇表失败: %v", err)
 	}
 
 	backend.Close()

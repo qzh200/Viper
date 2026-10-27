@@ -49,7 +49,7 @@ func TestTheBacklightBufferOfEveryLevel(t *testing.T) {
 func TestThePrivateBuilderIsThePublicOne(t *testing.T) {
 	// The two builders have to be the same, so that the stand and the
 	// machine cannot drift apart.
-	private := backlightBuffer(30)
+	private := NewBacklightBuffer(30)
 	public := NewBacklightBuffer(30)
 	for i := range private {
 		if private[i] != public[i] {

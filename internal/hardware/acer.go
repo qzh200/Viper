@@ -133,7 +133,6 @@ func NewBackendWith(provider Provider, gamingPath, actionPath string) *Backend {
 }
 
 // Instance returns the resolved object path of the gaming functions.
-func (b *Backend) Instance() string { return b.gamingPath }
 
 // operate runs one operation on the machine while holding the lock.
 //
@@ -157,46 +156,8 @@ func (b *Backend) callGaming(method string, args map[string]wmi.Value) (map[stri
 }
 
 // callAction invokes a method of the APGeAction class.
-func (b *Backend) callAction(method string, args map[string]wmi.Value) (map[string]wmi.Value, error) {
-	return b.client.Call(ClassAction, method, b.actionPath, args)
-}
 
 // Sensors reads the current temperatures and fan speeds.
-func (b *Backend) Sensors() (Sensors, error) {
-	var out Sensors
-
-	cpuTemp, err := b.sysInfo(sysInfoCPUTemp, false)
-	if err != nil {
-		return out, err
-	}
-	out.CPUTempC = cpuTemp
-
-	cpuFan, err := b.sysInfo(sysInfoCPUFanRPM, true)
-	if err != nil {
-		return out, err
-	}
-	out.CPUFanRPM = cpuFan
-
-	sysTemp, err := b.sysInfo(sysInfoSystemTemp, false)
-	if err != nil {
-		return out, err
-	}
-	out.SystemTempC = sysTemp
-
-	gpuFan, err := b.sysInfo(sysInfoGPUFanRPM, true)
-	if err != nil {
-		return out, err
-	}
-	out.GPUFanRPM = gpuFan
-
-	gpuTemp, err := b.sysInfo(sysInfoGPUTemp, false)
-	if err != nil {
-		return out, err
-	}
-	out.GPUTempC = gpuTemp
-
-	return out, nil
-}
 
 // sysInfo reads one value through GetGamingSysInfo.
 //
@@ -207,31 +168,6 @@ func (b *Backend) Sensors() (Sensors, error) {
 // 转速用整个十六位，温度只用低八位。以前这里靠"高位是不是零"来分辨转速和
 // 温度：零度和零转速会落到另一个分支，把状态字节当成读数报出去，而且不看
 // 状态字节，错误码 0x0002 会被报成两度或者两转。
-func (b *Backend) sysInfo(query uint32, wide bool) (int, error) {
-	outputs, err := b.callGaming("GetGamingSysInfo", map[string]wmi.Value{
-		"gmInput": wmi.Uint32(query),
-	})
-	if err != nil {
-		return 0, err
-	}
-	value, ok := outputs["gmOutput"]
-	if !ok {
-		return 0, fmt.Errorf("hardware: GetGamingSysInfo 没有返回 gmOutput")
-	}
-
-	raw, err := decodeUint(value)
-	if err != nil {
-		return 0, err
-	}
-	if status := raw & 0xFF; status != 0 {
-		return 0, fmt.Errorf("hardware: 固件没有回答分类 0x%02X，状态字节是 %d", query>>8, status)
-	}
-	if wide {
-		return int((raw >> 8) & 0xFFFF), nil
-	}
-	return int((raw >> 8) & 0xFF), nil
-}
-
 // decodeUint extracts a numeric value from a WMI result.
 //
 // The Acer provider returns most readings as a hexadecimal string, so both

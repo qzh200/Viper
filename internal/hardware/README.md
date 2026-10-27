@@ -3,8 +3,8 @@
 **补充那一侧**：直接跟机器的 ACPI WMI 提供程序说话。
 
 ```
-root\wmi\AcerGamingFunction   传感器、风扇、灯效、性能档位、杂项设置表
-root\wmi\APGeAction            动作类：键盘背光、CoolBoost
+root\wmi\AcerGamingFunction   风扇表、杂项设置表（超频能力）、背光缓冲区、灯效
+root\wmi\APGeAction            动作类：锁 Windows 键
 ```
 
 ## 它现在的位置
@@ -17,14 +17,11 @@ root\wmi\APGeAction            动作类：键盘背光、CoolBoost
 
 | 设置 | 为什么原厂程序给不了 |
 | :--- | :--- |
-| `CoolBoost` / 风扇表 | 加速在动作类 `APGeAction` 上，服务不报 |
-| 超频能力 | 服务自己也不实现（结果码 3） |
-| 背光原始缓冲区 | 服务只报亮度，不报那个十六字节的缓冲区 |
-| 复位灯效 | 复位是固件的动作 |
-| 锁 Windows 键 | **服务收下请求却不生效**：写 0 写 1 读回来一直是一个。锁是固件档案里的一个位（`GetGamingProfile` 的第 2 号开关，锁在第 24 位） |
-
-这一侧同时是**顶替模式**（`internal/service`）的数据源——顶替模式的前提就
-是原厂服务被停掉，客户端那条路这时不可用。
+| 风扇表 | 原厂服务不报风扇表 |
+| 超频能力 | 原厂服务自己也不实现（结果码 3） |
+| 背光原始缓冲区 | 原厂服务只报亮度，不报那个十六字节的缓冲区 |
+| 复位灯效 | 原厂服务能写灯效，但复位是固件的动作 |
+| 锁 Windows 键 | **原厂服务收下请求却不生效**（实测：写 0 写 1 读回来一直是一个，等了五秒也不变） |
 
 **它不是客户端路线的兜底。** 原厂服务不在的时候，程序直接报错，不偷偷换成
 这一侧：直接操控固件只是补充，不是主路挂了拿固件顶上。
@@ -32,74 +29,64 @@ root\wmi\APGeAction            动作类：键盘背光、CoolBoost
 这一侧**需要管理员权限**：枚举实例与调用方法都要。非管理员身份下连实例都
 找不到，报的是 `no AcerGamingFunction instance found`。
 
-## 固件读不到的东西
+## 实测得到的两件事
 
-这一侧读不到的东西，原厂服务都读得到：
+**一、风扇表写不进去。** `GetGamingFanTable` 恒答 `0x1`（普通的表），
+`SetGamingFanTable` 写了也不变。动作类的加速通道同样不响应：读回来是 `0x0`，
+写了状态也不变。所以**风扇加速走原厂服务的全速模式**（实测 2722 RPM 升到
+7092 RPM），不碰固件。
 
-* **分区颜色**：`GetGamingLED` 读回来的字节始终是全零，`GetGamingLEDColor`
-  与 `GetGamingLEDBehavior` 恒答 2，八种灯效的结果一模一样。
-* **灯效与特效**：固件不报告，灯光的状态由原厂服务或 Viper 自己记住。
-* **显卡风扇组的行为**：固件只报告主风扇组（CPU）的行为。
-* **每核实时频率**：要靠性能计数器，Windows 的性能数据接口在本机初始化失败。
-* **显卡使用率、网络上下行、内存占用**：这一侧没有接口。
+表号在**低字节**（1 是普通的表，3 是加速的表）。以前这里取的是高字节，所以
+读出来永远是零。
 
-写完之后的读回校验一律用 `GetGamingRgbKb` 一类的真实读数，不看 setter 的
-输出参数——它回显新值而不是状态码，拿它判断成败会一直判成成功。
+**二、档案类是个常量通道。** `GetGamingProfile` 对任何查询（1、2、3、4、7、
+16、132）都只答 `0x2`，`GetGamingProfileSetting` 对 1、2、3 答 1、对其余答 2，
+写进去的位读回来一个都不变。用原厂服务改屏幕超频（它写进去了），固件这一
+边的读数也不跟着变。所以锁 Windows 键在这台机器上走不通。
 
-## 实测得到的接口约束
-
-WMI COM 接口的 vtable 布局在不同 Windows 版本上并不一致，公开的
-`wbemcli.h` 头文件在本机上是错。以下结论均由实测确定：
-
-| 约束 | 说明 |
-| :--- | :--- |
-| `CoInitializeSecurity` 的时机 | 必须在 `CoInitializeEx` 之后，否则返回 `CO_E_NOTINITIALIZED` |
-| `IWbemLocator::ConnectServer` | 8 参数，命名空间在前、输出指针在后；头文件里的 9 参数版本会被拒绝 |
-| `IWbemServices::ExecQuery` | 6 参数，含一个 `ppCallResult` 槽位；少传会崩在 provider 内部 |
-| `IWbemServices::ExecMethod` | 7 参数；`ppContext` 与 `pFlags` 必须传 NULL，传可写指针会让 provider 写入其中并崩溃 |
-| `IWbemClassObject::Get` / `Put` | 槽位 4 / 5 |
-| `IWbemClassObject::GetMethod` | 槽位 19 |
-| `IWbemClassObject::SpawnInstance` | 槽位 15 |
-| 参数 VARIANT 类型 | provider 把 UInt32 参数声明成无符号整数，却只接受 `VT_I4` 或 `VT_BSTR`，写入时按 `I4 → UI8 → UI4 → BSTR` 依次尝试 |
-| 风扇模式编码 | 写入用 `1/2/3`（自动/全速/自定义）；读回时 provider 把同一个编码乘以 256 放进第三个字节，要先右移八位再取两位 |
-| 风扇分组 | provider 只报告主风扇组的行为，显卡风扇组的行为读不回来；占空比用 `GetGamingFanSpeed` 按风扇编号读（1 是 CPU，4 和 2 是显卡） |
-| 灯效特效编码 | `0` 静态、`1` 呼吸、`2` 霓虹、`3` 波形、`4` 切换、`5` 缩放、`6` 流星雨、`7` 闪烁。原厂档案 `LightingProfile.ini` 里每个模式都有一个 `value` 字段，编号与官方应用列出的顺序完全一致 |
-| 灯效颜色 | 每个分区一个颜色，写入时是 `0x00RRGGBB` 加分区编号，分区从 1 开始。原厂档案里的 `PerKeyColor` 用的是 `0xBBGGRR`，同一颜色两种写法 |
-| 背光缓冲区 | `SetGamingKBBacklight` 的十六字节缓冲区里，**亮度在 byte2 和 byte5**，byte8 是标志位，**byte9 必须为 1**，否则固件直接丢弃缓冲区并把亮度清零 |
-| 30 秒超时 | 由动作类 `APGeAction.SetFunction` 控制，超时秒数放在第 40 位；读回用 `GetFunction(0x00088401)`，第六个字节是 `30` 即表示开启 |
-| 性能档位编码 | **不是** MOF 暗示的 `0/1/2/3`。实测可用值只有 `0` 静音、`1` 均衡、`4` 性能、`5` 加速、`6` 节能；写 `2`/`3` 会被静默钳制回均衡 |
-| 权限 | 枚举实例与调用方法都需要管理员权限 |
-
-## 杂项设置表（`SetGamingMiscSetting`）
-
-固件把一堆互不相干的开关放在同一张表里，标识符在低字节、值在高字节。
-只有 `0x00`–`0x0D` 之间的标识符可写，其余返回 `0x2`（未定义）。
-
-| 标识符 | 功能 | 取值 |
-| :--- | :--- | :--- |
-| `0x02` | GPU 显示模式 | `1` 混合（MS Hybrid）、`2` 仅独显、`3` 自动选择 / DDS |
-| `0x06` | 开机音效 | `0` 关、`1` 开 |
-| `0x09` | 独显状态（只读） | — |
-| `0x0A` | CPU 超频能力（只读） | — |
-| `0x0B` | 性能档位 | `0` 静音、`1` 均衡、`4` 性能、`5` 加速、`6` 节能 |
-| `0x01`、`0x08` | 写入后没有任何可见效果，含义未确定 | — |
-
-写入 `0x02` 会改变图形切换方式，**重启后才生效**，与官方应用的行为一致。
+`GetGamingProfileSetting` 没有封装的原因记在 `overclock.go` 里。
 
 ## 接缝
 
+硬件层要哪几项，由 `internal/machine` 的 `Extras` 接口说了算：
+
 ```go
-// Firmware 是这一侧对外面暴露的能力，internal/machine 只认这个接口。
-type Firmware interface {
-	CoolBoostEnabled() (bool, error)
-	CoolBoost(enabled bool) error
+// Extras is the set of abilities the program asks the firmware for.
+type Extras interface {
 	FanTable() (uint64, error)
 	OverclockCapability() (gpu bool, cpu bool, err error)
 	BacklightBuffer() ([]byte, error)
 	ResetLighting() error
+	WinKeyLocked() (bool, error)
+	SetWinKeyLocked(locked bool) error
 	Close()
 }
 ```
+
+## 杂项设置表（`GetGamingMiscSetting`）
+
+固件把一堆互不相干的开关放在同一张表里，标识符在低字节、值在高字节。
+这一侧现在只问一项：
+
+| 标识符 | 功能 | 取值 |
+| :--- | :--- | :--- |
+| `0x0A` | CPU 超频能力（只读） | 0 表示不支持，`0xFF` 表示不知道 |
+
+固件用低字节当状态，状态非零就表示这个设置它不认识（`0x02` 是"不知道"）。
+原厂服务包了表里其余的几项（显卡模式 `0x02`、开机音效 `0x06`、性能档位
+`0x0B`），所以这一侧不再写这张表。
+
+## 背光缓冲区
+
+`SetGamingKBBacklight` 的十六字节缓冲区里，**亮度在 byte2 和 byte5**，byte8
+是标志位（三表示三十秒后自己熄灭），**byte9 必须为 1**，否则固件直接丢弃缓
+冲区并把亮度清零。固件读回来的时候第九个字节是零，所以核对亮度时只看第二
+个和第五个字节。
+
+## 身份与电源
+
+这一侧还有两样跟原厂程序无关、也不是"补充"的东西：机器身份（SMBIOS 的
+`RSMB` 表）与电源状态（Windows 的内核接口）。它们只读，都不要管理员权限。
 
 ## 测试
 
@@ -107,5 +94,8 @@ type Firmware interface {
 go test ./internal/hardware/...
 ```
 
-用例锁的是实测结论：性能档位的五个编码、风扇行为的三个编码、八种灯效的
-编号、杂项设置的标识符、颜色字与背光缓冲区的字节布局、SMBIOS 的解析。
+用例锁的是实测结论：风扇表的低字节编码、背光缓冲区的字节布局、档位的
+编号、杂项设置表的状态字节。
+
+读这台机器自己的用例（身份、电源、粘滞键）只读不写，读不到就跳过。改
+粘滞键的用例要环境变量 `VIPER_LIVE_MACHINE=1` 才跑，它会改回原来的样子。

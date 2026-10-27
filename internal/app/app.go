@@ -33,6 +33,7 @@ type abilities interface {
 	hardware.LightingWriter
 	hardware.LightingReset
 	hardware.FansReader
+	hardware.FansWriter
 	hardware.CoolBoostReader
 	hardware.SwitchesReader
 }
@@ -229,8 +230,14 @@ func (a *App) hardware() (abilities, error) {
 // 第二个结果是程序走的是哪条路，命令行会把它报出来。
 func openMachine(address string) (hardware.Gaming, string, error) {
 	backend, err := machine.New(machine.Options{
-		Address:      address,
-		OpenFirmware: hardware.OpenFirmware,
+		Address: address,
+		OpenFirmware: func() (machine.Extras, error) {
+			provider, err := hardware.OpenFirmware()
+			if err != nil {
+				return nil, err
+			}
+			return provider, nil
+		},
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("%w"+

@@ -76,9 +76,16 @@ type LightingReset interface {
 }
 
 // Fans is the fan configuration of the machine.
+//
+// 读与写分成两个接口：原厂服务包了风扇的写入（它的风扇模式 1 就是全速），
+// 固件那一侧只读不写，所以固件的提供者只满足读的那一个。
 type FansReader interface {
 	// Fans reads the fan configuration.
 	Fans() (FanState, error)
+}
+
+// FansWriter is the writing of the fan configuration.
+type FansWriter interface {
 	// SetFans applies a fan configuration.
 	SetFans(config FanConfig) error
 }
@@ -145,10 +152,8 @@ type Gaming interface {
 	LightingReset
 	LightingBuffer
 	FansReader
+	FansWriter
 	FanTableReader
 	CoolBoostReader
 	SwitchesReader
 }
-
-// The backend is the implementation that talks to the firmware.
-var _ Gaming = (*Backend)(nil)

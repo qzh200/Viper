@@ -1,7 +1,6 @@
 package app
 
 import (
-	"path/filepath"
 	"testing"
 
 	"viper/internal/config"
@@ -9,15 +8,6 @@ import (
 )
 
 // newTestApp opens the program with settings in a temporary file.
-func newTestApp(t *testing.T) *App {
-	t.Helper()
-	store, err := config.OpenAt(filepath.Join(t.TempDir(), "config.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return NewWithStore(store)
-}
-
 func TestSaveScenario(t *testing.T) {
 	application := newTestApp(t)
 
