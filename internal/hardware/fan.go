@@ -73,6 +73,17 @@ type FanConfig struct {
 // 写完之后把行为、占空比和风扇表读回来核对，固件没有接受哪一个设置就在错误
 // 信息里说清楚是哪一个。
 func (b *Backend) SetFans(config FanConfig) error {
+	_, err := operate(b, func() (struct{}, error) {
+		return struct{}{}, b.applyFans(config)
+	})
+	return err
+}
+
+// applyFans writes the fan configuration without holding the lock.
+//
+// 锁加在公开的那一层，内部的辅助方法不再加锁，所以一个操作里可以调用另一个
+// 操作而不会自己等自己。
+func (b *Backend) applyFans(config FanConfig) error {
 	cpuPercent := clampPercent(config.CPUPercent)
 	gpuPercent := clampPercent(config.GPUPercent)
 

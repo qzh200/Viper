@@ -32,20 +32,23 @@ func (b *Backend) PowerMode() (PowerMode, error) {
 // elsewhere. The output parameter of the setter echoes the new value rather
 // than a status code, so the result is confirmed by reading it back.
 func (b *Backend) SetPowerMode(mode PowerMode) error {
-	if _, err := b.callGaming("SetGamingMiscSetting", map[string]wmi.Value{
-		"gmInput": wmi.Uint64((mode.providerCode() << 8) | uint64(MiscOperationMode)),
-	}); err != nil {
-		return fmt.Errorf("hardware: set power mode: %w", err)
-	}
+	_, err := operate(b, func() (struct{}, error) {
+		if _, err := b.callGaming("SetGamingMiscSetting", map[string]wmi.Value{
+			"gmInput": wmi.Uint64((mode.providerCode() << 8) | uint64(MiscOperationMode)),
+		}); err != nil {
+			return struct{}{}, fmt.Errorf("hardware: set power mode: %w", err)
+		}
 
-	current, err := b.PowerMode()
-	if err != nil {
-		return err
-	}
-	if current != mode {
-		return fmt.Errorf("hardware: the provider kept power mode %s instead of %s", current, mode)
-	}
-	return nil
+		current, err := b.PowerMode()
+		if err != nil {
+			return struct{}{}, err
+		}
+		if current != mode {
+			return struct{}{}, fmt.Errorf("hardware: the provider kept power mode %s instead of %s", current, mode)
+		}
+		return struct{}{}, nil
+	})
+	return err
 }
 
 // DiscreteGPU reports the state of the discrete GPU switch.

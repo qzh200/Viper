@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"viper/internal/wmi"
 )
@@ -59,10 +60,20 @@ type Provider interface {
 }
 
 // Backend talks to the Acer ACPI WMI provider.
+//
+// 服务的每个连接各有一个 goroutine，它们共用同一个后端。写设置和写完
+// 之后的读回校验必须是一整段，不然两个请求会交叉：一个请求写完背光，
+// 另一个请求读回时读到的是前一个的值，于是拿到一个假的错误；或者四个
+// 分区的颜色来自两份不同的配置，键盘上真的就花了。
 type Backend struct {
 	client     Provider
 	gamingPath string
 	actionPath string
+
+	// mutex guards the whole operation on the machine, so that a write
+	// and the check that follows it are not interleaved with another
+	// operation.
+	mutex sync.Mutex
 }
 
 // NewBackend connects to the ACPI namespace and resolves the instances that
@@ -115,6 +126,19 @@ func NewBackendWith(provider Provider, gamingPath, actionPath string) *Backend {
 
 // Instance returns the resolved object path of the gaming functions.
 func (b *Backend) Instance() string { return b.gamingPath }
+
+// operate runs one operation on the machine while holding the lock.
+//
+// 写设置和写完之后的读回校验是一整段，不能和另一个操作交叉。服务里每个
+// 连接各有一个 goroutine，它们共用同一个后端。
+//
+// 锁只加在这一层，内部的辅助方法不再加锁，所以一个操作里可以调用另一个
+// 操作而不会自己等自己。
+func operate[T any](b *Backend, body func() (T, error)) (T, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return body()
+}
 
 // Close releases the WMI connection.
 func (b *Backend) Close() { b.client.Close() }

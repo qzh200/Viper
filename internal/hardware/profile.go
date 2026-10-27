@@ -45,25 +45,28 @@ func (b *Backend) LCDOverdrive() (bool, error) {
 // Overdrive pushes the panel beyond its rated refresh rate, so it is only
 // turned on when the caller explicitly asks for it.
 func (b *Backend) SetLCDOverdrive(enabled bool) error {
-	input := uint64(profileLCDOverdrive)
-	if enabled {
-		input |= profileOverdriveFlag
-	}
+	_, err := operate(b, func() (struct{}, error) {
+		input := uint64(profileLCDOverdrive)
+		if enabled {
+			input |= profileOverdriveFlag
+		}
 
-	if _, err := b.callGaming("SetGamingProfile", map[string]wmi.Value{
-		"gmInput": wmi.Uint64(input),
-	}); err != nil {
-		return fmt.Errorf("hardware: set LCD overdrive: %w", err)
-	}
+		if _, err := b.callGaming("SetGamingProfile", map[string]wmi.Value{
+			"gmInput": wmi.Uint64(input),
+		}); err != nil {
+			return struct{}{}, fmt.Errorf("hardware: set LCD overdrive: %w", err)
+		}
 
-	current, err := b.LCDOverdrive()
-	if err != nil {
-		return err
-	}
-	if current != enabled {
-		return fmt.Errorf("hardware: the provider kept LCD overdrive %v instead of %v", current, enabled)
-	}
-	return nil
+		current, err := b.LCDOverdrive()
+		if err != nil {
+			return struct{}{}, err
+		}
+		if current != enabled {
+			return struct{}{}, fmt.Errorf("hardware: the provider kept LCD overdrive %v instead of %v", current, enabled)
+		}
+		return struct{}{}, nil
+	})
+	return err
 }
 
 // WinKeyLocked reports whether the Windows key is locked.
@@ -89,23 +92,26 @@ func (b *Backend) WinKeyLocked() (bool, error) {
 
 // SetWinKeyLocked locks or unlocks the Windows key.
 func (b *Backend) SetWinKeyLocked(locked bool) error {
-	input := uint64(profileWinKeyLock)
-	if locked {
-		input |= 1 << 24
-	}
+	_, err := operate(b, func() (struct{}, error) {
+		input := uint64(profileWinKeyLock)
+		if locked {
+			input |= 1 << 24
+		}
 
-	if _, err := b.callGaming("SetGamingProfile", map[string]wmi.Value{
-		"gmInput": wmi.Uint64(input),
-	}); err != nil {
-		return fmt.Errorf("hardware: set Windows key lock: %w", err)
-	}
+		if _, err := b.callGaming("SetGamingProfile", map[string]wmi.Value{
+			"gmInput": wmi.Uint64(input),
+		}); err != nil {
+			return struct{}{}, fmt.Errorf("hardware: set Windows key lock: %w", err)
+		}
 
-	current, err := b.WinKeyLocked()
-	if err != nil {
-		return err
-	}
-	if current != locked {
-		return fmt.Errorf("hardware: the provider kept the Windows key %v instead of %v", current, locked)
-	}
-	return nil
+		current, err := b.WinKeyLocked()
+		if err != nil {
+			return struct{}{}, err
+		}
+		if current != locked {
+			return struct{}{}, fmt.Errorf("hardware: the provider kept the Windows key %v instead of %v", current, locked)
+		}
+		return struct{}{}, nil
+	})
+	return err
 }

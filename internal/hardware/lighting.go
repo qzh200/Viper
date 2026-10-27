@@ -40,6 +40,17 @@ type BacklightState struct {
 // 速度、方向和亮度在这里先被限制到固件能接受的范围，和上层写进配置文件的
 // 范围一样，这样写进固件的值和记下来的值是同一个值。
 func (b *Backend) SetLighting(config RGBConfig) error {
+	_, err := operate(b, func() (struct{}, error) {
+		return struct{}{}, b.applyLighting(config)
+	})
+	return err
+}
+
+// applyLighting writes the lighting without holding the lock.
+//
+// 锁加在公开的那一层，内部的辅助方法不再加锁，所以一个操作里可以调用另一个
+// 操作而不会自己等自己。
+func (b *Backend) applyLighting(config RGBConfig) error {
 	speed := clampUint(config.Speed, 1, 9)
 	direction := clampUint(config.Direction, 0, 1)
 	brightness := clampUint(config.Brightness, 0, 100)
@@ -97,7 +108,10 @@ func (b *Backend) ResetLighting() error {
 	for i := range config.Zones {
 		config.Zones[i] = white
 	}
-	return b.SetLighting(config)
+	_, err := operate(b, func() (struct{}, error) {
+		return struct{}{}, b.applyLighting(config)
+	})
+	return err
 }
 
 // Lighting reads the keyboard lighting configuration.
@@ -192,7 +206,10 @@ func backlightBuffer(level int) []byte {
 // the Acer gaming class, because the two classes drive different parts of the
 // keyboard controller.
 func (b *Backend) SetBacklight(brightness int, timeout bool) error {
-	return b.setBacklight(brightness, &timeout)
+	_, err := operate(b, func() (struct{}, error) {
+		return struct{}{}, b.setBacklight(brightness, &timeout)
+	})
+	return err
 }
 
 // setBacklight writes the backlight.

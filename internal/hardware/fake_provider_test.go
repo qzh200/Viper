@@ -199,3 +199,8 @@ func (p *fakeProvider) countOf(method string) int {
 func newFakeBackend(provider *fakeProvider) *Backend {
 	return NewBackendWith(provider, "gaming\\instance", "action\\instance")
 }
+
+// newBackendWith builds a backend on top of the given provider.
+func newBackendWith(provider Provider) *Backend {
+	return NewBackendWith(provider, "gaming\\instance", "action\\instance")
+}
