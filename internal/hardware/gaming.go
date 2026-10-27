@@ -133,4 +133,7 @@ type Gaming interface {
 	FansWriter
 	CoolBoostReader
 	SwitchesReader
+	// Monitor reads everything the machine reports about itself: the
+	// temperatures, the loads, the clocks, the memory and the network.
+	Monitor() (MonitorData, error)
 }

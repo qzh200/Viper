@@ -34,6 +34,9 @@ type abilities interface {
 	hardware.FansWriter
 	hardware.CoolBoostReader
 	hardware.SwitchesReader
+	// Monitor reads everything the machine reports about itself: the
+	// temperatures, the loads, the clocks, the memory and the network.
+	Monitor() (hardware.MonitorData, error)
 }
 
 // The routes the program can reach the machine by.

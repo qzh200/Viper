@@ -42,6 +42,8 @@ type fakeGaming struct {
 	lighting hardware.RGBConfig
 	// brightnessError is the failure of the brightness of the keyboard.
 	brightnessError error
+	// monitorError is the failure of the readings of the machine.
+	monitorError error
 
 	// closed reports whether the connection was released.
 	closed bool
@@ -169,6 +171,31 @@ func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 		Timeout:    timeout,
 	}
 	return nil
+}
+
+// Monitor returns what the machine reports about itself.
+//
+// 原厂服务的监视数据：替身给的是一组固定的数。
+func (g *fakeGaming) Monitor() (hardware.MonitorData, error) {
+	if g.monitorError != nil {
+		return hardware.MonitorData{}, g.monitorError
+	}
+	return hardware.MonitorData{
+		CPUTemperatureC:    90,
+		CPUFanRPM:          2700,
+		CPUUsagePercent:    12.5,
+		CPUFrequencyMHz:    3400,
+		CPUMaxFrequencyMHz: 5000,
+		SystemTempC:        63,
+		GPUTemperatureC:    58,
+		GPUFanRPM:          2705,
+		GPUUsagePercent:    39,
+		GPUFrequencyMHz:    420,
+		GPUMaxFrequencyMHz: 3105,
+		RAMTotalMB:         32487,
+		RAMUsagePercent:    42.8,
+		RAMFrequencyMHz:    5600,
+	}, nil
 }
 
 // Fans returns the fan configuration of the machine.

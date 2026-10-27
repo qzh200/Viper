@@ -128,36 +128,88 @@ func (b *Backend) set(function string, parameter any) error {
 	return nil
 }
 
-// Sensors reads the current temperatures and fan speeds.
+// Monitor reads everything the machine reports about itself.
 //
-// 原厂服务的监视数据里有处理器温度、处理器风扇转速、主板温度、显卡温度与
-// 显卡风扇转速，它们直接来自机器。
-func (b *Backend) Sensors() (hardware.Sensors, error) {
+// 原厂服务的监视数据里有：处理器的温度、使用率、频率与每核频率，显卡的温度、
+// 使用率与频率，内存的占用与频率，网络的上下行。它们直接来自机器。
+func (b *Backend) Monitor() (hardware.MonitorData, error) {
 	answer, err := b.service.MonitorData()
 	if err != nil {
-		return hardware.Sensors{}, fmt.Errorf("machine: 读取监视数据失败: %w", err)
+		return hardware.MonitorData{}, fmt.Errorf("machine: 读取监视数据失败: %w", err)
 	}
 	if err, failed := answer.Err(); failed {
-		return hardware.Sensors{}, err
+		return hardware.MonitorData{}, err
 	}
 
 	var data struct {
-		CPUTemperature float64 `json:"CPU_TEMPERATURE"`
-		CPUFanSpeed    float64 `json:"CPU_FANSPEED"`
-		SystemTemp     float64 `json:"SYS1_TEMPERATURE"`
-		GPUFanSpeed    float64 `json:"GPU1_FANSPEED"`
-		GPUTemp        float64 `json:"GPU1_TEMPERATURE"`
+		CPUTemperature   float64   `json:"CPU_TEMPERATURE"`
+		CPUFanSpeed      float64   `json:"CPU_FANSPEED"`
+		SystemTemp       float64   `json:"SYS1_TEMPERATURE"`
+		GPUTemperature   float64   `json:"GPU1_TEMPERATURE"`
+		GPUFanSpeed      float64   `json:"GPU1_FANSPEED"`
+		GPUIdle          float64   `json:"GPU1_IDLE_STATUS"`
+		GPUUsage         float64   `json:"GPU1_USAGE"`
+		GPUFrequency     float64   `json:"GPU1_FREQUENCY"`
+		GPUMaxFrequency  float64   `json:"GPU1_MAX_FREQUENCY"`
+		CPUFrequency     float64   `json:"CPU_FREQUENCY"`
+		CPUMaxFrequency  float64   `json:"CPU_MAX_FREQUENCY"`
+		CPUUsage         float64   `json:"CPU_USAGE"`
+		CPUCoreFrequency []float64 `json:"CPU_CORE_FREQUENCY"`
+		RAMUsage         float64   `json:"RAM_USAGE"`
+		RAMTotal         float64   `json:"RAM_TOTAL"`
+		RAMFrequency     float64   `json:"RAM_FREQUENCY"`
+		WIFIDownload     float64   `json:"WIFI_DOWNLOAD"`
+		WIFIUpload       float64   `json:"WIFI_UPLOAD"`
+		EtherDownload    float64   `json:"ETHERNET_DOWNLOAD"`
+		EtherUpload      float64   `json:"ETHERNET_UPLOAD"`
 	}
 	if err := answer.Decode(&data); err != nil {
+		return hardware.MonitorData{}, err
+	}
+
+	result := hardware.MonitorData{
+		CPUTemperatureC:    int(data.CPUTemperature),
+		CPUFanRPM:          int(data.CPUFanSpeed),
+		CPUUsagePercent:    data.CPUUsage,
+		CPUFrequencyMHz:    int(data.CPUFrequency),
+		CPUMaxFrequencyMHz: int(data.CPUMaxFrequency),
+		SystemTempC:        int(data.SystemTemp),
+		GPUTemperatureC:    int(data.GPUTemperature),
+		GPUFanRPM:          int(data.GPUFanSpeed),
+		GPUUsagePercent:    int(data.GPUUsage),
+		GPUFrequencyMHz:    int(data.GPUFrequency),
+		GPUMaxFrequencyMHz: int(data.GPUMaxFrequency),
+		GPUIdle:            data.GPUIdle != 0,
+		RAMTotalMB:         data.RAMTotal,
+		RAMUsagePercent:    data.RAMUsage,
+		RAMFrequencyMHz:    int(data.RAMFrequency),
+		WIFIDownload:       data.WIFIDownload,
+		WIFIUpload:         data.WIFIUpload,
+		EthernetDownload:   data.EtherDownload,
+		EthernetUpload:     data.EtherUpload,
+	}
+	for _, clock := range data.CPUCoreFrequency {
+		result.CPUCoreFrequencyMHz = append(result.CPUCoreFrequencyMHz, int(clock))
+	}
+	return result, nil
+}
+
+// Sensors reads the current temperatures and fan speeds.
+//
+// 它是监视数据里的一部分，其余的读数（使用率、频率、内存、网络）在 Monitor
+// 里。
+func (b *Backend) Sensors() (hardware.Sensors, error) {
+	data, err := b.Monitor()
+	if err != nil {
 		return hardware.Sensors{}, err
 	}
 
 	return hardware.Sensors{
-		CPUTempC:    int(data.CPUTemperature),
-		CPUFanRPM:   int(data.CPUFanSpeed),
-		GPUTempC:    int(data.GPUTemp),
-		GPUFanRPM:   int(data.GPUFanSpeed),
-		SystemTempC: int(data.SystemTemp),
+		CPUTempC:    data.CPUTemperatureC,
+		CPUFanRPM:   data.CPUFanRPM,
+		GPUTempC:    data.GPUTemperatureC,
+		GPUFanRPM:   data.GPUFanRPM,
+		SystemTempC: data.SystemTempC,
 	}, nil
 }
 

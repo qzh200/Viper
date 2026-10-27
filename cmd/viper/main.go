@@ -14,7 +14,6 @@ import (
 
 	"viper/internal/app"
 	"viper/internal/hardware"
-	"viper/internal/nvidia"
 	"viper/internal/quickaccess"
 )
 
@@ -193,39 +192,74 @@ func runStatus() error {
 		fmt.Println("  Battery           :", power.BatteryPercent, "%")
 	}
 
-	sensors, err := application.Sensors()
+	telemetry, err := application.Telemetry()
 	if err != nil {
 		return err
 	}
-
-	fmt.Println()
-	fmt.Println("  CPU temperature   :", sensors.CPUTempC, "C")
-	fmt.Println("  CPU fan speed     :", sensors.CPUFanRPM, "RPM")
-	fmt.Println("  GPU temperature   :", sensors.GPUTempC, "C")
-	fmt.Println("  GPU fan speed     :", sensors.GPUFanRPM, "RPM")
-	fmt.Println("  Motherboard / VRM :", sensors.SystemTempC, "C")
-
-	cards, err := application.GPUTelemetry()
-	if err != nil {
-		return err
-	}
-	for _, card := range cards {
-		printCard(card)
-	}
+	printTelemetry(telemetry)
 	return nil
 }
 
-// printCard shows the state of a graphics card.
-func printCard(card nvidia.Telemetry) {
+// printTelemetry shows the readings of the machine.
+//
+// 读数是原厂服务报的：处理器的使用率与频率、每核频率、显卡的使用率与频率、
+// 内存的占用与频率、网络的上下行。显卡驱动只补它没报的那几样：显卡的名字、
+// 显存与显存频率。
+func printTelemetry(telemetry app.Telemetry) {
+	monitor := telemetry.Monitor
+
 	fmt.Println()
-	fmt.Println("  Graphics card     :", card.Name)
-	fmt.Println("  Graphics usage    :", card.UsagePercent, "%")
-	fmt.Println("  Graphics clock    :", card.GraphicsClockMHz, "MHz (max", card.MaxGraphicsClockMHz, "MHz)")
-	fmt.Println("  Memory clock      :", card.MemoryClockMHz, "MHz")
-	fmt.Println("  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
-	if card.IsIdle() {
-		fmt.Println("  The card is idle")
+	fmt.Println("  CPU temperature   :", monitor.CPUTemperatureC, "C")
+	fmt.Printf("  CPU usage         : %.1f %%\n", monitor.CPUUsagePercent)
+	fmt.Printf("  CPU clock         : %d MHz (max %d MHz)\n", monitor.CPUFrequencyMHz, monitor.CPUMaxFrequencyMHz)
+	fmt.Println("  CPU fan speed     :", monitor.CPUFanRPM, "RPM")
+	fmt.Println("  GPU temperature   :", monitor.GPUTemperatureC, "C")
+	fmt.Println("  GPU usage         :", monitor.GPUUsagePercent, "%")
+	fmt.Printf("  GPU clock         : %d MHz (max %d MHz)\n", monitor.GPUFrequencyMHz, monitor.GPUMaxFrequencyMHz)
+	fmt.Println("  GPU fan speed     :", monitor.GPUFanRPM, "RPM")
+	fmt.Println("  Motherboard / VRM :", monitor.SystemTempC, "C")
+	fmt.Printf("  Memory            : %.1f %% of %.0f MB @ %d MHz\n",
+		monitor.RAMUsagePercent, monitor.RAMTotalMB, monitor.RAMFrequencyMHz)
+	fmt.Printf("  Network           : wifi down %.1f up %.1f, ethernet down %.1f up %.1f\n",
+		monitor.WIFIDownload, monitor.WIFIUpload, monitor.EthernetDownload, monitor.EthernetUpload)
+
+	if len(monitor.CPUCoreFrequencyMHz) > 0 {
+		clocks := monitor.CPUCoreFrequencyMHz
+		fmt.Printf("  Core clocks       : %d cores, %d to %d MHz\n",
+			len(clocks), minOf(clocks), maxOf(clocks))
 	}
+
+	for _, card := range telemetry.Cards {
+		fmt.Println()
+		fmt.Println("  Graphics card     :", card.Name)
+		fmt.Println("  Memory clock      :", card.MemoryClockMHz, "MHz")
+		fmt.Println("  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
+		if card.IsIdle() {
+			fmt.Println("  The card is idle")
+		}
+	}
+}
+
+// minOf returns the smallest of the numbers.
+func minOf(values []int) int {
+	smallest := values[0]
+	for _, value := range values {
+		if value < smallest {
+			smallest = value
+		}
+	}
+	return smallest
+}
+
+// maxOf returns the largest of the numbers.
+func maxOf(values []int) int {
+	largest := values[0]
+	for _, value := range values {
+		if value > largest {
+			largest = value
+		}
+	}
+	return largest
 }
 
 // formatBytes renders a number of bytes in a readable way.
@@ -344,10 +378,9 @@ func listScenarios(application *app.App) error {
 	return nil
 }
 
-// runTelemetry shows the state of the graphics card.
+// runTelemetry shows the state of the machine.
 //
-// The numbers come from the driver of the card, so this command works
-// without the rights of an administrator.
+// 读数是原厂服务报的，显卡驱动补它没报的那几样。
 func runTelemetry() error {
 	application, err := app.New()
 	if err != nil {
@@ -355,17 +388,11 @@ func runTelemetry() error {
 	}
 	defer application.Close()
 
-	cards, err := application.GPUTelemetry()
+	telemetry, err := application.Telemetry()
 	if err != nil {
 		return err
 	}
-	if len(cards) == 0 {
-		fmt.Println("  no graphics card offers telemetry")
-		return nil
-	}
-	for _, card := range cards {
-		printCard(card)
-	}
+	printTelemetry(telemetry)
 	return nil
 }
 

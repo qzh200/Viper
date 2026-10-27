@@ -56,15 +56,16 @@ func TestTheStickyKeysOfTheMachine(t *testing.T) {
 }
 
 func TestTheGraphicsTelemetryOfTheMachine(t *testing.T) {
-	// A machine without the driver of the vendor has no telemetry, that
-	// is not an error.
+	// A machine without the driver of the vendor has no telemetry from the
+	// card, that is not an error. The readings of the service are still
+	// there.
 	application := newTestAppWithoutMachine(t)
 
-	cards, err := application.GPUTelemetry()
+	telemetry, err := application.Telemetry()
 	if err != nil {
 		t.Skipf("the telemetry of the card cannot be read on this system: %v", err)
 	}
-	for _, card := range cards {
+	for _, card := range telemetry.Cards {
 		if card.UsagePercent < 0 || card.UsagePercent > 100 {
 			t.Errorf("the card reports the load %d percent", card.UsagePercent)
 		}
