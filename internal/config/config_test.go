@@ -16,8 +16,13 @@ func TestDefaultSettings(t *testing.T) {
 	if !settings.BacklightTimeout {
 		t.Error("the backlight timeout is switched off by default")
 	}
-	if settings.Fans.CPUMode != 1 || settings.Fans.GPUMode != 1 {
-		t.Errorf("the fans start in the mode %d and %d, want 1 and 1", settings.Fans.CPUMode, settings.Fans.GPUMode)
+	if settings.Fans.CPUMode != 0 || settings.Fans.GPUMode != 0 {
+		t.Errorf("the fans start in the mode %d and %d, want 0 and 0, which is the automatic mode",
+			settings.Fans.CPUMode, settings.Fans.GPUMode)
+	}
+	if settings.Fans.CPUPercent != 0 || settings.Fans.GPUPercent != 0 {
+		t.Errorf("the fans start at %d and %d percent, want zero",
+			settings.Fans.CPUPercent, settings.Fans.GPUPercent)
 	}
 }
 
