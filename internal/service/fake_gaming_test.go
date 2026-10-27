@@ -91,17 +91,10 @@ func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.bac
 
 // BacklightBuffer reads the raw buffer of the keyboard backlight.
 //
-// The level sits in byte two and in byte five, byte eight holds the flags
-// and byte nine has to be one, otherwise the firmware drops the buffer.
+// The buffer is built by the hardware layer, so that the stand answers
+// in the same shape as the machine does.
 func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
-	buffer := make([]byte, 16)
-	level := uint16(g.brightness * 256 / 100)
-	buffer[2] = byte(level)
-	buffer[3] = byte(level >> 8)
-	buffer[5] = byte(level)
-	buffer[6] = byte(level >> 8)
-	buffer[9] = 1
-	return buffer, nil
+	return hardware.NewBacklightBuffer(int(g.brightness)), nil
 }
 
 func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {

@@ -154,19 +154,30 @@ func colorWord(color RGBColor, zone uint64) uint64 {
 		zone
 }
 
-// backlightBuffer builds the sixteen byte buffer of the keyboard backlight.
+// NewBacklightBuffer builds the sixteen byte buffer of the keyboard
+// backlight.
 //
 // The layout was read back from the provider with GetGamingKBBacklight:
 // the level sits in byte two and in byte five, byte eight holds the flags
 // of the backlight and byte nine has to be one, otherwise the provider
 // drops the buffer and zeroes the level.
-func backlightBuffer(level int) []byte {
+//
+// The function is public, so that a stand for the machine builds the
+// buffer the same way the machine does. A stand that builds its own
+// buffer would answer in a different shape than the hardware and the
+// tests of the layers above would not notice a wrong layout.
+func NewBacklightBuffer(level int) []byte {
 	buffer := make([]byte, 16)
 	buffer[2] = byte(level)
 	buffer[5] = byte(level)
 	buffer[8] = backlightFlags
 	buffer[9] = 1
 	return buffer
+}
+
+// backlightBuffer builds the sixteen byte buffer of the keyboard backlight.
+func backlightBuffer(level int) []byte {
+	return NewBacklightBuffer(level)
 }
 
 // SetBacklight sets the keyboard backlight brightness.
