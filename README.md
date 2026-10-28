@@ -5,7 +5,7 @@ Acer 游戏本硬件控制中心的 Go 重写版。
 **原厂程序是主要调用依赖。** 官方 PredatorSense 的后台服务
 （`AcerAgentService`）是这台机器上真正管着灯光、风扇、性能档位与传感器读数
 的那一路，Viper 作为它的客户端去问，**不需要管理员权限**。Quick Access 服务
-（`AcerQAAgent`）管着蓝光灯、USB 充电这些系统设置。
+（`AcerQAAgent`）管着 USB 充电这些系统设置。
 
 **没有第二条路。** 原厂服务不在的时候，程序直接把实情报给用的人，不偷偷换成
 别的路——直接操控固件（ACPI/WMI）那一整条路线已经删掉了：那些设置原厂程序
@@ -18,7 +18,7 @@ Acer 游戏本硬件控制中心的 Go 重写版。
    原厂服务 ───▶ │  internal/agentservice ─▶ internal/machine │ ──▶ 硬件层接口
  (46933, SYSTEM) │   （协议客户端）            （硬件层）      │      ↑
                  │                                            │      │
-   原厂 Quick ─▶ │  internal/quickaccess（蓝光灯、USB 充电等）──┘      │
+   原厂 Quick ─▶ │  internal/quickaccess（USB 充电等）──┘      │
   (5141, SYSTEM) │                                            │      │
                  │  internal/hardware（词汇表 + 机器自己的情况）       │
                  └────────────────────────────────────────────┘
@@ -30,6 +30,8 @@ Acer 游戏本硬件控制中心的 Go 重写版。
 | :--- | :--- |
 | 硬件层 `internal/machine` + `internal/agentservice` | ✅ 已完成，真机验证通过 |
 | 命令行接到硬件层 | ✅ 已接上，**不需要管理员权限** |
+| 命令行这一层的用例 | ✅ 有用例，替身是一台假机器 |
+| 取证与真机验证的工具 | ✅ 在默认的构建与测试链里 |
 | 直接操控固件（ACPI/WMI） | ❌ 整条路线删掉了 |
 | 图形界面 | 🚧 以后再说 |
 
@@ -114,6 +116,10 @@ Viper 写的时候照服务自己的三个模式来：两个风扇都自动写�
 **灯光**（`LIGHTING`）：四个分区各一个颜色（`#RRGGBB`），加上效果名、速度、
 方向与亮度。写亮度时要把四个分区一起写回去，否则原厂服务会把颜色清掉。
 
+**改灯效只改点到的那几项**：`viper lighting set` 是以机器现在的灯效为底子的，
+命令里没点到的那几项保持原样。所以 `viper lighting set brightness 80` 只改
+亮度，颜色与效果留着；`zone 2 #00FF00` 只改第二个分区，其余分区留着。
+
 **锁 Windows 键**：原厂服务**收下请求**（结果码 0），但写 0 写 1 读回来一直是
 一个，等了五秒也不变。固件那一侧曾经也是一个常量通道
 （`GetGamingProfile` 对任何查询都只答 `0x2`，`SetGamingProfile` 写不进去），
@@ -140,6 +146,11 @@ Viper 写的时候照服务自己的三个模式来：两个风扇都自动写�
 `FanControl\CurrentFanMode` 上都能看到——那是服务自己记下的状态，不是我们
 自己记的。
 
+`cmd/agcheck write` 是**写回服务报出来的值**，用来证明写通路是通的，机器的
+状态不变。这一条要求全局颜色与分区颜色分开写：服务读回来有哪一个就写回哪
+一个——少写一个，另一个会被服务清掉（写回一个空的分区数组，等于把键盘正在
+用的颜色抹成黑色）。这条以前就踩过，现在有用例守着。
+
 ## 架构
 
 ```
@@ -154,7 +165,8 @@ internal/agentservice 原厂 AcerAgentService 的协议客户端
 internal/machine      硬件层：只问原厂服务
 internal/hardware     机器的词汇表 + 机器自己的情况（身份、电源、粘滞键）
 internal/nvidia       显卡遥测：走显卡驱动的管理库
-internal/quickaccess  原厂 Quick Access 服务客户端（蓝光灯、USB 充电）
+internal/quickaccess  原厂 Quick Access 服务客户端（USB 充电等）
+internal/probe        取证工具用到的协议知识（灯光、风扇、Win 键、验证流程）
 internal/config       设置持久化
 internal/app          用例层
 ```
@@ -163,6 +175,12 @@ internal/app          用例层
 中间夹着应用层。**
 
 硬件层与协议层之间只有一个接口：`machine.Service`（对原厂服务）。
+
+那几个取证工具是薄的：它们读命令行、调用 `internal/probe`、把结果打出来。
+协议的知识放在 `internal/probe` 里，所以不用真的机器也有用例守着。
+
+那几个 `cmd/` 下的工具与命令行一样，都在默认的构建与测试链里——它们没有
+构建标签挡着，所以 `go build ./...` 与 `go test ./...` 都会把它们算进去。
 
 ## 依赖哪些原厂进程
 
@@ -185,7 +203,10 @@ internal/app          用例层
 ## 命令行
 
 ```powershell
-# 编译
+# 编译全部程序（命令行 + 那几个取证与验证的工具）
+.\build.ps1
+
+# 只编译命令行
 go build -o bin/viper.exe ./cmd/viper
 
 # 运行
@@ -232,8 +253,21 @@ go test ./internal/machine/... ./internal/agentservice/... -cover
 SMBIOS 的解析、Quick Access 的加密——最后这一条用的是原厂服务握手时返回的
 真实密文，改动加密实现会立刻让用例失败。
 
-覆盖率：`internal/machine` 84.6%、`internal/agentservice` 93.4%、
-`internal/app` 83.5%、`internal/hardware` 84.0%。
+**命令行这一层也有用例**：机器与 Quick Access 服务在用例里是替身，所以命令
+的分派、参数的校验、灯效的解析都能在没有真机器的情况下跑。替身跟机器一样：
+写进去的值读回来还是新值。
+
+**取证工具的协议知识也有用例**：它们在 `internal/probe` 里，替身是一个按命令名
+回答的假服务，所以灯光、风扇、Win 键的读写形状与「逐项改一次再还原」的验证
+流程都能在没有机器的情况下跑。
+
+覆盖率（整个项目 **80.7%**）：`internal/agentservice` 93.4%、
+`internal/nvidia` 87.1%、`internal/machine` 87.0%、`internal/probe` 86.4%、
+`internal/hardware` 84.3%、`internal/app` 83.6%、`internal/quickaccess` 83.4%、
+`internal/config` 81.4%、`cmd/viper` 78.2%、`cmd/smbiosdump` 82.1%。
+
+那几个取证与真机验证的工具也在默认的测试链里，所以 `go test ./...` 会把它们
+一起编译——以前它们被构建标签挡在默认构建之外，改坏了不会有任何东西报警。
 
 ## 已知限制
 
@@ -241,8 +275,7 @@ SMBIOS 的解析、Quick Access 的加密——最后这一条用的是原厂服
   读回来一直是一个）。Viper 如实报错，不假装成功。
 * **超频能力报成不支持**：原厂服务自己也不实现这一项（结果码 3），而固件那一
   侧已经删掉了。
-* 蓝光灯的写入接口只接受 `0`–`4` 五个预设档位，本机当前是「自定义」
-  （`5`），写入后无法用同一接口还原。
+
 * 启动标志自定义需要固件支持，本机
   `HKLM\SOFTWARE\OEM\AcerAgentService\Customize_POST_Support` 为 `0`，
   原厂服务也回答 `SUPPORT_CUSTOM_BOOT_LOGO = 0`。
