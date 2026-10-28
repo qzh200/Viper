@@ -85,27 +85,71 @@ func readIdentity() (Identity, error) {
 		Product:      "Acer Gaming Laptop",
 	}
 
-	size := getSystemFirmwareTable(rsmb, 0, nil)
-	if size == 0 {
-		return identity, fmt.Errorf("hardware: the firmware table is not available")
+	table, err := RawFirmwareTable()
+	if err != nil {
+		return identity, err
 	}
 
-	buffer := make([]byte, size)
-	if getSystemFirmwareTable(rsmb, 0, buffer) == 0 {
-		return identity, fmt.Errorf("hardware: the firmware table could not be read")
-	}
-
-	// The raw SMBIOS data starts with an eight byte header, the structures
-	// follow behind it.
-	if len(buffer) < 8 {
-		return identity, fmt.Errorf("hardware: the firmware table is truncated")
-	}
-
-	found, ok := parseIdentity(buffer[8:])
+	found, ok := parseIdentity(table)
 	if !ok {
 		return identity, fmt.Errorf("hardware: no system information structure found")
 	}
 	return found, nil
+}
+
+// Structure is one structure of a raw SMBIOS table.
+type Structure struct {
+	// Type is the type of the structure.
+	Type byte
+	// Data is the formatted area of the structure.
+	Data []byte
+	// Offset is where the structure starts in the table.
+	Offset int
+	// Strings are the strings that follow the structure.
+	Strings []string
+}
+
+// Structures walks a raw SMBIOS table and returns the structures in it.
+//
+// 表是一段一段的，每一段后面跟着它的字符串表。身份解析与那个转储工具用的是
+// 同一份遍历。
+func Structures(table []byte) []Structure {
+	var out []Structure
+	for offset := 0; offset+4 <= len(table); {
+		structType := table[offset]
+		length := int(table[offset+1])
+		if length < 4 || offset+length > len(table) {
+			break
+		}
+
+		out = append(out, Structure{
+			Type:    structType,
+			Data:    table[offset : offset+length],
+			Offset:  offset,
+			Strings: collectStrings(table[offset+length:]),
+		})
+		offset = nextStructure(table, offset, length)
+	}
+	return out
+}
+
+// RawFirmwareTable returns the raw system information block of the firmware.
+//
+// The data starts with an eight byte header, the structures follow behind it.
+func RawFirmwareTable() ([]byte, error) {
+	size := getSystemFirmwareTable(rsmb, 0, nil)
+	if size == 0 {
+		return nil, fmt.Errorf("hardware: the firmware table is not available")
+	}
+
+	buffer := make([]byte, size)
+	if getSystemFirmwareTable(rsmb, 0, buffer) == 0 {
+		return nil, fmt.Errorf("hardware: the firmware table could not be read")
+	}
+	if len(buffer) < 8 {
+		return nil, fmt.Errorf("hardware: the firmware table is truncated")
+	}
+	return buffer[8:], nil
 }
 
 // parseIdentity walks the structures of a raw SMBIOS table and returns the
@@ -116,26 +160,18 @@ func parseIdentity(table []byte) (Identity, bool) {
 		Product:      "Acer Gaming Laptop",
 	}
 
-	for offset := 0; offset+4 <= len(table); {
-		structType := table[offset]
-		length := int(table[offset+1])
-		if length < 4 || offset+length > len(table) {
-			break
+	for _, structure := range Structures(table) {
+		if structure.Type != systemInformationType || len(structure.Data) < 8 {
+			continue
 		}
-
-		if structType == systemInformationType && length >= 8 {
-			strings := collectStrings(table[offset+length:])
-			identity.Manufacturer = pick(strings, table[offset+4])
-			identity.Product = pick(strings, table[offset+5])
-			identity.Version = pick(strings, table[offset+6])
-			identity.SerialNumber = pick(strings, table[offset+7])
-			if length >= 0x1B {
-				identity.Family = pick(strings, table[offset+0x1A])
-			}
-			return identity, true
+		identity.Manufacturer = pick(structure.Strings, structure.Data[4])
+		identity.Product = pick(structure.Strings, structure.Data[5])
+		identity.Version = pick(structure.Strings, structure.Data[6])
+		identity.SerialNumber = pick(structure.Strings, structure.Data[7])
+		if len(structure.Data) >= 0x1B {
+			identity.Family = pick(structure.Strings, structure.Data[0x1A])
 		}
-
-		offset = nextStructure(table, offset, length)
+		return identity, true
 	}
 
 	return identity, false
@@ -158,6 +194,16 @@ type ProcessorSpeed struct {
 //
 // The firmware table carries the speed of the memory modules, the first
 // module of the machine is enough.
+
+// Word reads a little endian word out of a structure.
+//
+// 结构里的数是按字节摆的，读的时候按小端拼起来。
+func Word(data []byte, offset int) int {
+	if offset+2 > len(data) {
+		return -1
+	}
+	return int(data[offset]) | int(data[offset+1])<<8
+}
 
 // nextStructure advances past the current structure and its string table.
 func nextStructure(table []byte, offset, length int) int {

@@ -131,6 +131,10 @@ Windows 键  需要管理员权限，跳过
 `HKLM\SOFTWARE\OEM\AcerAgentService\FanControl\CurrentFanMode` 上能看到。
 那是服务自己记下的状态，不是程序自己记的。
 
+`cmd/agcheck write` 把服务报出来的值原样写回去，机器的状态不变——它写灯光
+的时候，全局颜色与分区颜色分开写：服务读回来有哪一个就写回哪一个。少写一
+个，另一个会被服务清掉。
+
 ## 测试
 
 ```powershell

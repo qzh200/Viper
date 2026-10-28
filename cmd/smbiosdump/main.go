@@ -2,63 +2,44 @@
 //
 // The fields of the structures are read by hand, so the bytes are shown
 // next to the numbers that are taken from them.
+//
+// 表的结构由硬件层读出来，这个工具只负责把它摊开看。
 package main
 
 import (
 	"fmt"
+	"io"
 	"os"
-	"unsafe"
 
-	"golang.org/x/sys/windows"
+	"viper/internal/hardware"
 )
 
-const rsmb = 0x52534D42
+// stdout is where the tool writes. 用例把它换成缓冲区。
+var stdout io.Writer = os.Stdout
 
 func main() {
-	kernel32 := windows.NewLazySystemDLL("kernel32.dll")
-	proc := kernel32.NewProc("GetSystemFirmwareTable")
-
-	size, _, _ := proc.Call(uintptr(rsmb), 0, 0, 0)
-	if size == 0 {
-		fmt.Println("the table is not available")
+	table, err := hardware.RawFirmwareTable()
+	if err != nil {
+		fmt.Fprintln(stdout, "读取固件表失败:", err)
 		os.Exit(1)
 	}
 
-	buffer := make([]byte, size)
-	proc.Call(uintptr(rsmb), 0, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
+	show(table)
+}
 
-	table := buffer[8:]
-	for offset := 0; offset+4 <= len(table); {
-		structType := table[offset]
-		length := int(table[offset+1])
-		if length < 4 || offset+length > len(table) {
-			break
-		}
-
-		switch structType {
+// show prints the structures of the firmware table.
+func show(table []byte) {
+	for _, structure := range hardware.Structures(table) {
+		switch structure.Type {
 		case 4:
-			fmt.Printf("=== processor information, length %d ===\n", length)
-			dump(table[offset : offset+length])
-			printProcessorFields(table[offset : offset+length])
+			fmt.Fprintf(stdout, "=== processor information, length %d ===\n", len(structure.Data))
+			dump(structure.Data)
+			printProcessorFields(structure.Data)
 		case 17:
-			fmt.Printf("=== memory device, length %d ===\n", length)
-			dump(table[offset : offset+length])
-			printMemoryFields(table[offset : offset+length])
+			fmt.Fprintf(stdout, "=== memory device, length %d ===\n", len(structure.Data))
+			dump(structure.Data)
+			printMemoryFields(structure.Data)
 		}
-
-		pos := offset + length
-		for pos < len(table) {
-			if table[pos] == 0 {
-				pos++
-				if pos < len(table) && table[pos] == 0 {
-					pos++
-					break
-				}
-				continue
-			}
-			pos++
-		}
-		offset = pos
 	}
 }
 
@@ -69,35 +50,27 @@ func dump(data []byte) {
 		if end > len(data) {
 			end = len(data)
 		}
-		fmt.Printf("  0x%02X:", i)
+		fmt.Fprintf(stdout, "  0x%02X:", i)
 		for j := i; j < end; j++ {
-			fmt.Printf(" %02X", data[j])
+			fmt.Fprintf(stdout, " %02X", data[j])
 		}
-		fmt.Println()
+		fmt.Fprintln(stdout)
 	}
 }
 
 // printProcessorFields shows the numbers that are taken from a processor
 // structure.
 func printProcessorFields(data []byte) {
-	fmt.Printf("  max speed   0x10: %d\n", word(data, 0x10))
-	fmt.Printf("  current spd 0x12: %d\n", word(data, 0x12))
-	fmt.Printf("  core count  0x14: %d\n", word(data, 0x14))
-	fmt.Printf("  thread cnt  0x18: %d\n", word(data, 0x18))
+	fmt.Fprintf(stdout, "  max speed   0x10: %d\n", hardware.Word(data, 0x10))
+	fmt.Fprintf(stdout, "  current spd 0x12: %d\n", hardware.Word(data, 0x12))
+	fmt.Fprintf(stdout, "  core count  0x14: %d\n", hardware.Word(data, 0x14))
+	fmt.Fprintf(stdout, "  thread cnt  0x18: %d\n", hardware.Word(data, 0x18))
 }
 
 // printMemoryFields shows the numbers that are taken from a memory
 // structure.
 func printMemoryFields(data []byte) {
-	fmt.Printf("  size        0x10: %d\n", word(data, 0x10))
-	fmt.Printf("  speed       0x1B: %d\n", word(data, 0x1B))
-	fmt.Printf("  speed alt   0x15: %d\n", word(data, 0x15))
-}
-
-// word reads a little endian word.
-func word(data []byte, offset int) int {
-	if offset+2 > len(data) {
-		return -1
-	}
-	return int(data[offset]) | int(data[offset+1])<<8
+	fmt.Fprintf(stdout, "  size        0x10: %d\n", hardware.Word(data, 0x10))
+	fmt.Fprintf(stdout, "  speed       0x1B: %d\n", hardware.Word(data, 0x1B))
+	fmt.Fprintf(stdout, "  speed alt   0x15: %d\n", hardware.Word(data, 0x15))
 }
