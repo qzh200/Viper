@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command agcheck talks to the original AcerAgentService through the client
 // of the program and shows what the service answers.
 //

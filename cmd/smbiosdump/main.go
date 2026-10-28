@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command smbiosdump prints the raw structures of the firmware table.
 //
 // The fields of the structures are read by hand, so the bytes are shown

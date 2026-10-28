@@ -5,6 +5,9 @@
 artifacts/
 cover.out
 
+# 程序不要放在仓库根目录，构建产物都进 /bin/。
+/*.exe
+
 # Go workspace files
 go.work
 go.work.sum

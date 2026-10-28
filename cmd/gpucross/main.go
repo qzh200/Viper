@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command gpucross compares the readings of the graphics card with the
 // ones of the original software.
 //

@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command fanproto finds out how the original AcerAgentService reads the
 // fan configuration.
 //

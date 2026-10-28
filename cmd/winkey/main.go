@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command winkey finds out what the WIN_KEY setting of the original service
 // means and whether it can be written at all.
 //

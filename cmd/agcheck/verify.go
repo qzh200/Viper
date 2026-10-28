@@ -1,5 +1,3 @@
-//go:build tools
-
 // Command verify changes every setting the hardware layer can write, reads
 // it back and puts the machine back where it was.
 //
