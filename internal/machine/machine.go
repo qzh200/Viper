@@ -454,18 +454,25 @@ func (b *Backend) verifyStatus(function string, expected int) error {
 //
 // 有的设置不是立刻生效的：服务把它交给别的服务或者写进固件，读回来的值会
 // 晚一点才变。所以读回核对要等一小会儿，而不是读一次就下结论。
+//
+// 服务正忙着让刚写下的设置生效的时候，会偶发回一个没有数据的应答。那不是
+// "失败"，是"还没好"：把它当成还没生效，继续等。等到期限过了，再把最后一次
+// 的错误报出来。
 func poll(read func() (bool, error)) (bool, error) {
 	deadline := time.Now().Add(verifyTimeout)
+	var lastErr error
 	for {
 		ok, err := read()
-		if err != nil {
-			return false, err
-		}
-		if ok {
+		switch {
+		case err != nil:
+			lastErr = err
+		case ok:
 			return true, nil
+		default:
+			lastErr = nil
 		}
 		if time.Now().After(deadline) {
-			return false, nil
+			return false, lastErr
 		}
 		time.Sleep(verifyInterval)
 	}

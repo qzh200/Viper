@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,49 @@ func TestThatTheLightingIsCheckedAfterTheWrite(t *testing.T) {
 
 	if err := backend.SetLighting(config); err != nil {
 		t.Fatalf("写入灯效失败: %v", err)
+	}
+}
+
+// TestThatTheReadKeepsWaitingWhenTheServiceAnswersWithoutData 读不到的时候
+// 要继续等，不要立刻当成失败。
+//
+// 服务正忙着让刚写下的设置生效的时候，会偶发回一个没有数据的应答。那不是
+// "失败"，是"还没好"。
+func TestThatTheReadKeepsWaitingWhenTheServiceAnswersWithoutData(t *testing.T) {
+	fastVerify(t)
+
+	tries := 0
+	ok, err := poll(func() (bool, error) {
+		tries++
+		if tries < 3 {
+			return false, errors.New("应答 LIGHTING 没有数据")
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("读了几次之后就不该再报错: %v", err)
+	}
+	if !ok {
+		t.Fatal("读到最后成功了，该算是核对通过")
+	}
+	if tries < 3 {
+		t.Errorf("只读了 %d 次", tries)
+	}
+}
+
+// TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing 一直读不到的时候
+// 要把最后的错误报出来。
+func TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing(t *testing.T) {
+	fastVerify(t)
+
+	_, err := poll(func() (bool, error) {
+		return false, errors.New("应答 LIGHTING 没有数据")
+	})
+	if err == nil {
+		t.Fatal("一直读不到的时候该报错")
+	}
+	if !strings.Contains(err.Error(), "没有数据") {
+		t.Errorf("错误信息不对: %v", err)
 	}
 }
 
