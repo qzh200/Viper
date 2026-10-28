@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"viper/internal/app"
 	"viper/internal/quickaccess"
 )
 
@@ -23,7 +22,7 @@ import (
 // provider has a second way to the same switch, that one is the command
 // "viper gpu".
 func runDisplayMode(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -34,7 +33,7 @@ func runDisplayMode(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  display mode:", mode)
+		fmt.Fprintln(stdout, "  display mode:", mode)
 		return nil
 	}
 
@@ -49,13 +48,13 @@ func runDisplayMode(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  display mode:", current)
+	fmt.Fprintln(stdout, "  display mode:", current)
 	return nil
 }
 
 // runDarkMode shows or changes the dark mode of the system.
 func runDarkMode(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func runDarkMode(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  dark mode:", onOff(enabled))
+		fmt.Fprintln(stdout, "  dark mode:", onOff(enabled))
 		return nil
 	}
 
@@ -77,13 +76,13 @@ func runDarkMode(args []string) error {
 	if err := application.SetDarkMode(enabled); err != nil {
 		return err
 	}
-	fmt.Println("  dark mode:", onOff(enabled))
+	fmt.Fprintln(stdout, "  dark mode:", onOff(enabled))
 	return nil
 }
 
 // runTransparent shows or changes the transparency of the windows.
 func runTransparent(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -94,7 +93,7 @@ func runTransparent(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  transparent effect:", onOff(enabled))
+		fmt.Fprintln(stdout, "  transparent effect:", onOff(enabled))
 		return nil
 	}
 
@@ -105,7 +104,7 @@ func runTransparent(args []string) error {
 	if err := application.SetTransparentEffect(enabled); err != nil {
 		return err
 	}
-	fmt.Println("  transparent effect:", onOff(enabled))
+	fmt.Fprintln(stdout, "  transparent effect:", onOff(enabled))
 	return nil
 }
 
@@ -113,7 +112,7 @@ func runTransparent(args []string) error {
 //
 // The setting is switched on when the taskbar hides itself.
 func runTaskbar(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -124,7 +123,7 @@ func runTaskbar(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  auto hide taskbar:", onOff(hidden))
+		fmt.Fprintln(stdout, "  auto hide taskbar:", onOff(hidden))
 		return nil
 	}
 
@@ -135,7 +134,7 @@ func runTaskbar(args []string) error {
 	if err := application.SetAutoHideTaskbar(enabled); err != nil {
 		return err
 	}
-	fmt.Println("  auto hide taskbar:", onOff(enabled))
+	fmt.Fprintln(stdout, "  auto hide taskbar:", onOff(enabled))
 	return nil
 }
 
@@ -144,7 +143,7 @@ func runTaskbar(args []string) error {
 // The second form sets the idle time in seconds before the screen saver
 // starts.
 func runScreenSaver(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func runScreenSaver(args []string) error {
 		if err := application.SetScreenSaverTimeout(seconds); err != nil {
 			return err
 		}
-		fmt.Println("  screen saver timeout:", seconds, "seconds")
+		fmt.Fprintln(stdout, "  screen saver timeout:", seconds, "seconds")
 		return nil
 	}
 
@@ -173,10 +172,10 @@ func runScreenSaver(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  screen saver:", onOff(enabled))
+		fmt.Fprintln(stdout, "  screen saver:", onOff(enabled))
 		timeout, err := application.ScreenSaverTimeout()
 		if err == nil {
-			fmt.Println("  timeout     :", timeout, "seconds")
+			fmt.Fprintln(stdout, "  timeout     :", timeout, "seconds")
 		}
 		return nil
 	}
@@ -188,6 +187,6 @@ func runScreenSaver(args []string) error {
 	if err := application.SetScreenSaver(enabled); err != nil {
 		return err
 	}
-	fmt.Println("  screen saver:", onOff(enabled))
+	fmt.Fprintln(stdout, "  screen saver:", onOff(enabled))
 	return nil
 }

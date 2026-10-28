@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -16,9 +17,23 @@ import (
 	"viper/internal/hardware"
 )
 
+// stdout 与 stderr 是程序的输出目标。
+//
+// 用例把它们换成缓冲区，所以用例能看见命令行到底写了什么——命令行这一层
+// 以前没有用例，改坏了不会红。
+var (
+	stdout io.Writer = os.Stdout
+	stderr io.Writer = os.Stderr
+)
+
+// newApp opens the program.
+//
+// 用例把它换成一台假机器上的程序，所以命令行这一层不用真的机器也能测。
+var newApp = app.New
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "viper:", err)
+		fmt.Fprintln(stderr, "viper:", err)
 		os.Exit(1)
 	}
 }
@@ -39,6 +54,11 @@ func run(args []string) error {
 			}
 			app.SetServiceAddress(args[1])
 			args = args[2:]
+		case "--help":
+			// 这个选项也走命令那一层的用法说明。它以 "--" 开头，所以会先落
+			// 到这个循环里——不单独放行的话，它会被当成不认识的选项报出来。
+			usage()
+			return nil
 		default:
 			return fmt.Errorf("unknown option %q", args[0])
 		}
@@ -94,7 +114,7 @@ func run(args []string) error {
 
 // usage prints the command overview.
 func usage() {
-	fmt.Println(`viper - Acer gaming laptop control centre
+	fmt.Fprintln(stdout, `viper - Acer gaming laptop control centre
 
 Usage:
   viper status                      live temperatures and fan speeds
@@ -152,12 +172,14 @@ Lighting options:
   brightness <0-100> overall brightness
   color <#RRGGBB>    one colour for every zone
   zone <n> <#RRGGBB> colour of a single zone, may be repeated
-  all                apply the colours to every zone`)
+  all                finish the zone colours, every zone keeps its own colour
+
+The options that are not mentioned keep the value the machine has now.`)
 }
 
 // runStatus prints a live telemetry snapshot.
 func runStatus() error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -167,9 +189,9 @@ func runStatus() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("instance:", instance)
+	fmt.Fprintln(stdout, "instance:", instance)
 	// 走的哪条路要报出来：这一层只有原厂程序这一路。
-	fmt.Println("route  :", application.Route())
+	fmt.Fprintln(stdout, "route  :", application.Route())
 
 	// The power supply comes from the kernel of Windows, it is shown
 	// first because it is there even when the hardware needs the rights
@@ -178,10 +200,10 @@ func runStatus() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println("  Power supply      :", power)
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "  Power supply      :", power)
 	if power.OnBattery {
-		fmt.Println("  Battery           :", power.BatteryPercent, "%")
+		fmt.Fprintln(stdout, "  Battery           :", power.BatteryPercent, "%")
 	}
 
 	telemetry, err := application.Telemetry()
@@ -200,35 +222,35 @@ func runStatus() error {
 func printTelemetry(telemetry app.Telemetry) {
 	monitor := telemetry.Monitor
 
-	fmt.Println()
-	fmt.Println("  CPU temperature   :", monitor.CPUTemperatureC, "C")
-	fmt.Printf("  CPU usage         : %.1f %%\n", monitor.CPUUsagePercent)
-	fmt.Printf("  CPU clock         : %d MHz (max %d MHz)\n", monitor.CPUFrequencyMHz, monitor.CPUMaxFrequencyMHz)
-	fmt.Println("  CPU fan speed     :", monitor.CPUFanRPM, "RPM")
-	fmt.Println("  GPU temperature   :", monitor.GPUTemperatureC, "C")
-	fmt.Println("  GPU usage         :", monitor.GPUUsagePercent, "%")
-	fmt.Printf("  GPU clock         : %d MHz (max %d MHz)\n", monitor.GPUFrequencyMHz, monitor.GPUMaxFrequencyMHz)
-	fmt.Println("  GPU fan speed     :", monitor.GPUFanRPM, "RPM")
-	fmt.Println("  Motherboard / VRM :", monitor.SystemTempC, "C")
-	fmt.Printf("  Memory            : %.1f %% of %.0f MB @ %d MHz\n",
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "  CPU temperature   :", monitor.CPUTemperatureC, "C")
+	fmt.Fprintf(stdout, "  CPU usage         : %.1f %%\n", monitor.CPUUsagePercent)
+	fmt.Fprintf(stdout, "  CPU clock         : %d MHz (max %d MHz)\n", monitor.CPUFrequencyMHz, monitor.CPUMaxFrequencyMHz)
+	fmt.Fprintln(stdout, "  CPU fan speed     :", monitor.CPUFanRPM, "RPM")
+	fmt.Fprintln(stdout, "  GPU temperature   :", monitor.GPUTemperatureC, "C")
+	fmt.Fprintln(stdout, "  GPU usage         :", monitor.GPUUsagePercent, "%")
+	fmt.Fprintf(stdout, "  GPU clock         : %d MHz (max %d MHz)\n", monitor.GPUFrequencyMHz, monitor.GPUMaxFrequencyMHz)
+	fmt.Fprintln(stdout, "  GPU fan speed     :", monitor.GPUFanRPM, "RPM")
+	fmt.Fprintln(stdout, "  Motherboard / VRM :", monitor.SystemTempC, "C")
+	fmt.Fprintf(stdout, "  Memory            : %.1f %% of %.0f MB @ %d MHz\n",
 		monitor.RAMUsagePercent, monitor.RAMTotalMB, monitor.RAMFrequencyMHz)
-	fmt.Printf("  Network           : wifi down %.1f up %.1f kbps, ethernet down %.1f up %.1f kbps\n",
+	fmt.Fprintf(stdout, "  Network           : wifi down %.1f up %.1f kbps, ethernet down %.1f up %.1f kbps\n",
 		monitor.WIFIDownloadKbps, monitor.WIFIUploadKbps,
 		monitor.EthernetDownloadKbps, monitor.EthernetUploadKbps)
 
 	if len(monitor.CPUCoreFrequencyMHz) > 0 {
 		clocks := monitor.CPUCoreFrequencyMHz
-		fmt.Printf("  Core clocks       : %d cores, %d to %d MHz\n",
+		fmt.Fprintf(stdout, "  Core clocks       : %d cores, %d to %d MHz\n",
 			len(clocks), minOf(clocks), maxOf(clocks))
 	}
 
 	for _, card := range telemetry.Cards {
-		fmt.Println()
-		fmt.Println("  Graphics card     :", card.Name)
-		fmt.Println("  Memory clock      :", card.MemoryClockMHz, "MHz")
-		fmt.Println("  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "  Graphics card     :", card.Name)
+		fmt.Fprintln(stdout, "  Memory clock      :", card.MemoryClockMHz, "MHz")
+		fmt.Fprintln(stdout, "  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
 		if card.IsIdle() {
-			fmt.Println("  The card is idle")
+			fmt.Fprintln(stdout, "  The card is idle")
 		}
 	}
 }
@@ -274,7 +296,7 @@ func formatBytes(value uint64) string {
 // A scene holds the lighting and the fans, it can be bound to a
 // performance profile so that the profile brings its own look.
 func runScenario(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -294,7 +316,7 @@ func runScenario(args []string) error {
 		if err := application.SaveScenario(args[1]); err != nil {
 			return err
 		}
-		fmt.Println("scene saved:", args[1])
+		fmt.Fprintln(stdout, "scene saved:", args[1])
 		return nil
 	case "apply":
 		if len(args) < 2 {
@@ -303,7 +325,7 @@ func runScenario(args []string) error {
 		if err := application.ApplyScenario(args[1]); err != nil {
 			return err
 		}
-		fmt.Println("scene applied:", args[1])
+		fmt.Fprintln(stdout, "scene applied:", args[1])
 		return nil
 	case "delete", "remove":
 		if len(args) < 2 {
@@ -312,7 +334,7 @@ func runScenario(args []string) error {
 		if err := application.DeleteScenario(args[1]); err != nil {
 			return err
 		}
-		fmt.Println("scene deleted:", args[1])
+		fmt.Fprintln(stdout, "scene deleted:", args[1])
 		return nil
 	case "bind":
 		if len(args) < 3 {
@@ -325,7 +347,7 @@ func runScenario(args []string) error {
 		if err := application.BindScenario(mode.String(), args[2]); err != nil {
 			return err
 		}
-		fmt.Printf("scene %q is bound to the profile %s\n", args[2], mode)
+		fmt.Fprintf(stdout, "scene %q is bound to the profile %s\n", args[2], mode)
 		return nil
 	case "unbind":
 		if len(args) < 2 {
@@ -338,7 +360,7 @@ func runScenario(args []string) error {
 		if err := application.UnbindScenario(mode.String()); err != nil {
 			return err
 		}
-		fmt.Println("the profile", mode, "has no scene")
+		fmt.Fprintln(stdout, "the profile", mode, "has no scene")
 		return nil
 	default:
 		return fmt.Errorf("unknown scenario command %q", args[0])
@@ -349,10 +371,10 @@ func runScenario(args []string) error {
 func listScenarios(application *app.App) error {
 	scenarios := application.Scenarios()
 	if len(scenarios) == 0 {
-		fmt.Println("  no scene is saved")
+		fmt.Fprintln(stdout, "  no scene is saved")
 	} else {
 		for name, scenario := range scenarios {
-			fmt.Printf("  %-16s lighting %s at %d%%, fans %s\n", name,
+			fmt.Fprintf(stdout, "  %-16s lighting %s at %d%%, fans %s\n", name,
 				hardware.LightingEffect(scenario.Lighting.Effect),
 				scenario.Lighting.Brightness,
 				hardware.FanMode(scenario.Fans.CPUMode))
@@ -363,10 +385,10 @@ func listScenarios(application *app.App) error {
 	if len(bindings) == 0 {
 		return nil
 	}
-	fmt.Println()
-	fmt.Println("  bound scenes:")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "  bound scenes:")
 	for profile, name := range bindings {
-		fmt.Printf("    %-12s -> %s\n", profile, name)
+		fmt.Fprintf(stdout, "    %-12s -> %s\n", profile, name)
 	}
 	return nil
 }
@@ -375,7 +397,7 @@ func listScenarios(application *app.App) error {
 //
 // 读数是原厂服务报的，显卡驱动补它没报的那几样。
 func runTelemetry() error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -394,7 +416,7 @@ func runTelemetry() error {
 // The information comes from the kernel of Windows, so this command works
 // without the rights of an administrator.
 func runPowerStatus() error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -404,22 +426,22 @@ func runPowerStatus() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  Power supply      :", power)
+	fmt.Fprintln(stdout, "  Power supply      :", power)
 	if power.OnBattery {
-		fmt.Println("  Battery           :", power.BatteryPercent, "%")
+		fmt.Fprintln(stdout, "  Battery           :", power.BatteryPercent, "%")
 	}
 	if power.BatteryLow {
-		fmt.Println("  The battery is running low")
+		fmt.Fprintln(stdout, "  The battery is running low")
 	}
 	if power.BatteryCritical {
-		fmt.Println("  The battery is almost empty")
+		fmt.Fprintln(stdout, "  The battery is almost empty")
 	}
 	return nil
 }
 
 // runFan shows or changes the fan configuration.
 func runFan(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -430,9 +452,9 @@ func runFan(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
-		fmt.Println("  GPU fan    :", describeGPUFan(state))
-		fmt.Println("  CoolBoost :", onOff(state.CoolBoost))
+		fmt.Fprintln(stdout, "  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
+		fmt.Fprintln(stdout, "  GPU fan    :", describeGPUFan(state))
+		fmt.Fprintln(stdout, "  CoolBoost :", onOff(state.CoolBoost))
 		return nil
 	}
 
@@ -448,7 +470,7 @@ func runFan(args []string) error {
 		if err := application.SetCoolBoost(enabled); err != nil {
 			return err
 		}
-		fmt.Println("CoolBoost:", onOff(enabled))
+		fmt.Fprintln(stdout, "CoolBoost:", onOff(enabled))
 		return nil
 	case "auto", "max":
 		mode := hardware.FanAuto
@@ -488,8 +510,8 @@ func applyFan(application *app.App, config hardware.FanConfig) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
-	fmt.Println("  GPU fan    :", describeGPUFan(state))
+	fmt.Fprintln(stdout, "  CPU fan    :", describeFan(state.CPUMode, state.CPUPercent))
+	fmt.Fprintln(stdout, "  GPU fan    :", describeGPUFan(state))
 	return nil
 }
 
@@ -520,7 +542,7 @@ func describeGPUFan(state app.FanStatus) string {
 
 // runPower shows or changes the performance profile.
 func runPower(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -531,7 +553,7 @@ func runPower(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  performance profile:", mode)
+		fmt.Fprintln(stdout, "  performance profile:", mode)
 		return nil
 	}
 
@@ -549,13 +571,13 @@ func runPower(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  performance profile:", current)
+	fmt.Fprintln(stdout, "  performance profile:", current)
 	return nil
 }
 
 // runLighting shows or changes the keyboard lighting.
 func runLighting(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -565,7 +587,7 @@ func runLighting(args []string) error {
 		if err := application.ResetLighting(); err != nil {
 			return err
 		}
-		fmt.Println("lighting reset to the default")
+		fmt.Fprintln(stdout, "lighting reset to the default")
 		return nil
 	}
 
@@ -580,7 +602,7 @@ func runLighting(args []string) error {
 		if err := application.SetBacklightTimeout(enabled); err != nil {
 			return err
 		}
-		fmt.Println("backlight timeout:", onOff(enabled))
+		fmt.Fprintln(stdout, "backlight timeout:", onOff(enabled))
 		return nil
 	}
 
@@ -588,14 +610,24 @@ func runLighting(args []string) error {
 		return showLighting(application)
 	}
 
-	options, err := parseLightingOptions(args[1:])
+	// 以机器现在的灯效为底，只改命令里点到的那几项。原厂服务在写的时候会把
+	// 没写回去的颜色清掉，所以底子少了会把用户正在用的颜色抹成黑色。
+	//
+	// 机器读不到的时候用 Viper 自己记着的那一份，但那是它自己的记录，不是
+	// 机器现在的样子——写下去仍然是机器的实情。
+	base, err := application.Lighting()
+	if err != nil {
+		base = application.StoredLighting()
+	}
+
+	options, err := parseLightingOptions(base, args[1:])
 	if err != nil {
 		return err
 	}
 	if err := application.SetLighting(*options); err != nil {
 		return err
 	}
-	fmt.Println("lighting applied")
+	fmt.Fprintln(stdout, "lighting applied")
 	return nil
 }
 
@@ -606,29 +638,38 @@ func runLighting(args []string) error {
 func showLighting(application *app.App) error {
 	config, err := application.Lighting()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "viper:", err)
-		fmt.Println("  machine     : not readable, showing what Viper wrote last")
+		fmt.Fprintln(stderr, "viper:", err)
+		fmt.Fprintln(stdout, "  machine     : not readable, showing what Viper wrote last")
 		config = application.StoredLighting()
 	} else {
-		fmt.Printf("  brightness  : %d\n", config.Brightness)
+		fmt.Fprintf(stdout, "  brightness  : %d\n", config.Brightness)
 	}
-	fmt.Printf("  effect      : %s\n", config.Effect)
-	fmt.Printf("  speed       : %d\n", config.Speed)
-	fmt.Printf("  direction   : %d\n", config.Direction)
+	fmt.Fprintf(stdout, "  effect      : %s\n", config.Effect)
+	fmt.Fprintf(stdout, "  speed       : %d\n", config.Speed)
+	fmt.Fprintf(stdout, "  direction   : %d\n", config.Direction)
 	for i, zone := range config.Zones {
-		fmt.Printf("  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
+		fmt.Fprintf(stdout, "  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
 	}
 	timeout, err := application.BacklightTimeout()
 	if err == nil {
-		fmt.Println("  timeout     :", onOff(timeout))
+		fmt.Fprintln(stdout, "  timeout     :", onOff(timeout))
 	}
-	fmt.Println("  settings    :", application.SettingsPath())
+	fmt.Fprintln(stdout, "  settings    :", application.SettingsPath())
 	return nil
 }
 
-// parseLightingOptions parses the arguments of "viper lighting set".
-func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
-	config := &hardware.RGBConfig{Effect: hardware.EffectStatic, Speed: 3, Brightness: 50}
+// parseLightingOptions applies the arguments of "viper lighting set" onto a
+// base configuration.
+//
+// The base is the lighting of the machine as it is now, so that the options
+// that are not mentioned keep their value. The service clears the colours
+// that are not written back, so a command that only changes the brightness
+// must not start from an empty colour.
+//
+// 参数是在底子（机器现在的灯效）上改的，所以没点到的那几项保持原样。原厂服
+// 务会把没写回去的颜色清掉，所以只改亮度的命令不能从一个空的颜色出发。
+func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGBConfig, error) {
+	config := base
 	zoneColours := map[int]hardware.RGBColor{}
 
 	for i := 0; i < len(args); i++ {
@@ -705,12 +746,15 @@ func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
 			config.PerZone = true
 			i += 2
 		case "all":
+			// 这一项把已经写好的分区颜色定下来：点过哪个分区，哪个分区就
+			// 用自己的颜色，其余分区沿用底子里的颜色。只要点过一个分区，
+			// 写回去的就是分区设置，不是全局颜色。
 			for zone := range config.Zones {
 				if colour, ok := zoneColours[zone+1]; ok {
 					config.Zones[zone] = colour
 				}
 			}
-			config.PerZone = len(zoneColours) > 1
+			config.PerZone = len(zoneColours) > 0
 		default:
 			return nil, fmt.Errorf("unknown lighting option %q", args[i])
 		}
@@ -719,7 +763,7 @@ func parseLightingOptions(args []string) (*hardware.RGBConfig, error) {
 	for zone, colour := range zoneColours {
 		config.Zones[zone-1] = colour
 	}
-	return config, nil
+	return &config, nil
 }
 
 // parseColor parses a hex colour.
@@ -741,7 +785,7 @@ func parseColor(text string) (hardware.RGBColor, error) {
 
 // runProfile shows or changes the display overdrive and the key lock.
 func runProfile(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -752,22 +796,22 @@ func runProfile(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  LCD overdrive :", onOff(overdrive))
+		fmt.Fprintln(stdout, "  LCD overdrive :", onOff(overdrive))
 
 		// 锁 Windows 键原厂服务写不动它（实测它收下请求却不生效），所以这一项
 		// 要管理员权限。读不到就把话说明白，别把整条命令都拖垮。
 		locked, err := application.WinKeyLocked()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "viper: 读不到 Windows 键的状态（需要管理员权限）:", err)
+			fmt.Fprintln(stderr, "viper: 读不到 Windows 键的状态（需要管理员权限）:", err)
 		} else {
-			fmt.Println("  Windows key   :", onOff(locked))
+			fmt.Fprintln(stdout, "  Windows key   :", onOff(locked))
 		}
 
 		sticky, err := application.StickyKeys()
 		if err != nil {
 			return err
 		}
-		fmt.Println("  Sticky keys   :", onOff(sticky))
+		fmt.Fprintln(stdout, "  Sticky keys   :", onOff(sticky))
 		return nil
 	}
 
@@ -783,7 +827,7 @@ func runProfile(args []string) error {
 		if err := application.SetLCDOverdrive(enabled); err != nil {
 			return err
 		}
-		fmt.Println("LCD overdrive:", onOff(enabled))
+		fmt.Fprintln(stdout, "LCD overdrive:", onOff(enabled))
 		return nil
 	case "winkey", "win":
 		if len(args) < 2 {
@@ -796,7 +840,7 @@ func runProfile(args []string) error {
 		if err := application.SetWinKeyLocked(locked); err != nil {
 			return err
 		}
-		fmt.Println("Windows key:", onOff(locked))
+		fmt.Fprintln(stdout, "Windows key:", onOff(locked))
 		return nil
 	case "stickykeys", "sticky":
 		if len(args) < 2 {
@@ -809,7 +853,7 @@ func runProfile(args []string) error {
 		if err := application.SetStickyKeys(enabled); err != nil {
 			return err
 		}
-		fmt.Println("sticky keys:", onOff(enabled))
+		fmt.Fprintln(stdout, "sticky keys:", onOff(enabled))
 		return nil
 	default:
 		return fmt.Errorf("unknown profile command %q", args[0])
@@ -818,7 +862,7 @@ func runProfile(args []string) error {
 
 // runGPU shows or changes the graphics mode of the machine.
 func runGPU(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -829,7 +873,7 @@ func runGPU(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  graphics mode:", mode)
+		fmt.Fprintln(stdout, "  graphics mode:", mode)
 		return nil
 	}
 
@@ -840,13 +884,13 @@ func runGPU(args []string) error {
 	if err := application.SetGPUMode(mode); err != nil {
 		return err
 	}
-	fmt.Println("  graphics mode:", mode, "(takes effect after a restart)")
+	fmt.Fprintln(stdout, "  graphics mode:", mode, "(takes effect after a restart)")
 	return nil
 }
 
 // runCharge shows or changes the charging settings.
 func runCharge(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -861,8 +905,8 @@ func runCharge(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("  charging limit  : %d%%\n", limit)
-		fmt.Println("  charging over USB:", onOff(enabled))
+		fmt.Fprintf(stdout, "  charging limit  : %d%%\n", limit)
+		fmt.Fprintln(stdout, "  charging over USB:", onOff(enabled))
 		return nil
 	}
 
@@ -878,7 +922,7 @@ func runCharge(args []string) error {
 		if err := application.SetUSBChargeLimit(percent); err != nil {
 			return err
 		}
-		fmt.Printf("  charging limit  : %d%%\n", percent)
+		fmt.Fprintf(stdout, "  charging limit  : %d%%\n", percent)
 		return nil
 	case "usb":
 		if len(args) < 2 {
@@ -891,7 +935,7 @@ func runCharge(args []string) error {
 		if err := application.SetUSBChargeEnabled(enabled); err != nil {
 			return err
 		}
-		fmt.Println("  charging over USB:", onOff(enabled))
+		fmt.Fprintln(stdout, "  charging over USB:", onOff(enabled))
 		return nil
 	default:
 		return fmt.Errorf("unknown charge command %q", args[0])
@@ -900,7 +944,7 @@ func runCharge(args []string) error {
 
 // runBootSound shows or changes the sound at the start of the machine.
 func runBootSound(args []string) error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -911,7 +955,7 @@ func runBootSound(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("  boot sound:", onOff(enabled))
+		fmt.Fprintln(stdout, "  boot sound:", onOff(enabled))
 		return nil
 	}
 
@@ -922,7 +966,7 @@ func runBootSound(args []string) error {
 	if err := application.SetBootSound(enabled); err != nil {
 		return err
 	}
-	fmt.Println("  boot sound:", onOff(enabled))
+	fmt.Fprintln(stdout, "  boot sound:", onOff(enabled))
 	return nil
 }
 
@@ -931,7 +975,7 @@ func runBootSound(args []string) error {
 // 报告是逐项的：读不到的那几项把原因写出来，不要把整份报告拖垮。
 // 把话说明白，不要把整份报告都拖垮。
 func runDiag() error {
-	application, err := app.New()
+	application, err := newApp()
 	if err != nil {
 		return err
 	}
@@ -941,23 +985,23 @@ func runDiag() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  instance        :", instance)
-	fmt.Println("  route           :", application.Route())
+	fmt.Fprintln(stdout, "  instance        :", instance)
+	fmt.Fprintln(stdout, "  route           :", application.Route())
 
 	identity, err := application.Identity()
 	if err != nil {
 		return err
 	}
-	fmt.Println("  model           :", identity.Product)
-	fmt.Println("  family          :", identity.Family)
+	fmt.Fprintln(stdout, "  model           :", identity.Product)
+	fmt.Fprintln(stdout, "  family          :", identity.Family)
 	isPredator := hardware.IsPredatorModel(identity.Product, identity.Family)
-	fmt.Println("  Predator series :", onOff(isPredator))
+	fmt.Fprintln(stdout, "  Predator series :", onOff(isPredator))
 
 	modes := make([]string, 0, 4)
 	for _, mode := range application.AvailablePowerModes() {
 		modes = append(modes, mode.String())
 	}
-	fmt.Println("  profiles        :", strings.Join(modes, ", "))
+	fmt.Fprintln(stdout, "  profiles        :", strings.Join(modes, ", "))
 
 	mode, err := application.PowerMode()
 	report("power profile", mode, err)
@@ -966,9 +1010,9 @@ func runDiag() error {
 	if fanErr != nil {
 		report("fans", nil, fanErr)
 	} else {
-		fmt.Println("  CPU fan         :", describeFan(state.CPUMode, state.CPUPercent))
-		fmt.Println("  GPU fan         :", describeFan(state.GPUMode, state.GPUPercent))
-		fmt.Println("  CoolBoost       :", onOff(state.CoolBoost))
+		fmt.Fprintln(stdout, "  CPU fan         :", describeFan(state.CPUMode, state.CPUPercent))
+		fmt.Fprintln(stdout, "  GPU fan         :", describeFan(state.GPUMode, state.GPUPercent))
+		fmt.Fprintln(stdout, "  CoolBoost       :", onOff(state.CoolBoost))
 	}
 
 	discrete, err := application.DiscreteGPU()
@@ -978,16 +1022,16 @@ func runDiag() error {
 	if err != nil {
 		report("overclock", nil, err)
 	} else {
-		fmt.Println("  GPU overclock   :", onOff(gpuOC))
-		fmt.Println("  CPU overclock   :", onOff(cpuOC))
+		fmt.Fprintln(stdout, "  GPU overclock   :", onOff(gpuOC))
+		fmt.Fprintln(stdout, "  CPU overclock   :", onOff(cpuOC))
 	}
 
 	lighting, err := application.Lighting()
 	if err != nil {
 		report("key lighting", nil, err)
 	} else {
-		fmt.Println("  key brightness  :", lighting.Brightness)
-		fmt.Println("  key effect      :", lighting.Effect)
+		fmt.Fprintln(stdout, "  key brightness  :", lighting.Brightness)
+		fmt.Fprintln(stdout, "  key effect      :", lighting.Effect)
 	}
 
 	gpuMode, err := application.GPUMode()
@@ -1003,7 +1047,7 @@ func runDiag() error {
 	locked, err := application.WinKeyLocked()
 	report("Windows key", onOff(locked), err)
 
-	fmt.Println("  settings        :", application.SettingsPath())
+	fmt.Fprintln(stdout, "  settings        :", application.SettingsPath())
 	return nil
 }
 
@@ -1012,10 +1056,10 @@ func runDiag() error {
 // 读不到的时候把原因写出来，别把整份报告都拖垮。
 func report(name string, value any, err error) {
 	if err != nil {
-		fmt.Printf("  %-16s: 读不到（%v）\n", name, err)
+		fmt.Fprintf(stdout, "  %-16s: 读不到（%v）\n", name, err)
 		return
 	}
-	fmt.Printf("  %-16s: %v\n", name, value)
+	fmt.Fprintf(stdout, "  %-16s: %v\n", name, value)
 }
 
 // parseOnOff parses an on or off argument.
