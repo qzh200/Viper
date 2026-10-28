@@ -14,7 +14,6 @@ import (
 
 	"viper/internal/app"
 	"viper/internal/hardware"
-	"viper/internal/quickaccess"
 )
 
 func main() {
@@ -62,8 +61,6 @@ func run(args []string) error {
 		return runProfile(args[1:])
 	case "gpu":
 		return runGPU(args[1:])
-	case "bluelight", "blueshield":
-		return runBluelight(args[1:])
 	case "charge", "battery":
 		return runCharge(args[1:])
 	case "displaymode", "display":
@@ -126,8 +123,6 @@ Usage:
   viper profile stickykeys <on|off> switch the sticky keys on or off
   viper gpu                         show the graphics mode
   viper gpu <mode>                  set hybrid|discrete|auto
-  viper bluelight                   show the blue light shield
-  viper bluelight <level>           set the shield, 0 to 4
   viper charge                      show the charging settings
   viper charge limit <percent>      set the charging limit, 10, 20 or 30
   viper charge usb <on|off>         allow or forbid charging over USB
@@ -157,10 +152,7 @@ Lighting options:
   brightness <0-100> overall brightness
   color <#RRGGBB>    one colour for every zone
   zone <n> <#RRGGBB> colour of a single zone, may be repeated
-  all                apply the colours to every zone
-
-Blue light shield levels:
-  0 disabled   1 low   2 medium   3 high   4 long hour`)
+  all                apply the colours to every zone`)
 }
 
 // runStatus prints a live telemetry snapshot.
@@ -850,68 +842,6 @@ func runGPU(args []string) error {
 	}
 	fmt.Println("  graphics mode:", mode, "(takes effect after a restart)")
 	return nil
-}
-
-// runBluelight shows or changes the blue light shield.
-func runBluelight(args []string) error {
-	application, err := app.New()
-	if err != nil {
-		return err
-	}
-	defer application.Close()
-
-	if len(args) == 0 {
-		level, err := application.BlueLightShield()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("  blue light shield: %s (%d)\n", level, int(level))
-		return nil
-	}
-
-	level, ok := parseBlueLight(args[0])
-	if !ok {
-		return fmt.Errorf("unknown blue light level %q", args[0])
-	}
-	if err := application.SetBlueLightShield(level); err != nil {
-		return err
-	}
-	fmt.Println("  blue light shield:", level)
-	return nil
-}
-
-// parseBlueLight parses the level of the blue light shield.
-//
-// The level may be given as a number or as one of the names of the
-// original application.
-func parseBlueLight(text string) (quickaccess.BlueLight, bool) {
-	switch strings.ToLower(text) {
-	case "disabled", "off", "none":
-		return quickaccess.BlueLightDisabled, true
-	case "low":
-		return quickaccess.BlueLightLow, true
-	case "medium":
-		return quickaccess.BlueLightMedium, true
-	case "high":
-		return quickaccess.BlueLightHigh, true
-	case "long", "longhour", "long hour":
-		return quickaccess.BlueLightLongHour, true
-	}
-
-	number, err := strconv.Atoi(text)
-	if err != nil {
-		return quickaccess.BlueLightDisabled, false
-	}
-	switch quickaccess.BlueLight(number) {
-	case quickaccess.BlueLightDisabled,
-		quickaccess.BlueLightLow,
-		quickaccess.BlueLightMedium,
-		quickaccess.BlueLightHigh,
-		quickaccess.BlueLightLongHour:
-		return quickaccess.BlueLight(number), true
-	default:
-		return quickaccess.BlueLightDisabled, false
-	}
 }
 
 // runCharge shows or changes the charging settings.

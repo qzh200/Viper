@@ -8,8 +8,6 @@ import (
 
 // The commands of the service that Viper uses.
 const (
-	// CommandBluelightShield selects the blue light shield.
-	CommandBluelightShield = "BluelightShield"
 	// CommandUSBCharge holds the charging limit in percent.
 	CommandUSBCharge = "USBCharge"
 	// CommandUSBChargeSwitch allows the charging over USB.
@@ -29,49 +27,6 @@ const (
 	// saver starts.
 	CommandScreenSaverTimeout = "ScreenSaverTimeout"
 )
-
-// BlueLight is a level of the blue light shield.
-//
-// The names are the ones the service uses in its own description.
-type BlueLight int
-
-// The levels of the blue light shield.
-const (
-	// BlueLightDisabled switches the shield off.
-	BlueLightDisabled BlueLight = 0
-	// BlueLightLow reduces the blue light a little.
-	BlueLightLow BlueLight = 1
-	// BlueLightMedium reduces the blue light halfway.
-	BlueLightMedium BlueLight = 2
-	// BlueLightHigh reduces the blue light strongly.
-	BlueLightHigh BlueLight = 3
-	// BlueLightLongHour is the level for long working days.
-	BlueLightLongHour BlueLight = 4
-	// BlueLightCustomised is the level that the service reports when the
-	// shield is not set to one of the presets. The service cannot write
-	// this level.
-	BlueLightCustomised BlueLight = 5
-)
-
-// String renders the level for display.
-func (b BlueLight) String() string {
-	switch b {
-	case BlueLightDisabled:
-		return "disabled"
-	case BlueLightLow:
-		return "low"
-	case BlueLightMedium:
-		return "medium"
-	case BlueLightHigh:
-		return "high"
-	case BlueLightLongHour:
-		return "long hour"
-	case BlueLightCustomised:
-		return "customised"
-	default:
-		return "unknown"
-	}
-}
 
 // DisplayMode is the way the machine drives the graphics chip.
 type DisplayMode int
@@ -116,27 +71,6 @@ func ParseDisplayMode(name string) (DisplayMode, bool) {
 	default:
 		return DisplayModeHybrid, false
 	}
-}
-
-// BlueLightShield reads the level of the blue light shield.
-func (c *Client) BlueLightShield() (BlueLight, error) {
-	result, err := c.Get(CommandBluelightShield)
-	if err != nil {
-		return BlueLightDisabled, err
-	}
-	value, err := intValue(result)
-	if err != nil {
-		return BlueLightDisabled, fmt.Errorf("quickaccess: %s: %w", CommandBluelightShield, err)
-	}
-	return BlueLight(value), nil
-}
-
-// SetBlueLightShield selects a level of the blue light shield.
-func (c *Client) SetBlueLightShield(level BlueLight) error {
-	if err := c.Set(CommandBluelightShield, int(level)); err != nil {
-		return err
-	}
-	return nil
 }
 
 // USBChargeLimit reads the charging limit in percent.

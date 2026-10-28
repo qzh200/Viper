@@ -1,7 +1,7 @@
 // Package app is the use case layer of Viper.
 //
 // It joins the hardware backend with the stored settings. The settings that
-// do not belong to the gaming hardware, such as the blue light shield, are
+// do not belong to the gaming hardware, such as the charging over USB, are
 // read from the service of the original software.
 //
 // 硬件层只有一条路：原厂程序。灯光、灯效、风扇、性能档位与传感器读数都问

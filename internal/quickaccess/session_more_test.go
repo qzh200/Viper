@@ -116,25 +116,6 @@ func TestSetACommand(t *testing.T) {
 	}
 }
 
-func TestTheBlueLightShield(t *testing.T) {
-	server := newTestServer(t)
-	server.answer(CommandBluelightShield, 2)
-
-	client, err := Connect(Options{Address: server.address()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	level, err := client.BlueLightShield()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if level != BlueLightMedium {
-		t.Errorf("the level is %d, want %d", level, BlueLightMedium)
-	}
-}
-
 func TestTheChargingLimit(t *testing.T) {
 	server := newTestServer(t)
 	server.answer(CommandUSBCharge, 20)
@@ -249,7 +230,6 @@ func TestTheSettingsOfTheService(t *testing.T) {
 	// The service is asked for every setting, so that the whole surface
 	// of the client is covered.
 	server := newTestServer(t)
-	server.answer(CommandBluelightShield, 1)
 	server.answer(CommandUSBCharge, 10)
 	server.answer(CommandUSBChargeSwitch, true)
 	server.answer(CommandDisplayMode, 3)
@@ -261,9 +241,6 @@ func TestTheSettingsOfTheService(t *testing.T) {
 	}
 	defer client.Close()
 
-	if level, err := client.BlueLightShield(); err != nil || level != BlueLightLow {
-		t.Errorf("the level of the blue light shield is %d (%v), want %d", level, err, BlueLightLow)
-	}
 	if limit, err := client.USBChargeLimit(); err != nil || limit != 10 {
 		t.Errorf("the charging limit is %d (%v), want 10", limit, err)
 	}
@@ -280,7 +257,6 @@ func TestTheSettingsOfTheService(t *testing.T) {
 
 func TestSetTheSettingsOfTheService(t *testing.T) {
 	server := newTestServer(t)
-	server.answer(CommandBluelightShield, 1)
 	server.answer(CommandUSBCharge, 10)
 	server.answer(CommandUSBChargeSwitch, true)
 	server.answer(CommandDisplayMode, 3)
@@ -292,9 +268,6 @@ func TestSetTheSettingsOfTheService(t *testing.T) {
 	}
 	defer client.Close()
 
-	if err := client.SetBlueLightShield(BlueLightLow); err != nil {
-		t.Fatal(err)
-	}
 	if err := client.SetUSBChargeLimit(10); err != nil {
 		t.Fatal(err)
 	}
@@ -308,8 +281,8 @@ func TestSetTheSettingsOfTheService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(server.receivedRequests()) != 5 {
-		t.Errorf("the service received %d requests, want five", len(server.receivedRequests()))
+	if len(server.receivedRequests()) != 4 {
+		t.Errorf("the service received %d requests, want four", len(server.receivedRequests()))
 	}
 }
 

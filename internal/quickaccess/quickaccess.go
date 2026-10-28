@@ -1,8 +1,11 @@
 // Package quickaccess talks to the Acer Quick Access service.
 //
-// The service is part of the original PredatorSense stack. It offers the
+// The service is part of the original PredatorSense stack. It owns the
 // settings that do not belong to the gaming hardware provider, such as the
-// blue light shield and the charging over USB.
+// charging over USB.
+//
+// 这个包是原厂软件 Quick Access 服务的客户端，管的是那些不属于游戏硬件的
+// 设置，比如 USB 充电。
 //
 // The service listens on a local port and speaks the WebSocket protocol
 // over TLS. The first packet of a session is an authentication packet whose

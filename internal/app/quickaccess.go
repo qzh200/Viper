@@ -1,4 +1,4 @@
-// 原厂 Quick Access 服务管的那几项设置：蓝光灯、USB 充电、显示模式等。
+// 原厂 Quick Access 服务管的那几项设置：USB 充电、显示模式等。
 package app
 
 import (
@@ -14,10 +14,6 @@ import (
 // a stand for the service, so that the behaviour can be checked without
 // the service of the original software.
 type QuickAccess interface {
-	// BlueLightShield reads the level of the blue light shield.
-	BlueLightShield() (quickaccess.BlueLight, error)
-	// SetBlueLightShield selects a level of the blue light shield.
-	SetBlueLightShield(level quickaccess.BlueLight) error
 	// USBChargeLimit reads the charging limit in percent.
 	USBChargeLimit() (int, error)
 	// SetUSBChargeLimit sets the charging limit in percent.
@@ -52,36 +48,6 @@ type QuickAccess interface {
 	SetScreenSaverTimeout(seconds int) error
 	// Close ends the session.
 	Close() error
-}
-
-// BlueLightShield reads the level of the blue light shield.
-//
-// The setting belongs to the Quick Access service of the original stack,
-// it is not part of the gaming hardware provider.
-func (a *App) BlueLightShield() (quickaccess.BlueLight, error) {
-	client, release, err := a.quick()
-	if err != nil {
-		return quickaccess.BlueLightDisabled, err
-	}
-	defer release()
-	level, err := client.BlueLightShield()
-	if err != nil {
-		return quickaccess.BlueLightDisabled, fmt.Errorf("app: 读取蓝光屏蔽失败: %w", err)
-	}
-	return level, nil
-}
-
-// SetBlueLightShield selects a level of the blue light shield.
-func (a *App) SetBlueLightShield(level quickaccess.BlueLight) error {
-	client, release, err := a.quick()
-	if err != nil {
-		return err
-	}
-	defer release()
-	if err := client.SetBlueLightShield(level); err != nil {
-		return fmt.Errorf("app: 设置蓝光屏蔽失败: %w", err)
-	}
-	return nil
 }
 
 // USBChargeLimit reads the charging limit in percent.
@@ -328,9 +294,8 @@ func (a *App) SetScreenSaverTimeout(seconds int) error {
 // stack.
 //
 // The service owns the settings that do not belong to the gaming
-// hardware, such as the blue light shield and the charging over USB. It
-// is not needed for the other settings, so the session is only opened
-// when one of them is used.
+// hardware, such as the charging over USB. It is not needed for the other
+// settings, so the session is only opened when one of them is used.
 //
 // 注入给程序的会话属于注入的人，程序不会关掉它。程序自己开的会话每次
 // 调用都用完就关，因为关掉的会话不能再用第二次。

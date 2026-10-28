@@ -20,7 +20,7 @@
 | :--- | :--- | :--- |
 | `USBCharge` | `{"Value":30,"Text":…}` | `USBChargeLimit` / `SetUSBChargeLimit`（10、20、30） |
 | `USBChargeSwitch` | `{"Value":true}` | `USBChargeEnabled` / `SetUSBChargeEnabled` |
-| `BluelightShield` | `{"Value":5,"Text":…}` | `BlueLightShield` / `SetBlueLightShield`（0–4） |
+Value:5,Text:…}` | `BlueLightShield` / `SetBlueLightShield`（0–4） |"Value":5,"Text":…}` | `BlueLightShield` / `SetBlueLightShield`（0–4） |
 | `DisplayModeSwitch` | `{"Value":2,"Description":…}` | `DisplayMode` / `SetDisplayMode`（1、2、3） |
 | `DarkMode` | `{"Value":false,"Text":…}` | `DarkMode` / `SetDarkMode` |
 | `TransparentEffect` | `{"Value":1,"Text":…}`（数字） | `TransparentEffect` / `SetTransparentEffect` |

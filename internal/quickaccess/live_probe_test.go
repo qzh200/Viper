@@ -35,7 +35,6 @@ func TestLiveProbeOfTheCommands(t *testing.T) {
 		"ScreenSaverTimeout",
 		"HighlightFeature",
 		"HDR",
-		"BluelightShield",
 		"DisplayModeSwitch",
 	}
 
@@ -100,11 +99,6 @@ func TestLiveProbeOfTheMethods(t *testing.T) {
 		t.Errorf("USB 充电阈值读取失败: %v", err)
 	} else {
 		t.Logf("USBChargeLimit      = %v", value)
-	}
-	if value, err := client.BlueLightShield(); err != nil {
-		t.Errorf("蓝光灯读取失败: %v", err)
-	} else {
-		t.Logf("BlueLightShield     = %v", value)
 	}
 }
 

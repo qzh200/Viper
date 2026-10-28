@@ -17,13 +17,13 @@
 | `power.go` | 性能档位：读、写、这台机器有哪几个 |
 | `switches.go` | 开关类：屏幕超频、Windows 键、开机音效、显卡模式 |
 | `scenarios.go` | 场景：把灯效与风扇打包，绑到性能档位上 |
-| `quickaccess.go` | 原厂 Quick Access 服务管的那几项：蓝光灯、USB 充电、显示模式等 |
+| `quickaccess.go` | 原厂 Quick Access 服务管的那几项：USB 充电、显示模式等 |
 
 ## 两条依赖
 
 ```
 hardware.Gaming   机器的能力（灯光、风扇、档位、传感器、开关）
-QuickAccess       原厂 Quick Access 服务的能力（蓝光灯、USB 充电……）
+QuickAccess       原厂 Quick Access 服务的能力（USB 充电……）
 ```
 
 两个都是接口，所以用例可以放替身进去，测试不用碰真的机器。

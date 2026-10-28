@@ -43,7 +43,7 @@ func TestAnswersCommand(t *testing.T) {
 		want   bool
 	}{
 		{map[string]any{"PacketType": float64(3), "Command": "USBCharge"}, true},
-		{map[string]any{"PacketType": float64(3), "Command": "BluelightShield"}, false},
+		{map[string]any{"PacketType": float64(3), "Command": "DisplayModeSwitch"}, false},
 		{map[string]any{"PacketType": float64(2), "Command": "USBCharge"}, false},
 	}
 	for _, c := range cases {
@@ -89,22 +89,6 @@ func TestResultOfIgnoresNotifications(t *testing.T) {
 	}
 	if _, ok, _ := resultOf(answer, "USBCharge"); ok {
 		t.Error("a notification was taken for an answer")
-	}
-}
-
-func TestBlueLightNames(t *testing.T) {
-	cases := map[BlueLight]string{
-		BlueLightDisabled:   "disabled",
-		BlueLightLow:        "low",
-		BlueLightMedium:     "medium",
-		BlueLightHigh:       "high",
-		BlueLightLongHour:   "long hour",
-		BlueLightCustomised: "customised",
-	}
-	for level, want := range cases {
-		if got := level.String(); got != want {
-			t.Errorf("level %d renders as %q, want %q", level, got, want)
-		}
 	}
 }
 
