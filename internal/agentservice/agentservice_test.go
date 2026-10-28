@@ -12,41 +12,32 @@ import (
 	"time"
 )
 
-// request is a request that the fake service received.
 type request struct {
-	// Packet is the identifier of the packet.
 	Packet uint32
-	// Function is the name of the setting.
+
 	Function string
-	// Parameter is the value that was written.
+
 	Parameter any
-	// Raw is the payload of the request as it came in.
+
 	Raw map[string]any
 }
 
-// fake is a service that answers the requests of a test.
-//
-// The answers are given per function, a function that has no answer is
-// answered with the failure of the service.
 type fake struct {
 	listener net.Listener
 
 	mutex sync.Mutex
-	// answers maps a function to the answer it gets. The key of the
-	// monitor data and of the devices is the name of the packet.
+
 	answers map[string]map[string]any
-	// received holds the requests that arrived, in order.
+
 	received []request
-	// breakAfter closes the connection after this many requests. A value
-	// of zero keeps the connection open.
+
 	breakAfter int
-	// requests counts the requests that arrived.
+
 	requests int
-	// conns holds the connections that are open.
+
 	conns []net.Conn
 }
 
-// stop closes the service and the connections it holds.
 func (f *fake) stop() {
 	f.mutex.Lock()
 	conns := make([]net.Conn, len(f.conns))
@@ -72,10 +63,8 @@ func newFake(t *testing.T, answers map[string]map[string]any) *fake {
 	return f
 }
 
-// address is the address of the fake service.
 func (f *fake) address() string { return f.listener.Addr().String() }
 
-// serve answers the requests that arrive.
 func (f *fake) serve() {
 	for {
 		conn, err := f.listener.Accept()
@@ -86,7 +75,6 @@ func (f *fake) serve() {
 	}
 }
 
-// handle answers the requests of one connection.
 func (f *fake) handle(conn net.Conn) {
 	defer conn.Close()
 
@@ -115,7 +103,6 @@ func (f *fake) handle(conn net.Conn) {
 	}
 }
 
-// answerFor builds the answer of a request.
 func (f *fake) answerFor(received request) map[string]any {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -131,7 +118,6 @@ func (f *fake) answerFor(received request) map[string]any {
 	return answer
 }
 
-// requests returns the requests that arrived.
 func (f *fake) requests_() []request {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -141,7 +127,6 @@ func (f *fake) requests_() []request {
 	return out
 }
 
-// readFrame reads one request of a connection.
 func readFrame(conn net.Conn) (request, error) {
 	header := make([]byte, 8)
 	if _, err := readFull(conn, header); err != nil {
@@ -174,7 +159,6 @@ func readFrame(conn net.Conn) (request, error) {
 	return out, nil
 }
 
-// readFull reads a fixed number of bytes.
 func readFull(conn net.Conn, buffer []byte) (int, error) {
 	read := 0
 	for read < len(buffer) {
@@ -187,7 +171,6 @@ func readFull(conn net.Conn, buffer []byte) (int, error) {
 	return read, nil
 }
 
-// readJSON reads one JSON document of a stream.
 func readJSON(conn net.Conn) ([]byte, error) {
 	var out []byte
 	depth := 0
@@ -214,7 +197,6 @@ func readJSON(conn net.Conn) ([]byte, error) {
 	}
 }
 
-// writeAnswer writes the answer of a request.
 func writeAnswer(conn net.Conn, answer map[string]any) error {
 	body, err := json.Marshal(answer)
 	if err != nil {
@@ -224,7 +206,6 @@ func writeAnswer(conn net.Conn, answer map[string]any) error {
 	return err
 }
 
-// stringOf reads a string of a value.
 func stringOf(value any) string {
 	text, _ := value.(string)
 	return text
@@ -408,8 +389,7 @@ func TestBrokenConnectionIsOpenedAgain(t *testing.T) {
 	if _, err := client.Get(FunctionOperatingMode); err != nil {
 		t.Fatalf("第一次读取失败: %v", err)
 	}
-	// The service closes the connection after the first request, the client
-	// has to open a new one for the second.
+
 	if _, err := client.Get(FunctionOperatingMode); err != nil {
 		t.Fatalf("第二次读取失败: %v", err)
 	}
@@ -520,7 +500,7 @@ func TestCloseReleasesTheConnection(t *testing.T) {
 	if err := client.Close(); err != nil {
 		t.Fatalf("关闭失败: %v", err)
 	}
-	// Closing twice is not an error.
+
 	if err := client.Close(); err != nil {
 		t.Fatalf("第二次关闭失败: %v", err)
 	}
@@ -678,8 +658,6 @@ func TestAServiceThatGoesAway(t *testing.T) {
 		t.Fatalf("第一次读取失败: %v", err)
 	}
 
-	// The service goes away, the client has to report it instead of
-	// pretending that the answer is fine.
 	service.stop()
 
 	if _, err := client.Get(FunctionOperatingMode); err == nil {

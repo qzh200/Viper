@@ -1,69 +1,73 @@
-# internal/hardware
+# hardware
 
-机器的**词汇表**，以及跟原厂程序无关的两样东西。
+`hardware` 定义了 Viper 项目中与硬件交互相关的核心接口、领域数据结构，并提供了直接调用操作系统 Win32 API 与系统固件表（SMBIOS）的底层能力。
 
+## 模块构成
+
+### 1. 硬件抽象接口定义 (`gaming.go`)
+
+- **`Gaming`**：组合了所有硬件控制接口的顶级接口契约。
+- **细粒度子接口**：
+  - `PowerModeReader`：读取与切换电源模式。
+  - `GraphicsModeReader`：读取显卡直连模式与探测超频支持。
+  - `LightingReader` / `LightingConfig` / `LightingWriter` / `LightingReset`：键盘背光亮度、灯效模式及 4 分区 RGB 设置。
+  - `FansReader` / `FansWriter` / `CoolBoostReader`：风扇转速、运转模式与强冷加速。
+  - `SwitchesReader`：Win 键锁定、屏幕响应时间超速与开机启动声音。
+  - `ReadingsReader`：设备标识与基础传感器数据读取。
+
+### 2. 领域数据模型 (`model.go`, `monitor.go`)
+
+- **枚举类型**：
+  - `FanMode`：`FanAuto`（自动）、`FanMax`（全速）、`FanCustom`（自定义）。
+  - `PowerMode`：`PowerQuiet`（静音）、`PowerBalanced`（平衡）、`PowerPerformance`（高性能）、`PowerTurbo`（极速）、`PowerEco`（节能）。
+  - `GPUMode`：`GPUModeHybrid`（混合）、`GPUModeDiscrete`（独显直连）、`GPUModeAuto`（自动切换）。
+  - `LightingEffect`：静态常亮、呼吸、霓虹、波浪、切换、缩放、流星、闪烁。
+- **结构体**：
+  - `RGBColor` 与 `RGBConfig`：4 分区 RGB 颜色及动画控制。
+  - `FanState` 与 `FanConfig`：风扇状态与目标下发配置。
+  - `MonitorData`：汇集整机 CPU、GPU、内存、温度及网络实时遥测指标。
+
+### 3. 电源与电池状态 (`power_status.go`, `power_status_type.go`)
+
+直接通过 Windows Win32 API `kernel32.dll` 中的 `GetSystemPowerStatus` 读取：
+- 是否连接交流电源适配器 (`OnAC`)。
+- 是否处于电池供电 (`OnBattery`)。
+- 电池剩余百分比 (`BatteryPercent`) 与充电中标记 (`Charging`)。
+- **特点**：无需依赖宏碁原厂服务，无需管理员提权即可直接读取。
+
+### 4. 固件身份与 SMBIOS 结构解析 (`smbios.go`)
+
+通过 Windows Win32 API `GetSystemFirmwareTable` 获取底层 SMBIOS（`RSMB`）原始固件表数据：
+- 解析 Type 1 结构（System Information），提取制造商（Manufacturer）、型号（Product）、家族（Family）、版本及序列号。
+- 提供 `IsPredatorModel` 与 `IsPredator` 判断当前机器是否为宏碁掠夺者（Predator）系列。
+- 支持枚举所有的 SMBIOS 结构单元（Type 4 处理器信息、Type 17 内存插槽信息等）。
+
+### 5. Windows 辅助功能接口 (`windows.go`)
+
+通过 Win32 API `SystemParametersInfoW` 及注册表（`HKCU\Control Panel\Accessibility\StickyKeys`）读取并配置系统粘滞键开关。
+
+## 使用示例
+
+```go
+package main
+
+import (
+	"fmt"
+	"viper/internal/hardware"
+)
+
+func main() {
+	// 查询电源适配器与电池状态（免提权、免原厂服务）
+	power, err := hardware.SystemPowerStatus()
+	if err == nil {
+		fmt.Printf("供电状态: %s (电量 %d%%)\n", power, power.BatteryPercent)
+	}
+
+	// 读取 SMBIOS 机器型号
+	info, err := hardware.SystemInfo()
+	if err == nil {
+		fmt.Printf("机器型号: %s (%s)\n", info.Product, info.Family)
+		fmt.Printf("是否属于掠夺者系列: %v\n", hardware.IsPredator())
+	}
+}
 ```
-model.go       性能档位、灯效、显卡模式、风扇、传感器的类型与编号
-gaming.go      硬件层的能力接口（应用层依赖的形状）
-smbios.go      机器身份（SMBIOS 的 RSMB 表）
-power_status.go 电源与电池（Windows 的内核接口）
-windows.go     粘滞键（SystemParametersInfo 与注册表）
-```
-
-## 它现在管什么
-
-**原厂程序是主要调用依赖**：灯光、灯效、风扇、性能档位、显卡模式、传感器
-读数、开关类设置，全都问原厂服务（见 `internal/machine`）。这一层是那些
-设置的**词汇**：编号、名字与形状。
-
-编号只有一套，原厂服务与固件用的是同一套：
-
-| 设置 | 编号 |
-| :--- | :--- |
-| 性能档位 | `0` 静音、`1` 均衡、`4` 性能、`5` 加速、`6` 节能 |
-| 风扇行为 | `1` 自动、`2` 全速、`3` 固定占空比 |
-| 灯效 | `0` 静态、`1` 呼吸、`2` 霓虹、`3` 波形、`4` 切换、`5` 缩放、`6` 流星雨、`7` 闪烁 |
-| 显卡模式 | `1` 混合、`2` 仅独显、`3` 自动 |
-
-写错一个编号，机器就会理解成另一个意思，所以这些编号有用例守着。
-
-## 读数（MonitorData）
-
-原厂服务的监视数据里有什么，这一层就记什么：处理器的温度、使用率、频率与每核
-频率，显卡的温度、使用率与频率，内存的占用与频率，网络的上下行。
-
-单位：温度是度，占用是百分比，频率是 MHz，内存总量是 MB，都核对过。**网络是
-kbps**（官方软件用的就是这个单位）：实测下载时网卡走 17.9 KB/s = 143 kbps，
-服务报 121.5，对得上。
-
-## 身份、电源与粘滞键
-
-这三样跟原厂程序无关，也不是"机器的功能"，是这台机器自己的情况：
-
-* **身份**：SMBIOS 的 `RSMB` 表，经内核的 `GetSystemFirmwareTable` 读，
-  不用管理员权限。型号与产品族决定这台机器有没有加速档、是不是 Predator。
-* **电源与电池**：Windows 的内核接口（`CallNtPowerInformation`）。
-* **粘滞键**：`SystemParametersInfo` 与注册表
-  `Control Panel\Accessibility\StickyKeys`。
-
-## 不在这一层的东西
-
-* **直接操控固件（ACPI/WMI）**：整条路线删掉了。那些设置原厂程序都包了，而且
-  读得更全（分区颜色、每核频率、显卡使用率、网络速率）。
-* **风扇表与背光原始缓冲区**：只有固件那一侧报，原厂程序不报，所以这两项
-  没有了。
-* **锁 Windows 键**：原厂服务收下请求却不生效（写 0 写 1 读回来一直是一个），
-  固件那一侧是个常量通道，所以这一项在这台机器上做不到。
-* **超频能力**：原厂服务自己也不实现（结果码 3），所以硬件层报成不支持。
-
-## 测试
-
-```powershell
-go test ./internal/hardware/...
-```
-
-用例锁的是编号与名字：档位的五个编号、灯效的八个编号、显卡模式的三个编号、
-风扇行为的三个编号，以及名字与命令行写法的对应关系。
-
-读这台机器自己的用例（身份、电源、粘滞键）只读不写，读不到就跳过。改
-粘滞键的用例要环境变量 `VIPER_LIVE_MACHINE=1` 才跑，它会改回原来的样子。

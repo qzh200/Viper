@@ -1,61 +1,79 @@
-# internal/quickaccess
+# quickaccess
 
-原厂 Quick Access 服务（`AcerQAAgent.exe`，服务名 `AcerQAAgentSvis`）的
-客户端。它监听 `127.0.0.1:5141`，用 TLS 承载 WebSocket。
+`quickaccess` 实现了与宏碁 `Acer QuickAccess` 系统服务的安全加密通信客户端，用于管理显示模式、关机充电及 Windows 桌面外观等扩展功能。
 
+## 通信协议与握手流程
+
+QuickAccess 服务监听本地端口，通信包含 TLS、WebSocket 升级与 AES 握手三层协议体系：
+
+1. **TLS 加密传输**：
+   - 默认端口：`127.0.0.1:5141`
+   - 使用 TLS 建立安全传输层连接（由于原厂采用自签名证书，客户端跳过证书校验）。
+2. **WebSocket 协议升级**：
+   - 发送标准 HTTP `GET /` 升级握手请求（带 `Upgrade: websocket` 与随机 `Sec-WebSocket-Key`）。
+   - 服务端返回 `101 Switching Protocols` 完成握手。
+3. **AES 鉴权认证握手**：
+   - 客户端采用固定的 AES 密钥（`A6052DC8A6E44210`）对特定握手提问字符串（`"AcerQuickAccessFunctionalityTests_HandshakingQuestion"`）进行 AES-ECB/PKCS7 算法加密。
+   - 将加密后的 Base64 字符串封装入类型为 `PacketType = 1`（`AuthKey`）的认证包发送，服务端确认后鉴权通过。
+4. **WebSocket 帧通信**：
+   - 数据交互通过标准 WebSocket 文本与二进制帧进行，内置 Ping/Pong 链路保活机制。
+
+## 报文与指令格式
+
+请求结构序列化为 JSON：
+```json
+{
+  "PacketType": 2,
+  "Version": 1,
+  "Session": "<UUID>",
+  "Command": "<CommandName>",
+  "Action": "Get" | "Set",
+  "Param1": <Value>
+}
 ```
-握手： 先做 WebSocket 升级，再发 AuthPacket（PacketType = 1），
-      负载是 AES-128-ECB 加密的 {"Question":…,"Key":…}
-请求： {"PacketType":2,"Version":1,"Session":…,"Command":…,"Action":"Get"|"Set","Param1":…}
-应答： {"PacketType":3,"Command":…,"Action":…,"Result":{"Value":…,"Text":…}}
-```
 
-两把密钥与挑战串在原厂应用里是硬编码的，本包按同样的方式实现。
+## 支持的控制功能
 
-## 本机支持的命令
-
-下表的「服务答话」一列是**本机实测**的应答形状，方法按这个形状来解析：
-
-| 命令 | 服务答话 | 方法 |
+| 功能命令 | 读写操作 | 说明 |
 | :--- | :--- | :--- |
-| `USBCharge` | `{"Value":30,"Text":…}` | `USBChargeLimit` / `SetUSBChargeLimit`（10、20、30） |
-| `USBChargeSwitch` | `{"Value":true}` | `USBChargeEnabled` / `SetUSBChargeEnabled` |
-Value:5,Text:…}` | `BlueLightShield` / `SetBlueLightShield`（0–4） |"Value":5,"Text":…}` | `BlueLightShield` / `SetBlueLightShield`（0–4） |
-| `DisplayModeSwitch` | `{"Value":2,"Description":…}` | `DisplayMode` / `SetDisplayMode`（1、2、3） |
-| `DarkMode` | `{"Value":false,"Text":…}` | `DarkMode` / `SetDarkMode` |
-| `TransparentEffect` | `{"Value":1,"Text":…}`（数字） | `TransparentEffect` / `SetTransparentEffect` |
-| `AutoHideTaskbar` | `{"Value":0,"Text":…}`（数字） | `AutoHideTaskbar` / `SetAutoHideTaskbar` |
-| `ScreenSaver` | `{"Value":false,"Text":…}`（开关） | `ScreenSaver` / `SetScreenSaver` |
-| `ScreenSaverTimeout` | `{"Value":0,"Text":…}`（秒） | `ScreenSaverTimeout` / `SetScreenSaverTimeout` |
+| `USBCharge` | Get / Set | 关机 USB 供电截止电量百分比（限制为 10%, 20%, 30%） |
+| `USBChargeSwitch` | Get / Set | 关机状态下 USB 端口对外供电开关 |
+| `DisplayModeSwitch` | Get / Set | 显卡输出模式（1: Hybrid 混合, 2: Discrete 独显直连, 3: Auto 自动切换） |
+| `DarkMode` | Get / Set | Windows 浅色/深色主题模式 |
+| `TransparentEffect` | Get / Set | 系统窗口背景透明与亚克力视觉特效 |
+| `AutoHideTaskbar` | Get / Set | 任务栏自动隐藏开关 |
+| `ScreenSaver` | Get / Set | 屏幕保护程序启用开关 |
+| `ScreenSaverTimeout` | Get / Set | 屏幕保护程序激活前的空闲等待秒数 |
 
-透明效果与任务栏自动隐藏，服务报的是数字（1 开、0 关），所以写回去的也是
-数字；屏保服务报的是开关，写回去的也是开关。`switchValue` 两种形状都能读。
+## 使用示例
 
-本机服务认识的另外两个命令没有做：
+```go
+package main
 
-* `SystemUsageOSD` —— 服务**不回答**这个命令（实测会等到超时）。
-* `HDR` —— 服务答得上（`{"Value":false,"Description":…}`），但原厂应用
-  没有用它，先不做。
+import (
+	"fmt"
+	"viper/internal/quickaccess"
+)
 
-## 等待的规矩
+func main() {
+	client, err := quickaccess.Connect(quickaccess.Options{})
+	if err != nil {
+		panic(err)
+	}
+	defer client.Close()
 
-服务不认识的命令**根本不回答**。所以每一次读取与写入都有期限，期限到了就
-报错，不会把调用方永远挂在那里（`client.deadline()`）。服务还会夹带自己
-的通知，读取时会跳过通知，直到属于这个命令的应答出现。
+	// 查询显卡显示模式
+	mode, err := client.DisplayMode()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("当前显示模式:", mode)
 
-## 测试
-
-```powershell
-go test ./internal/quickaccess/...
-```
-
-`server_test.go` 里的替身服务说同一套协议，所以整个会话（握手、命令、
-应答）都能在没有原厂服务的情况下跑完。
-
-`live_probe_test.go` 连的是本机真正在跑的原厂服务，**只读**。它平时跳过，
-设了环境变量 `VIPER_LIVE_QUICKACCESS=1` 才会跑，用来核对命令名与应答形状：
-
-```powershell
-$env:VIPER_LIVE_QUICKACCESS = 1
-go test ./internal/quickaccess/ -run TestLiveProbe -v
+	// 查询关机充电阈值
+	limit, err := client.USBChargeLimit()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("关机充电截止电量: %d%%\n", limit)
+}
 ```

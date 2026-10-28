@@ -4,10 +4,6 @@ import (
 	"testing"
 )
 
-// The client talks to the service of the original stack. The tests below
-// drive a whole session against a stand for the service, so that the
-// handshake, the commands and the answers are all checked.
-
 func TestConnectToTheService(t *testing.T) {
 	server := newTestServer(t)
 
@@ -19,7 +15,7 @@ func TestConnectToTheService(t *testing.T) {
 }
 
 func TestConnectToAServiceThatIsNotThere(t *testing.T) {
-	// The service of the vendor is not running on every machine.
+
 	_, err := Connect(Options{Address: "127.0.0.1:1"})
 	if err == nil {
 		t.Error("the connection to a service that is not there was accepted")
@@ -227,8 +223,7 @@ func TestTheDisplayMode(t *testing.T) {
 }
 
 func TestTheSettingsOfTheService(t *testing.T) {
-	// The service is asked for every setting, so that the whole surface
-	// of the client is covered.
+
 	server := newTestServer(t)
 	server.answer(CommandUSBCharge, 10)
 	server.answer(CommandUSBChargeSwitch, true)
@@ -295,8 +290,6 @@ func TestSetTheChargingLimitOfAValueThatIsNotThere(t *testing.T) {
 	}
 	defer client.Close()
 
-	// The limit is refused before the service is asked, so the request
-	// never leaves the program.
 	if err := client.SetUSBChargeLimit(15); err == nil {
 		t.Error("a limit that the service does not offer was accepted")
 	}
@@ -314,8 +307,6 @@ func TestTheAnswerOfACommandThatTheServiceDoesNotKnow(t *testing.T) {
 	}
 	defer client.Close()
 
-	// The service answers with nothing, the caller has to notice that
-	// there is no number.
 	if _, err := client.USBChargeLimit(); err == nil {
 		t.Error("an answer without a number was taken for one")
 	}
@@ -327,8 +318,7 @@ func TestTheSessionOfAServiceThatClosesIt(t *testing.T) {
 
 	client, err := Connect(Options{Address: server.address()})
 	if err != nil {
-		// The service may close the session before the authentication is
-		// answered, that is a refusal of the session.
+
 		return
 	}
 	defer client.Close()

@@ -8,19 +8,7 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// The settings of this file belong to the Quick Access service of the
-// original software. They are not part of the gaming hardware provider,
-// so they need the service of the original stack to be running.
-//
-// 这几个设置属于原厂软件的 Quick Access 服务，不属于游戏硬件的固件接口，
-// 所以它们需要原厂服务在跑。
-
-// runDisplayMode shows or changes the way the machine drives the graphics
-// chip.
-//
-// The setting is the one of the Quick Access service. The hardware
-// provider has a second way to the same switch, that one is the command
-// "viper gpu".
+// runDisplayMode 处理显卡显示输出模式的查询与切换。
 func runDisplayMode(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -52,7 +40,7 @@ func runDisplayMode(args []string) error {
 	return nil
 }
 
-// runDarkMode shows or changes the dark mode of the system.
+// runDarkMode 处理系统深色主题模式的查询与切换。
 func runDarkMode(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -80,7 +68,7 @@ func runDarkMode(args []string) error {
 	return nil
 }
 
-// runTransparent shows or changes the transparency of the windows.
+// runTransparent 处理系统窗口透明度视觉效果的查询与开关。
 func runTransparent(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -108,9 +96,7 @@ func runTransparent(args []string) error {
 	return nil
 }
 
-// runTaskbar shows or changes the automatic hiding of the taskbar.
-//
-// The setting is switched on when the taskbar hides itself.
+// runTaskbar 处理任务栏自动隐藏设置的查询与开关。
 func runTaskbar(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -138,10 +124,7 @@ func runTaskbar(args []string) error {
 	return nil
 }
 
-// runScreenSaver shows or changes the screen saver.
-//
-// The second form sets the idle time in seconds before the screen saver
-// starts.
+// runScreenSaver 处理屏幕保护程序的开关与超时等待秒数设置。
 func runScreenSaver(args []string) error {
 	application, err := newApp()
 	if err != nil {

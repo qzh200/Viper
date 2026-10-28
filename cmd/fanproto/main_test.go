@@ -10,12 +10,11 @@ import (
 	"viper/internal/probe"
 )
 
-// fakeService is a stand for the service of the original software.
 type fakeService struct {
 	answers map[string]json.RawMessage
 	written []string
 	fail    error
-	// monitorFails makes the monitor data fail.
+
 	monitorFails bool
 }
 
@@ -53,7 +52,6 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 	return agentservice.Answer{Data: s.answers["monitor"], Result: "0"}, nil
 }
 
-// capture runs the tool with the output captured.
 func capture(t *testing.T, fn func()) string {
 	t.Helper()
 
@@ -66,7 +64,6 @@ func capture(t *testing.T, fn func()) string {
 	return buffer.String()
 }
 
-// TestProbeFans writes the fans and shows them before and after.
 func TestProbeFans(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl,
@@ -93,7 +90,6 @@ func TestProbeFans(t *testing.T) {
 	}
 }
 
-// TestShowOfAServiceThatIsNotThere covers the read that fails.
 func TestShowOfAServiceThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 	service.fail = errNotThere{}
@@ -104,7 +100,6 @@ func TestShowOfAServiceThatIsNotThere(t *testing.T) {
 	}
 }
 
-// TestShowWithoutMonitorData covers the monitor data that does not come.
 func TestShowWithoutMonitorData(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl, `{"mode":0,"custom_fan_data":[]}`)
@@ -116,12 +111,10 @@ func TestShowWithoutMonitorData(t *testing.T) {
 	}
 }
 
-// errNotThere is the error of a service that is not there.
 type errNotThere struct{}
 
 func (errNotThere) Error() string { return "服务不可达" }
 
-// contains reports whether the text holds the name.
 func contains(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {

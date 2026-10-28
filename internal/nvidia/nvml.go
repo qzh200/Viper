@@ -1,15 +1,6 @@
 //go:build windows
 
-// Package nvidia reads the telemetry of the graphics card from the
-// driver of the vendor.
-//
-// The driver offers two sets of calls. The interface of the driver itself
-// exports only a single function and hides everything else behind a table
-// of numbers, the management library exports the calls by name and is much
-// easier to use. Viper takes the management library.
-//
-// The library belongs to the driver, so it is loaded when it is needed and
-// a machine without an NVIDIA card simply has no telemetry.
+// Package nvidia 提供基于 NVIDIA NVML (nvml.dll) 的显卡遥测数据采集功能。
 package nvidia
 
 import (
@@ -19,31 +10,22 @@ import (
 	"unsafe"
 )
 
-// The clock kinds the driver knows.
 const (
-	// clockGraphics is the graphics clock.
 	clockGraphics = 0
-	// clockMemory is the memory clock.
-	clockMemory = 2
+	clockMemory   = 2
 )
 
-// utilization is the load of the card.
 type utilization struct {
 	GPU    uint32
 	Memory uint32
 }
 
-// memory is the memory of the card.
-//
-// The first version of the call carries three numbers, the second one a
-// version field in front of them. Not every driver knows the second one.
 type memory struct {
 	Total uint64
 	Free  uint64
 	Used  uint64
 }
 
-// memoryV2 is the structure of the second version of the call.
 type memoryV2 struct {
 	Version uint64
 	Total   uint64
@@ -51,23 +33,8 @@ type memoryV2 struct {
 	Used    uint64
 }
 
-// entry is an entry point of the management library.
-//
-// The type of the entry point is a function and not a pointer to the
-// procedure of the library, so that a test can put a stand for the
-// driver in place of the real one. A machine without the driver never
-// reaches the code that reads the card, so those branches would otherwise
-// stay untested.
-//
-// The second result tells whether the entry point is there at all. Not
-// every driver exports every entry point, and a missing one has to be
-// told apart from one that failed.
 type entry func(arguments ...uintptr) (result uintptr, present bool)
 
-// library holds the entry points of the management library.
-//
-// The name of the card, the performance state and the version of the
-// driver are optional, not every driver exports them.
 type library struct {
 	handle syscall.Handle
 
@@ -85,10 +52,6 @@ type library struct {
 	systemDriverVersion entry
 }
 
-// wrap turns an entry point of the library into a call.
-//
-// Not every driver exports every entry point, so a missing one answers
-// that it is not there, and the caller leaves the value alone.
 func wrap(dll *syscall.LazyDLL, name string) entry {
 	proc := dll.NewProc(name)
 	return func(arguments ...uintptr) (uintptr, bool) {
@@ -100,10 +63,6 @@ func wrap(dll *syscall.LazyDLL, name string) entry {
 	}
 }
 
-// call runs an entry point of the library.
-//
-// The result is false when the entry point is missing, the caller then
-// leaves the value alone.
 func call(proc entry, arguments ...uintptr) (uintptr, bool) {
 	if proc == nil {
 		return 0, false
@@ -111,46 +70,44 @@ func call(proc entry, arguments ...uintptr) (uintptr, bool) {
 	return proc(arguments...)
 }
 
-// Telemetry is a snapshot of the graphics card.
+// Telemetry 记录单个 NVIDIA GPU 的硬件遥测指标。
 type Telemetry struct {
-	// Name is the name of the card.
+	// Name 显卡型号名称。
 	Name string
-	// UsagePercent is the load of the graphics processor in percent.
+
+	// UsagePercent 核心利用率百分比。
 	UsagePercent int
-	// MemoryUsagePercent is the load of the memory in percent.
+
+	// MemoryUsagePercent 显存控制器利用率百分比。
 	MemoryUsagePercent int
-	// GraphicsClockMHz is the current graphics clock.
+
+	// GraphicsClockMHz 当前核心主频（MHz）。
 	GraphicsClockMHz int
-	// MemoryClockMHz is the current memory clock.
+
+	// MemoryClockMHz 当前显存工作频率（MHz）。
 	MemoryClockMHz int
-	// MaxGraphicsClockMHz is the highest graphics clock the card reaches.
+
+	// MaxGraphicsClockMHz 显卡核心最大加速频率（MHz）。
 	MaxGraphicsClockMHz int
-	// MemoryUsedBytes is the memory in use by the graphics processor.
+
+	// MemoryUsedBytes 已使用的显存大小（字节）。
 	MemoryUsedBytes uint64
-	// MemoryTotalBytes is the memory the card has.
+
+	// MemoryTotalBytes 显存总容量（字节）。
 	MemoryTotalBytes uint64
-	// PState is the performance state of the card. The lower the number,
-	// the faster the card works. It is minus one when the driver does not
-	// report it.
+
+	// PState 性能电源状态等级（P-State）。
 	PState int
-	// Idle reports whether the card is doing nothing.
+
+	// Idle 标识显卡是否处于空闲省电状态。
 	Idle bool
 }
 
-// Idle reports whether the card sits idle.
-//
-// The driver does not always offer the performance state, so the load of
-// the graphics processor is used to tell.
+// IsIdle 判断显卡核心利用率是否为 0。
 func (t Telemetry) IsIdle() bool {
 	return t.UsagePercent == 0
 }
 
-// The state of the library.
-//
-// The service answers every connection in its own goroutine, so the state
-// is shared by all of them. It is guarded by a lock, because a reading
-// that arrives while the library is being opened would otherwise see a
-// half filled table and dereference a nil pointer.
 var (
 	mutex     sync.Mutex
 	loaded    bool
@@ -158,10 +115,6 @@ var (
 	current   *library
 )
 
-// load opens the management library of the driver.
-//
-// The library is opened once and kept open, because opening it again for
-// every reading would slow the dashboard down.
 func load() (*library, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -199,16 +152,13 @@ func load() (*library, error) {
 	return current, nil
 }
 
-// Available reports whether the driver of an NVIDIA card is present.
+// Available 检查系统是否安装并可正常加载 NVML 动态链接库。
 func Available() bool {
 	_, err := load()
 	return err == nil
 }
 
-// Close releases the management library.
-//
-// The library is opened again by the next reading, so that the program
-// survives the driver being installed while it runs.
+// Close 关闭 NVML 库并释放相关资源。
 func Close() {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -223,10 +173,7 @@ func Close() {
 	loaded = false
 }
 
-// Read reads the state of every graphics card of the machine.
-//
-// A machine without an NVIDIA card answers with an empty list, the caller
-// does not have to tell the two cases apart.
+// Read 查询并返回系统上所有 NVIDIA 显卡的遥测快照。
 func Read() ([]Telemetry, error) {
 	lib, err := load()
 	if err != nil {
@@ -259,7 +206,6 @@ func Read() ([]Telemetry, error) {
 	return out, nil
 }
 
-// read reads the state of one card.
 func read(lib *library, handle uintptr) Telemetry {
 	telemetry := Telemetry{PState: -1}
 
@@ -301,8 +247,6 @@ func read(lib *library, handle uintptr) Telemetry {
 		telemetry.MaxGraphicsClockMHz = int(clock)
 	}
 
-	// The driver of this machine knows the first version of the call, the
-	// second one is refused with the code for an unsupported feature.
 	var info memory
 	if result, ok := call(lib.deviceMemory,
 		handle,
@@ -332,7 +276,6 @@ func read(lib *library, handle uintptr) Telemetry {
 	return telemetry
 }
 
-// readName reads the name of a card.
 func readName(lib *library, handle uintptr) (string, bool) {
 	buffer := make([]byte, 96)
 	result, ok := call(lib.deviceName,
@@ -351,7 +294,7 @@ func readName(lib *library, handle uintptr) (string, bool) {
 	return string(buffer), true
 }
 
-// DriverVersion reads the version of the driver.
+// DriverVersion 查询当前安装的 NVIDIA 显卡驱动版本字符串。
 func DriverVersion() (string, error) {
 	lib, err := load()
 	if err != nil {

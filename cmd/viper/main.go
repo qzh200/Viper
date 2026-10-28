@@ -1,9 +1,4 @@
-// Command viper is the Viper control centre for Acer gaming laptops.
-//
-// Every subcommand talks to the services of the original software, so the
-// program does not need the rights of an administrator.
-//
-// 每一条子命令都是通过原厂程序跟机器说话的，程序不需要管理员权限。
+// viper 是 Acer 游戏笔记本（掠夺者 Predator / 暗影骑士 Nitro）的跨平台硬件控制中心命令行客户端。
 package main
 
 import (
@@ -17,18 +12,11 @@ import (
 	"viper/internal/hardware"
 )
 
-// stdout 与 stderr 是程序的输出目标。
-//
-// 用例把它们换成缓冲区，所以用例能看见命令行到底写了什么——命令行这一层
-// 以前没有用例，改坏了不会红。
 var (
 	stdout io.Writer = os.Stdout
 	stderr io.Writer = os.Stderr
 )
 
-// newApp opens the program.
-//
-// 用例把它换成一台假机器上的程序，所以命令行这一层不用真的机器也能测。
 var newApp = app.New
 
 func main() {
@@ -38,14 +26,12 @@ func main() {
 	}
 }
 
-// run dispatches a subcommand.
 func run(args []string) error {
 	if len(args) == 0 {
 		usage()
 		return nil
 	}
 
-	// 全局选项：--service <地址>。
 	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
 		switch args[0] {
 		case "--service":
@@ -55,8 +41,7 @@ func run(args []string) error {
 			app.SetServiceAddress(args[1])
 			args = args[2:]
 		case "--help":
-			// 这个选项也走命令那一层的用法说明。它以 "--" 开头，所以会先落
-			// 到这个循环里——不单独放行的话，它会被当成不认识的选项报出来。
+
 			usage()
 			return nil
 		default:
@@ -112,7 +97,6 @@ func run(args []string) error {
 	}
 }
 
-// usage prints the command overview.
 func usage() {
 	fmt.Fprintln(stdout, `viper - Acer gaming laptop control centre
 
@@ -177,7 +161,6 @@ Lighting options:
 The options that are not mentioned keep the value the machine has now.`)
 }
 
-// runStatus prints a live telemetry snapshot.
 func runStatus() error {
 	application, err := newApp()
 	if err != nil {
@@ -190,12 +173,9 @@ func runStatus() error {
 		return err
 	}
 	fmt.Fprintln(stdout, "instance:", instance)
-	// 走的哪条路要报出来：这一层只有原厂程序这一路。
+
 	fmt.Fprintln(stdout, "route  :", application.Route())
 
-	// The power supply comes from the kernel of Windows, it is shown
-	// first because it is there even when the hardware needs the rights
-	// of an administrator.
 	power, err := application.PowerStatus()
 	if err != nil {
 		return err
@@ -214,11 +194,6 @@ func runStatus() error {
 	return nil
 }
 
-// printTelemetry shows the readings of the machine.
-//
-// 读数是原厂服务报的：处理器的使用率与频率、每核频率、显卡的使用率与频率、
-// 内存的占用与频率、网络的上下行。显卡驱动只补它没报的那几样：显卡的名字、
-// 显存与显存频率。
 func printTelemetry(telemetry app.Telemetry) {
 	monitor := telemetry.Monitor
 
@@ -255,7 +230,6 @@ func printTelemetry(telemetry app.Telemetry) {
 	}
 }
 
-// minOf returns the smallest of the numbers.
 func minOf(values []int) int {
 	smallest := values[0]
 	for _, value := range values {
@@ -266,7 +240,6 @@ func minOf(values []int) int {
 	return smallest
 }
 
-// maxOf returns the largest of the numbers.
 func maxOf(values []int) int {
 	largest := values[0]
 	for _, value := range values {
@@ -277,7 +250,6 @@ func maxOf(values []int) int {
 	return largest
 }
 
-// formatBytes renders a number of bytes in a readable way.
 func formatBytes(value uint64) string {
 	switch {
 	case value >= 1<<30:
@@ -291,10 +263,6 @@ func formatBytes(value uint64) string {
 	}
 }
 
-// runScenario shows or changes the scenes.
-//
-// A scene holds the lighting and the fans, it can be bound to a
-// performance profile so that the profile brings its own look.
 func runScenario(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -367,7 +335,6 @@ func runScenario(args []string) error {
 	}
 }
 
-// listScenarios shows the saved scenes and the bindings.
 func listScenarios(application *app.App) error {
 	scenarios := application.Scenarios()
 	if len(scenarios) == 0 {
@@ -393,9 +360,6 @@ func listScenarios(application *app.App) error {
 	return nil
 }
 
-// runTelemetry shows the state of the machine.
-//
-// 读数是原厂服务报的，显卡驱动补它没报的那几样。
 func runTelemetry() error {
 	application, err := newApp()
 	if err != nil {
@@ -411,10 +375,6 @@ func runTelemetry() error {
 	return nil
 }
 
-// runPowerStatus prints the power supply of the machine.
-//
-// The information comes from the kernel of Windows, so this command works
-// without the rights of an administrator.
 func runPowerStatus() error {
 	application, err := newApp()
 	if err != nil {
@@ -439,7 +399,6 @@ func runPowerStatus() error {
 	return nil
 }
 
-// runFan shows or changes the fan configuration.
 func runFan(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -501,7 +460,6 @@ func runFan(args []string) error {
 	}
 }
 
-// applyFan applies a fan configuration and reports the result.
 func applyFan(application *app.App, config hardware.FanConfig) error {
 	if err := application.SetFans(config); err != nil {
 		return err
@@ -515,8 +473,6 @@ func applyFan(application *app.App, config hardware.FanConfig) error {
 	return nil
 }
 
-// describeFan renders a fan behaviour. The duty cycle is only meaningful
-// in custom mode, in automatic mode the controller runs its own curve.
 func describeFan(mode hardware.FanMode, percent int) string {
 	if mode == hardware.FanCustom {
 		return fmt.Sprintf("%s (%d%%)", mode, percent)
@@ -524,14 +480,6 @@ func describeFan(mode hardware.FanMode, percent int) string {
 	return mode.String()
 }
 
-// describeGPUFan renders the mode of the group of the graphics fan.
-//
-// The original service reports both fan groups, so the number of the
-// the graphics fan is the one Viper wrote last. The flag of the state
-// tells the caller that this is not a reading, the line says so as well.
-//
-// 原厂服务两组风扇都报，所以这里显示的是机器自己的读数；读不到的时候显示的是 Viper
-// 最后一次写入的值，标记为不是从机器读来的。
 func describeGPUFan(state app.FanStatus) string {
 	text := describeFan(state.GPUMode, state.GPUPercent)
 	if !state.GPUModeReadable {
@@ -540,7 +488,6 @@ func describeGPUFan(state app.FanStatus) string {
 	return text
 }
 
-// runPower shows or changes the performance profile.
 func runPower(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -575,7 +522,6 @@ func runPower(args []string) error {
 	return nil
 }
 
-// runLighting shows or changes the keyboard lighting.
 func runLighting(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -610,11 +556,6 @@ func runLighting(args []string) error {
 		return showLighting(application)
 	}
 
-	// 以机器现在的灯效为底，只改命令里点到的那几项。原厂服务在写的时候会把
-	// 没写回去的颜色清掉，所以底子少了会把用户正在用的颜色抹成黑色。
-	//
-	// 机器读不到的时候用 Viper 自己记着的那一份，但那是它自己的记录，不是
-	// 机器现在的样子——写下去仍然是机器的实情。
 	base, err := application.Lighting()
 	if err != nil {
 		base = application.StoredLighting()
@@ -631,10 +572,6 @@ func runLighting(args []string) error {
 	return nil
 }
 
-// showLighting prints the keyboard lighting of the machine.
-//
-// 机器读不到的时候，显示的是 Viper 自己记着的那一份，并且说清楚那是它自己的
-// 记录，不是机器现在的样子——不把旧的值说成机器的样子。
 func showLighting(application *app.App) error {
 	config, err := application.Lighting()
 	if err != nil {
@@ -658,16 +595,6 @@ func showLighting(application *app.App) error {
 	return nil
 }
 
-// parseLightingOptions applies the arguments of "viper lighting set" onto a
-// base configuration.
-//
-// The base is the lighting of the machine as it is now, so that the options
-// that are not mentioned keep their value. The service clears the colours
-// that are not written back, so a command that only changes the brightness
-// must not start from an empty colour.
-//
-// 参数是在底子（机器现在的灯效）上改的，所以没点到的那几项保持原样。原厂服
-// 务会把没写回去的颜色清掉，所以只改亮度的命令不能从一个空的颜色出发。
 func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGBConfig, error) {
 	config := base
 	zoneColours := map[int]hardware.RGBColor{}
@@ -746,9 +673,7 @@ func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGB
 			config.PerZone = true
 			i += 2
 		case "all":
-			// 这一项把已经写好的分区颜色定下来：点过哪个分区，哪个分区就
-			// 用自己的颜色，其余分区沿用底子里的颜色。只要点过一个分区，
-			// 写回去的就是分区设置，不是全局颜色。
+
 			for zone := range config.Zones {
 				if colour, ok := zoneColours[zone+1]; ok {
 					config.Zones[zone] = colour
@@ -766,7 +691,6 @@ func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGB
 	return &config, nil
 }
 
-// parseColor parses a hex colour.
 func parseColor(text string) (hardware.RGBColor, error) {
 	hex := strings.TrimPrefix(strings.TrimSpace(text), "#")
 	if len(hex) != 6 {
@@ -783,7 +707,6 @@ func parseColor(text string) (hardware.RGBColor, error) {
 	}, nil
 }
 
-// runProfile shows or changes the display overdrive and the key lock.
 func runProfile(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -798,8 +721,6 @@ func runProfile(args []string) error {
 		}
 		fmt.Fprintln(stdout, "  LCD overdrive :", onOff(overdrive))
 
-		// 锁 Windows 键原厂服务写不动它（实测它收下请求却不生效），所以这一项
-		// 要管理员权限。读不到就把话说明白，别把整条命令都拖垮。
 		locked, err := application.WinKeyLocked()
 		if err != nil {
 			fmt.Fprintln(stderr, "viper: 读不到 Windows 键的状态（需要管理员权限）:", err)
@@ -860,7 +781,6 @@ func runProfile(args []string) error {
 	}
 }
 
-// runGPU shows or changes the graphics mode of the machine.
 func runGPU(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -888,7 +808,6 @@ func runGPU(args []string) error {
 	return nil
 }
 
-// runCharge shows or changes the charging settings.
 func runCharge(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -942,7 +861,6 @@ func runCharge(args []string) error {
 	}
 }
 
-// runBootSound shows or changes the sound at the start of the machine.
 func runBootSound(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -970,10 +888,6 @@ func runBootSound(args []string) error {
 	return nil
 }
 
-// runDiag reports the capabilities of the machine.
-//
-// 报告是逐项的：读不到的那几项把原因写出来，不要把整份报告拖垮。
-// 把话说明白，不要把整份报告都拖垮。
 func runDiag() error {
 	application, err := newApp()
 	if err != nil {
@@ -1043,7 +957,6 @@ func runDiag() error {
 	sticky, err := application.StickyKeys()
 	report("sticky keys", onOff(sticky), err)
 
-	// 这两项要固件那一侧，也就是要管理员权限。
 	locked, err := application.WinKeyLocked()
 	report("Windows key", onOff(locked), err)
 
@@ -1051,9 +964,6 @@ func runDiag() error {
 	return nil
 }
 
-// report prints one item of the report.
-//
-// 读不到的时候把原因写出来，别把整份报告都拖垮。
 func report(name string, value any, err error) {
 	if err != nil {
 		fmt.Fprintf(stdout, "  %-16s: 读不到（%v）\n", name, err)
@@ -1062,7 +972,6 @@ func report(name string, value any, err error) {
 	fmt.Fprintf(stdout, "  %-16s: %v\n", name, value)
 }
 
-// parseOnOff parses an on or off argument.
 func parseOnOff(value string) (bool, error) {
 	switch strings.ToLower(value) {
 	case "on", "true", "1", "yes", "enable":
@@ -1074,7 +983,6 @@ func parseOnOff(value string) (bool, error) {
 	}
 }
 
-// onOff renders a boolean for display.
 func onOff(value bool) string {
 	if value {
 		return "on"

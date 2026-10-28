@@ -4,10 +4,6 @@ import (
 	"testing"
 )
 
-// 这一层现在是机器的词汇表：性能档位、灯效、显卡模式、风扇与传感器的类型。
-// 这些用例守着它们的编号与名字——原厂服务与固件用的是同一套编号，编错一个
-// 数字，机器就会理解成另一个意思。
-
 func TestTheNamesOfTheFanModes(t *testing.T) {
 	cases := map[FanMode]string{
 		FanAuto:     "auto",
@@ -39,7 +35,7 @@ func TestTheNamesOfThePerformanceProfiles(t *testing.T) {
 }
 
 func TestTheNumbersOfThePerformanceProfiles(t *testing.T) {
-	// 原厂服务与固件用的是同一套编号：0 静音、1 均衡、4 性能、5 加速、6 节能。
+
 	cases := map[PowerMode]uint64{
 		PowerQuiet:       0,
 		PowerBalanced:    1,
@@ -56,7 +52,6 @@ func TestTheNumbersOfThePerformanceProfiles(t *testing.T) {
 		}
 	}
 
-	// 不认识的编号只能解成"不知道"。
 	if got := DecodePowerMode(2); got != PowerUnknown {
 		t.Errorf("编号 2 解出来是 %v，不是不知道", got)
 	}
@@ -64,7 +59,6 @@ func TestTheNumbersOfThePerformanceProfiles(t *testing.T) {
 		t.Errorf("编号 99 解出来是 %v，不是不知道", got)
 	}
 
-	// 不认识的档位按均衡写。
 	if got := PowerModeCode(PowerUnknown); got != 1 {
 		t.Errorf("不知道的档位写成 %d，不是 1", got)
 	}

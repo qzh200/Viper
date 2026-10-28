@@ -1,49 +1,63 @@
-# internal/probe
+# probe
 
-那几个取证工具用到的**协议知识**。
+`probe` 提供了针对底层原厂服务（`AcerAgentService`）的协议探测工具、测试夹具及真机自动化校验流程。
 
-工具本身是薄的：读命令行、调用这里、把结果打出来。知识放在这里，所以不用真的
-机器也有用例守着。
+## 模块结构
 
+- **`probe.go`**：定义 `Service` 基础通信接口与通用的 JSON 解码辅助函数。
+- **`fan.go`**：风扇控制协议原始报文的提取、构造与下发方法（`ReadFan`, `WriteFan`, `WriteFans`）。
+- **`lighting.go`**：键盘灯效原始结构解析与请求构造（`ReadLighting`, `WriteLighting`）。
+- **`gpu.go`**：从监控遥测原始 JSON 中提取 GPU 核心指标与相关文本行。
+- **`winkey.go`**：Windows 徽标键状态的直接读写操作（`ReadWinKey`, `WriteWinKey`）。
+- **`verify.go`**：硬件控制读写完整闭环验证器（`Verify`）。
+
+## 硬件自动化校验流程 (`Verify`)
+
+`Verify` 函数对物理机硬件进行安全的读写能力回环校验：
+
+1. **状态快照备份**：
+   在执行任何修改前，全面读取并保存当前的硬件状态（键盘分区灯效、背光亮度与超时、电源性能档位、屏幕超速、开机声音、Win键锁定状态以及风扇策略）。
+2. **逐项修改与读写校验**：
+   依次对每一项功能执行写入变更并读取校验：
+   - 分区颜色切换测试
+   - 全局单色切换测试
+   - 背光亮度调节测试
+   - 背光 30 秒超时开关测试
+   - 屏幕 LCD Overdrive 超速开关测试
+   - 开机音效开关测试
+   - 电源性能档位切换测试
+   - Windows 徽标键锁定切换测试
+   - 风扇全速（Max）运转测试
+3. **安全即时还原**：
+   每一项测试在完成后立即执行 `restore` 还原逻辑，恢复备份的初始值，确保测试不会残留非预期状态。
+4. **结果统计**：
+   针对每一项输出 `StepResult`，明确区分成功、需管理员权限跳过（`ErrNoProvider`）、写入失败或还原失败。
+
+## 使用示例
+
+```go
+package main
+
+import (
+	"fmt"
+	"viper/internal/agentservice"
+	"viper/internal/machine"
+	"viper/internal/probe"
+)
+
+func main() {
+	backend, _ := machine.New(machine.Options{})
+	raw, _ := agentservice.Connect(agentservice.Options{})
+	defer backend.Close()
+	defer raw.Close()
+
+	original, results, err := probe.Verify(backend, raw)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, res := range results {
+		fmt.Printf("测试项目: %-10s 通过: %v\n", res.Name, res.OK())
+	}
+}
 ```
-原厂 AcerAgentService（127.0.0.1:46933）
-        │
-        │  internal/agentservice ← 协议客户端
-        ▼
-   internal/probe ← 本包：协议的形状（灯光、风扇、Win 键、验证流程）
-```
-
-## 这里有什么
-
-| 文件 | 管什么 |
-| :--- | :--- |
-| `probe.go` | 服务的那一小片接口（读、写、读数），还有答案的解析 |
-| `lighting.go` | 灯光的读写：全局颜色与分区颜色分开写 |
-| `fan.go` | 风扇的读写：模式、每个风扇的行为与占空比 |
-| `winkey.go` | Windows 键的读写 |
-| `gpu.go` | 监视数据里与显卡有关的那几项 |
-| `verify.go` | 「逐项改一次、读回核对、还原」的验证流程 |
-
-## 为什么要分开写
-
-**全局颜色与分区颜色是两回事。** 服务读回来的灯光里，`LEDs` 是四个分区各一个
-颜色，`color` 是全局的颜色。写回去的时候，服务读回来有哪一个就写回哪一个——
-少写一个，另一个会被服务清掉。写回一个空的分区数组，等于把键盘正在用的颜色
-抹成黑色。
-
-这一条是实测出来的：`agcheck write` 以前就是这么把颜色抹掉的，现在有用例守着。
-
-## 验证流程
-
-`Verify` 把硬件层能写的每一项改一次、读回来核对、再还原。风扇要按服务记着
-的样子写回去（只靠语义化的接口做不到），所以它同时要一个原始的会话。
-
-做不到的设置（要固件那一侧的）原样报出来，不算失败。
-
-## 测试
-
-```powershell
-go test ./internal/probe/... -cover
-```
-
-用例里的替身服务按命令名回答，替身机器跟机器一样：写进去的值读回来还是新值。

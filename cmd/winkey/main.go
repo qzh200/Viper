@@ -1,11 +1,4 @@
-// Command winkey finds out what the WIN_KEY setting of the original service
-// means and whether it can be written at all.
-//
-// The service answers with a number, and the number was read as "the key is
-// still usable". That reading was never checked against the machine, so
-// this command writes both numbers and shows what comes back.
-//
-// 读写的形状在 internal/probe 里，这个工具只管把过程走一遍。
+// winkey 用于向 AcerAgentService 写入并验证 Windows 徽标键锁定的生效时延与行为响应。
 package main
 
 import (
@@ -18,12 +11,8 @@ import (
 	"viper/internal/probe"
 )
 
-// wait is how long the tool pauses between two readings.
-//
-// 用例把它换成不等待的，所以跑用例不用真的等。
 var wait = time.Sleep
 
-// stdout is where the tool writes. 用例把它换成缓冲区。
 var stdout io.Writer = os.Stdout
 
 func main() {
@@ -40,7 +29,6 @@ func main() {
 	}
 }
 
-// probeWinKey writes both numbers and shows what comes back.
 func probeWinKey(client probe.Service) error {
 	original, err := probe.ReadWinKey(client)
 	if err != nil {

@@ -8,13 +8,12 @@ import (
 	"unsafe"
 )
 
-// kernel32 holds the calls of the kernel library.
 var (
 	kernel32Library          = syscall.NewLazyDLL("kernel32.dll")
 	procGetSystemPowerStatus = kernel32Library.NewProc("GetSystemPowerStatus")
 )
 
-// systemPowerStatus is the structure the system fills in.
+// systemPowerStatus 对应 Win32 API 原生 SYSTEM_POWER_STATUS 内存结构。
 type systemPowerStatus struct {
 	ACLineStatus        byte
 	BatteryFlag         byte
@@ -24,10 +23,7 @@ type systemPowerStatus struct {
 	BatteryFullLifeTime uint32
 }
 
-// SystemPowerStatus reads the power supply of the machine.
-//
-// The information comes from the kernel of Windows, so it works without the
-// services of the original software and without administrative rights.
+// SystemPowerStatus 调用 Windows Win32 API 读取当前电源适配器与电池状态。
 func SystemPowerStatus() (PowerStatus, error) {
 	var raw systemPowerStatus
 
@@ -47,7 +43,6 @@ func SystemPowerStatus() (PowerStatus, error) {
 		BatteryCritical: raw.BatteryFlag&BatteryCritical != 0,
 	}
 	if raw.BatteryFlag&BatteryAbsent != 0 {
-		// The machine runs on a power supply without a battery.
 		status.BatteryPercent = 0
 	}
 	return status, nil

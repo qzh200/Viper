@@ -1,19 +1,18 @@
 package hardware
 
-// FanMode is the behaviour of a fan group.
+// FanMode 表示风扇运转模式。
 type FanMode int
 
-// The fan behaviours the ACPI provider understands.
 const (
-	// FanAuto lets the embedded controller follow its own curve.
+	// FanAuto 表示风扇自动转速模式。
 	FanAuto FanMode = iota
-	// FanMax drives the fan at full speed.
+	// FanMax 表示风扇全速运转模式。
 	FanMax
-	// FanCustom drives the fan at a fixed duty cycle.
+	// FanCustom 表示用户自定义转速模式。
 	FanCustom
 )
 
-// String renders the mode for display.
+// String 返回风扇模式的文本名称。
 func (m FanMode) String() string {
 	switch m {
 	case FanAuto:
@@ -27,31 +26,25 @@ func (m FanMode) String() string {
 	}
 }
 
-// providerCode maps the mode onto the bit encoding the EC expects.
-
-// PowerMode is the performance profile of the machine.
+// PowerMode 表示系统电源/性能配置模式。
 type PowerMode int
 
-// The performance profiles the provider exposes.
 const (
-	// PowerQuiet favours silence over performance.
+	// PowerQuiet 表示静音/低功耗模式。
 	PowerQuiet PowerMode = iota
-	// PowerBalanced is the default profile.
+	// PowerBalanced 表示平衡模式。
 	PowerBalanced
-	// PowerPerformance favours performance.
+	// PowerPerformance 表示高性能模式。
 	PowerPerformance
-	// PowerTurbo is the maximum profile, available on Predator models only.
+	// PowerTurbo 表示极速/狂暴模式。
 	PowerTurbo
-	// PowerUnknown is a profile the firmware does not describe.
+	// PowerUnknown 表示未识别模式。
 	PowerUnknown
-	// PowerEco is the profile that saves power.
-	//
-	// 它的编号固定在最后，因为 Viper 的配置文件里保存的就是性能档位的编号，
-	// 已经用过的编号不能再变动。
+	// PowerEco 表示节能模式。
 	PowerEco PowerMode = 5
 )
 
-// String renders the mode for display.
+// String 返回电源模式的标识符。
 func (m PowerMode) String() string {
 	switch m {
 	case PowerQuiet:
@@ -69,26 +62,6 @@ func (m PowerMode) String() string {
 	}
 }
 
-// providerCode maps the mode onto the encoding the provider expects.
-//
-// The encoding is not a plain enumeration and it is not the one the MOF
-// suggests. Measured on a Predator Helios Neo 16, the provider keeps five
-// values and rejects everything else:
-//
-//	0 -> quiet
-//	1 -> balanced
-//	4 -> performance
-//	5 -> turbo
-//	6 -> eco
-//
-// Writing two or three leaves the previous profile in place, which is why
-// the values look like an ordinary enumeration to anyone who only tries
-// the obvious ones.
-//
-// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
-// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
-
-// decodePowerMode maps the provider's value back onto a mode.
 func decodePowerMode(value uint64) PowerMode {
 	switch value {
 	case 0:
@@ -106,37 +79,11 @@ func decodePowerMode(value uint64) PowerMode {
 	}
 }
 
-// PowerModeCode returns the number the machine uses for a performance profile.
-//
-// The numbering is the one of the machine itself: 0 is quiet, 1 is balanced,
-// 4 is performance, 5 is turbo and 6 is eco. The provider of the firmware
-// and the original service both use it, so a number that comes from one of
-// them means the same thing in the other.
-//
-// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
-// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
+// PowerModeCode 返回对应底层提供方的数值编码。
 func PowerModeCode(mode PowerMode) uint64 {
 	return mode.providerCode()
 }
 
-// providerCode maps the mode onto the encoding the provider expects.
-//
-// The encoding is not a plain enumeration and it is not the one the MOF
-// suggests. Measured on a Predator Helios Neo 16, the provider keeps five
-// values and rejects everything else:
-//
-//	0 -> quiet
-//	1 -> balanced
-//	4 -> performance
-//	5 -> turbo
-//	6 -> eco
-//
-// Writing two or three leaves the previous profile in place, which is why
-// the values look like an ordinary enumeration to anyone who only tries the
-// obvious ones.
-//
-// 编号 6 是节能档位，官方应用把它暴露给用户，原厂服务报告的能力列表
-// SUPPORT_OPERATING_MODE_CAPABILITY 里也有它。
 func (m PowerMode) providerCode() uint64 {
 	switch m {
 	case PowerQuiet:
@@ -154,14 +101,12 @@ func (m PowerMode) providerCode() uint64 {
 	}
 }
 
-// DecodePowerMode maps a number of the machine back onto a profile.
+// DecodePowerMode 将底层数值编码转换为对应的 PowerMode。
 func DecodePowerMode(value uint64) PowerMode {
 	return decodePowerMode(value)
 }
 
-// AvailablePowerModes lists the profiles this machine supports.
-//
-// Turbo needs a Predator, the other profiles are available everywhere.
+// AvailablePowerModes 返回机型支持的可用电源模式列表。
 func AvailablePowerModes(isPredator bool) []PowerMode {
 	if isPredator {
 		return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
@@ -169,7 +114,7 @@ func AvailablePowerModes(isPredator bool) []PowerMode {
 	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerEco}
 }
 
-// ParsePowerMode maps a command line word onto a power mode.
+// ParsePowerMode 根据名称解析电源模式。
 func ParsePowerMode(name string) (PowerMode, bool) {
 	switch name {
 	case "quiet":
@@ -187,74 +132,56 @@ func ParsePowerMode(name string) (PowerMode, bool) {
 	}
 }
 
-// RGBColor is a colour of one keyboard zone.
+// RGBColor 表示 24 位 RGB 颜色分量。
 type RGBColor struct {
 	R uint8
 	G uint8
 	B uint8
 }
 
-// RGBConfig is the full keyboard lighting configuration.
-//
-// The effect, the speed and the direction are global, because the provider
-// applies them to the whole keyboard at once. Only the colour is set per
-// zone, which is what the official application shows as the difference
-// between a global and a per zone setup.
+// RGBConfig 描述背光灯效的完整配置参数。
 type RGBConfig struct {
-	// Effect selects the lighting pattern.
+	// Effect 指定灯效模式。
 	Effect LightingEffect
-	// Speed is the animation speed.
+	// Speed 指定动态灯效速度。
 	Speed uint64
-	// Direction is the animation direction, zero or one.
+	// Direction 指定灯效流动方向（如 0 或 1）。
 	Direction uint64
-	// Brightness is the overall brightness, 0 to 100.
+	// Brightness 指定亮度百分比或等级。
 	Brightness uint64
-	// Zones holds the colour of each of the four lighting zones.
+	// Zones 包含各分区颜色（支持 4 分区）。
 	Zones [4]RGBColor
-	// PerZone reports whether the zones carry individual colours. When it
-	// is false every zone uses the colour of the first one.
+	// PerZone 标识是否采用多分区独立颜色。
 	PerZone bool
-	// ColourReadable reports whether the firmware reports the zone
-	// colours. It does not, so the caller keeps its own record.
+	// ColourReadable 标识颜色配置是否可读。
 	ColourReadable bool
-	// EffectReadable reports whether the firmware reports the lighting
-	// effect. It does not, so the caller keeps its own record.
+	// EffectReadable 标识灯效模式是否可读。
 	EffectReadable bool
 }
 
-// LightingEffect is one of the keyboard lighting patterns.
-//
-// The numbering is the one the Acer lighting service uses in its profile
-// file, where every pattern carries a value field:
-//
-//	0 static      1 breathing   2 neon     3 wave
-//	4 shifting    5 zoom        6 meteor   7 twinkling
-//
-// The order is the order in which the official application lists them.
+// LightingEffect 表示背光动画效果类型。
 type LightingEffect uint64
 
-// The lighting patterns of the official application, in the order it
-// lists them.
 const (
-	// EffectStatic keeps a constant colour.
+	// EffectStatic 静态常亮。
 	EffectStatic LightingEffect = 0
-	// EffectBreathing fades the colour in and out.
+	// EffectBreathing 呼吸渐变。
 	EffectBreathing LightingEffect = 1
-	// EffectNeon lights the zones one after the other.
+	// EffectNeon 霓虹变色。
 	EffectNeon LightingEffect = 2
-	// EffectWave moves a highlight across the zones.
+	// EffectWave 波浪滚动。
 	EffectWave LightingEffect = 3
-	// EffectSwitch alternates between two colours.
+	// EffectSwitch 交叉切换。
 	EffectSwitch LightingEffect = 4
-	// EffectScale grows and shrinks the highlight.
+	// EffectScale 缩放脉冲。
 	EffectScale LightingEffect = 5
-	// EffectMeteor runs a shower of lights.
+	// EffectMeteor 流星划过。
 	EffectMeteor LightingEffect = 6
-	// EffectFlash blinks the keyboard.
+	// EffectFlash 闪烁模式。
 	EffectFlash LightingEffect = 7
 )
 
-// String renders the effect for display.
+// String 返回灯效的文本表示。
 func (e LightingEffect) String() string {
 	switch e {
 	case EffectStatic:
@@ -278,7 +205,7 @@ func (e LightingEffect) String() string {
 	}
 }
 
-// ParseLightingEffect maps a name onto a lighting effect.
+// ParseLightingEffect 根据字符串解析灯效类型。
 func ParseLightingEffect(name string) (LightingEffect, bool) {
 	switch name {
 	case "static":
@@ -302,24 +229,19 @@ func ParseLightingEffect(name string) (LightingEffect, bool) {
 	}
 }
 
-// GPUMode is the way the machine drives the graphics chip.
-//
-// The numbering is the one of the original service, it describes the
-// display mode of the machine.
+// GPUMode 表示显卡切换与工作模式。
 type GPUMode uint64
 
-// The graphics modes the provider understands.
 const (
-	// GPUModeHybrid keeps the integrated graphics in charge, the
-	// dedicated graphics only takes over when a program asks for it.
+	// GPUModeHybrid 混合模式（核显+独显 Dynamic/Optimus）。
 	GPUModeHybrid GPUMode = 1
-	// GPUModeDiscrete hands the display over to the dedicated graphics.
+	// GPUModeDiscrete 纯独显直连模式。
 	GPUModeDiscrete GPUMode = 2
-	// GPUModeAuto lets the system pick the mode on its own.
+	// GPUModeAuto 自动显卡切换模式。
 	GPUModeAuto GPUMode = 3
 )
 
-// String renders the mode for display.
+// String 返回显卡模式的名称。
 func (m GPUMode) String() string {
 	switch m {
 	case GPUModeHybrid:
@@ -333,7 +255,7 @@ func (m GPUMode) String() string {
 	}
 }
 
-// ParseGPUMode maps a command line word onto a graphics mode.
+// ParseGPUMode 将模式名称解析为 GPUMode。
 func ParseGPUMode(name string) (GPUMode, bool) {
 	switch name {
 	case "hybrid", "optimus", "mshybrid":
@@ -347,10 +269,6 @@ func ParseGPUMode(name string) (GPUMode, bool) {
 	}
 }
 
-// clampUint limits a number to the given range.
-//
-// 硬件层用它把上层交过来的数值限制到固件能接受的范围内，这样写进固件的值
-// 和记在配置文件里的值才是同一个值。
 func clampUint(value, low, high uint64) uint64 {
 	if value < low {
 		return low
@@ -361,63 +279,39 @@ func clampUint(value, low, high uint64) uint64 {
 	return value
 }
 
-// LightingZones is the number of lighting zones the keyboard has.
+// LightingZones 定义支持的背光分区数量。
 const LightingZones = 4
 
-// Sensors is a snapshot of the machine temperatures and fan speeds.
+// Sensors 包含基本的温度与转速传感器数据。
 type Sensors struct {
-	// CPUTempC is the temperature of the processor in degrees.
-	CPUTempC int
-	// CPUFanRPM is the speed of the fan of the processor.
-	CPUFanRPM int
-	// GPUTempC is the temperature of the graphics card in degrees.
-	GPUTempC int
-	// GPUFanRPM is the speed of the fan of the graphics card.
-	GPUFanRPM int
-	// SystemTempC is the temperature of the motherboard in degrees.
+	CPUTempC    int
+	CPUFanRPM   int
+	GPUTempC    int
+	GPUFanRPM   int
 	SystemTempC int
 }
 
-// FanState describes the current fan configuration.
+// FanState 记录风扇当前的模式与运行状态。
 type FanState struct {
-	// CPUMode is the behaviour of the CPU fan.
-	CPUMode FanMode
-	// GPUMode is the behaviour of the GPU fan.
-	//
-	// 原厂服务读得回显卡风扇组的行为，所以这个字段在这条路上是有意义的。
-	GPUMode FanMode
-	// GPUModeReadable reports whether the behaviour of the graphics fan was
-	// read back from the machine.
+	CPUMode         FanMode
+	GPUMode         FanMode
 	GPUModeReadable bool
-	// CPUPercent is the duty cycle the CPU fan was last configured with.
-	//
-	// In automatic mode the embedded controller runs its own curve, so the
-	// value is only the last requested setting and not the current speed.
-	CPUPercent int
-	// GPUPercent is the duty cycle the GPU fan was last configured with.
-	GPUPercent int
-	// CoolBoost reports whether the fans run at full speed.
-	CoolBoost bool
+	CPUPercent      int
+	GPUPercent      int
+	CoolBoost       bool
 }
 
-// FanConfig describes a requested fan configuration.
+// FanConfig 定义待应用的风扇目标配置。
 type FanConfig struct {
-	// CPUMode is the requested behaviour of the CPU fan.
-	CPUMode FanMode
-	// GPUMode is the requested behaviour of the GPU fan.
-	GPUMode FanMode
-	// CPUPercent is the requested duty cycle of the CPU fan.
+	CPUMode    FanMode
+	GPUMode    FanMode
 	CPUPercent int
-	// GPUPercent is the requested duty cycle of the GPU fan.
 	GPUPercent int
-	// CoolBoost requests the fans at full speed.
-	CoolBoost bool
+	CoolBoost  bool
 }
 
-// BacklightState describes the keyboard backlight.
+// BacklightState 记录键盘背光亮度与自动超时关闭状态。
 type BacklightState struct {
-	// Brightness is the backlight level, 0 to 100.
 	Brightness int
-	// Timeout reports whether the backlight switches off after 30 seconds.
-	Timeout bool
+	Timeout    bool
 }

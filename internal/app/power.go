@@ -1,4 +1,3 @@
-// 性能档位：读、写、这台机器有哪几个。
 package app
 
 import (
@@ -8,7 +7,7 @@ import (
 	"viper/internal/hardware"
 )
 
-// PowerMode returns the performance profile.
+// PowerMode 查询当前生效的电源性能模式。
 func (a *App) PowerMode() (hardware.PowerMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -17,10 +16,7 @@ func (a *App) PowerMode() (hardware.PowerMode, error) {
 	return backend.PowerMode()
 }
 
-// SetPowerMode applies a performance profile and remembers it.
-//
-// When a scene is bound to the profile, the scene is applied with it, so
-// that every profile brings its own lighting and its own fans.
+// SetPowerMode 设置电源性能模式，更新本地配置，并自动应用绑定到该模式的场景预设（如果有）。
 func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	if mode != hardware.PowerQuiet && mode != hardware.PowerBalanced &&
 		mode != hardware.PowerPerformance && mode != hardware.PowerTurbo &&
@@ -40,7 +36,7 @@ func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	}); err != nil {
 		return fmt.Errorf("app: 保存性能档位失败: %w", err)
 	}
-	// 记下来的值必须还能读回同一个档位，这一行守着两套编号不会走偏。
+
 	if got := powerMode(a.store.Settings().PowerMode); got != mode {
 		return fmt.Errorf("app: 性能档位 %s 记下来之后变成了 %s", mode, got)
 	}
@@ -57,15 +53,6 @@ func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	return a.applyScenario(scenario)
 }
 
-// powerMode maps a stored profile onto the enumeration of the hardware
-// layer.
-//
-// The settings hold the semantic enumeration of the hardware layer. A
-// value that is not part of it comes from a file that was written by hand
-// or by another tool, such a value is treated as the balanced profile.
-//
-// 设置文件里存的是语义枚举。文件里的值不在枚举里，说明它被人手改过或者
-// 是别的工具写的，这种值按均衡模式处理。
 func powerMode(value uint64) hardware.PowerMode {
 	switch value {
 	case config.PowerQuiet:
@@ -83,14 +70,6 @@ func powerMode(value uint64) hardware.PowerMode {
 	}
 }
 
-// storedPowerMode maps a profile of the hardware layer onto the value that
-// is stored.
-//
-// The settings carry an enumeration of their own, so that the file keeps
-// its meaning even when the hardware layer gets a new profile.
-//
-// 设置文件带着自己的枚举，这样硬件层以后多一个档位时，文件里的意思不会
-// 跟着变。
 func storedPowerMode(mode hardware.PowerMode) uint64 {
 	switch mode {
 	case hardware.PowerQuiet:
@@ -108,7 +87,7 @@ func storedPowerMode(mode hardware.PowerMode) uint64 {
 	}
 }
 
-// AvailablePowerModes lists the profiles this machine supports.
+// AvailablePowerModes 返回当前机型支持的电源模式列表。
 func (a *App) AvailablePowerModes() []hardware.PowerMode {
 	return hardware.AvailablePowerModes(hardware.IsPredator())
 }

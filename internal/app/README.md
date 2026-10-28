@@ -1,87 +1,57 @@
-# internal/app
+# app
 
-**用例层**：把机器（硬件层）与两次运行之间的设置（`internal/config`）接起来，
-命令行与将来的图形界面都走它。
+`app` 是 Viper 应用程序的核心业务协调层，负责组装底层硬件后端（`machine`）、操作系统服务（`quickaccess`）、配置存储（`config`）与显卡驱动遥测（`nvidia`），提供高层次、统一的业务 API。
 
-规矩与 OpenPredator 项目一致：**硬件层不认识界面，界面层不直接调用机器，
-中间夹着这一层。**
+## 架构职责
 
-## 文件
+1. **统一门面 (Facade Pattern)**：上层命令行或界面组件仅需与 `*app.App` 实例交互，屏蔽底层多服务、多通道的复杂性。
+2. **状态持久化协同**：硬件设置变更（如背光颜色、风扇策略、电源档位）在成功写入硬件的同时，自动持久化至本地用户配置文件。
+3. **场景联动引擎 (Scenario Engine)**：支持将键盘灯效和风扇策略保存为自定义命名场景，并将场景与特定电源档位进行动态绑定；当切换电源模式时，自动联动应用对应的场景预设。
+4. **延迟连接与依赖注入**：硬件后端与 QuickAccess 服务采用按需建立连接机制，并支持在单元测试中注入 Fake 实例。
 
-| 文件 | 管什么 |
-| :--- | :--- |
-| `app.go` | 骨架：程序是什么、怎么开始、怎么结束、走的哪条路 |
-| `readings.go` | 机器的读数：传感器、电源、显卡遥测、身份 |
-| `lighting.go` | 键盘的灯效：读、写、复位、背光超时 |
-| `fans.go` | 风扇：读、写、加速 |
-| `power.go` | 性能档位：读、写、这台机器有哪几个 |
-| `switches.go` | 开关类：屏幕超频、Windows 键、开机音效、显卡模式 |
-| `scenarios.go` | 场景：把灯效与风扇打包，绑到性能档位上 |
-| `quickaccess.go` | 原厂 Quick Access 服务管的那几项：USB 充电、显示模式等 |
+## 子模块功能
 
-## 两条依赖
+- **`app.go`**：应用上下文管理、服务连接生命周期维护及通信路由信息展示。
+- **`power.go`**：电源性能模式切换、读取、持久化以及场景绑定自动触发。
+- **`fans.go`**：CPU 与 GPU 风扇模式（自动/全速/自定义）、转速占空比及 CoolBoost 强冷开关。
+- **`lighting.go`**：键盘 RGB 灯效读取与配置、4 分区独立调色、亮度调节、30 秒自动休眠开关与一键恢复出厂白色背光。
+- **`scenarios.go`**：命名场景管理（创建、保存、列举、应用、删除）以及电源档位与场景的绑定/解绑。
+- **`switches.go`**：外设与功能开关控制，包括 Windows 徽标键锁定、屏幕 LCD Overdrive 响应时间超速、开机声音及操作系统粘滞键。
+- **`quickaccess.go`**：与 QuickAccess 服务协同，管理关机 USB 供电阈值、显卡显示模式、Windows 深色主题、窗口透明效果、任务栏隐藏及屏幕保护程序。
+- **`readings.go`**：统一遥测与状态采集，组合整机硬件监控数据与 NVIDIA NVML 原生显卡指标。
 
+## 使用示例
+
+```go
+package main
+
+import (
+	"fmt"
+	"viper/internal/app"
+	"viper/internal/hardware"
+)
+
+func main() {
+	application, err := app.New()
+	if err != nil {
+		panic(err)
+	}
+	defer application.Close()
+
+	// 1. 读取整机传感器数据
+	sensors, err := application.Sensors()
+	if err == nil {
+		fmt.Printf("CPU: %d°C (%d RPM) | GPU: %d°C (%d RPM)\n",
+			sensors.CPUTempC, sensors.CPUFanRPM, sensors.GPUTempC, sensors.GPUFanRPM)
+	}
+
+	// 2. 切换到静音模式
+	if err := application.SetPowerMode(hardware.PowerQuiet); err != nil {
+		fmt.Println("切换失败:", err)
+	}
+
+	// 3. 保存当前状态为自定义场景并绑定到静音模式
+	_ = application.SaveScenario("夜间模式")
+	_ = application.BindScenario(hardware.PowerQuiet.String(), "夜间模式")
+}
 ```
-hardware.Gaming   机器的能力（灯光、风扇、档位、传感器、开关）
-QuickAccess       原厂 Quick Access 服务的能力（USB 充电……）
-```
-
-两个都是接口，所以用例可以放替身进去，测试不用碰真的机器。
-
-## 机器只有一条路
-
-硬件层走的是原厂 `AcerAgentService`（`internal/machine`），以系统的身份运行，
-**不用管理员权限**。原厂服务不在的时候，程序直接把实情报给用的人——这一层
-没有第二条路可走（直接操控固件那一整条路线已经删掉了）。
-
-`Route()` 报出程序走的是哪条路，命令行会把它显示出来。
-
-## 灯效以机器为准
-
-原厂服务读得回分区颜色与灯效，所以 `Lighting()` 给的是机器真正的样子。
-读不到的时候它**直接报错**，不拿 Viper 自己记着的那一份顶替——调用方必须
-能分清"机器读不到"和"亮度就是零"。
-
-`StoredLighting()` 给的是 Viper 自己记着的那一份（上次写进去的灯效与颜色），
-机器读不到的时候还能用它，但那是 Viper 的记录，不是机器现在的样子。
-
-## 场景存的是机器现在的样子
-
-`SaveScenario` 把机器当前的灯效与风扇存下来。原厂服务读得回颜色与灯效，
-所以场景里存的就是真的那个样子。
-
-一个例外：**背光自动熄灭的时候机器报的是零**，那不是用户选的亮度，所以零
-的时候仍然用 Viper 自己记着的那一个。
-
-绑到性能档位上的场景，在切档位的时候一起应用（`SetPowerMode`）。
-
-## 加速就是全速
-
-原厂服务的风扇模式 1 就是全速（实测 2722 RPM 升到 7092 RPM），所以"加速"
-这个开关写的就是全速模式，没有第二个实现。
-
-## 读数以原厂服务为主
-
-`Telemetry()` 给的是机器的状态：**原厂服务的监视数据**在前（处理器的使用率
-与频率、每核频率、显卡的使用率与频率、内存的占用与频率、网络的上下行），
-**显卡驱动在后**（显卡的名字、显存、显存频率——它只补原厂服务没报的那几样）。
-
-`Monitor()` 只给原厂服务的那部分，`Sensors()` 是其中温度与转速的子集。
-
-## 读不到的时候要报错
-
-这一层的每个方法都把"机器读不到"当成错误报出去，不拿别的东西顶替。已经
-做不到的几项（锁 Windows 键、显卡超频）原样报错，让用的人知道这台机器上
-它就是不行。
-
-## 测试
-
-```powershell
-go test ./internal/app/...
-```
-
-用例里的替身（`fake_gaming_test.go`）跟机器一样：写完读回来的是新值、加速
-按全速算、机器读不到的时候灯效也读不到。
-
-用例不碰真的机器：默认的后端换成"机器不在那里"的替身，需要真的机器的用例
-用环境变量 `VIPER_LIVE_MACHINE=1` 才会跑。

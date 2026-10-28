@@ -7,7 +7,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// TestStatusShowsTheReadings checks the command that shows the machine.
 func TestStatusShowsTheReadings(t *testing.T) {
 	installFakes(t)
 
@@ -30,7 +29,6 @@ func TestStatusShowsTheReadings(t *testing.T) {
 	}
 }
 
-// TestTelemetryAndPowerStatus checks the two commands that only read.
 func TestTelemetryAndPowerStatus(t *testing.T) {
 	installFakes(t)
 
@@ -51,7 +49,6 @@ func TestTelemetryAndPowerStatus(t *testing.T) {
 	}
 }
 
-// TestFanCommands checks reading and writing the fans.
 func TestFanCommands(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -95,7 +92,6 @@ func TestFanCommands(t *testing.T) {
 	}
 }
 
-// TestPowerCommand checks reading and writing the performance profile.
 func TestPowerCommand(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -115,7 +111,6 @@ func TestPowerCommand(t *testing.T) {
 	}
 }
 
-// TestLightingCommand checks reading and writing the keyboard lighting.
 func TestLightingCommand(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -127,7 +122,6 @@ func TestLightingCommand(t *testing.T) {
 		t.Errorf("灯效读数不对:\n%s", out)
 	}
 
-	// 只改亮度的时候，颜色要留着——原厂服务会把没写回去的颜色清掉。
 	before := machine.lighting.Zones
 	if _, _, err := capture(t, "lighting", "set", "brightness", "80"); err != nil {
 		t.Fatal(err)
@@ -142,7 +136,6 @@ func TestLightingCommand(t *testing.T) {
 		t.Errorf("效果被改了: %v", machine.lighting.Effect)
 	}
 
-	// 点一个分区，那个分区用自己的颜色，其余分区留着原来的。
 	if _, _, err := capture(t, "lighting", "set", "zone", "2", "#00FF00"); err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +150,6 @@ func TestLightingCommand(t *testing.T) {
 	}
 }
 
-// TestLightingReset checks that the lighting goes back to the default.
 func TestLightingReset(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -172,7 +164,6 @@ func TestLightingReset(t *testing.T) {
 	}
 }
 
-// TestProfileCommand checks the switches.
 func TestProfileCommand(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -192,7 +183,6 @@ func TestProfileCommand(t *testing.T) {
 	}
 }
 
-// TestGPUCommand checks the graphics mode.
 func TestGPUCommand(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -212,7 +202,6 @@ func TestGPUCommand(t *testing.T) {
 	}
 }
 
-// TestQuickAccessCommands checks the settings of the Quick Access service.
 func TestQuickAccessCommands(t *testing.T) {
 	_, quick := installFakes(t)
 
@@ -268,7 +257,6 @@ func TestQuickAccessCommands(t *testing.T) {
 	}
 }
 
-// TestBootSoundCommand checks the sound at the start.
 func TestBootSoundCommand(t *testing.T) {
 	machine, _ := installFakes(t)
 
@@ -280,7 +268,6 @@ func TestBootSoundCommand(t *testing.T) {
 	}
 }
 
-// TestScenarioCommands checks the scenes from the beginning to the end.
 func TestScenarioCommands(t *testing.T) {
 	installFakes(t)
 
@@ -333,7 +320,6 @@ func TestScenarioCommands(t *testing.T) {
 	}
 }
 
-// TestDiagReportsTheCapabilities checks the report of the machine.
 func TestDiagReportsTheCapabilities(t *testing.T) {
 	installFakes(t)
 

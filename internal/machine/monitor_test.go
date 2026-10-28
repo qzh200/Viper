@@ -7,10 +7,6 @@ import (
 	"viper/internal/agentservice"
 )
 
-// TestTheReadingsOfTheMachine 监视数据里的每一项都要读出来。
-//
-// 读数是原厂服务给的：处理器的使用率与频率、每核频率、显卡的使用率与频率、
-// 内存的占用与频率、网络的上下行。
 func TestTheReadingsOfTheMachine(t *testing.T) {
 	service := newFakeService()
 	service.monitor = answer(map[string]any{
@@ -108,7 +104,6 @@ func TestTheReadingsOfTheMachine(t *testing.T) {
 	}
 }
 
-// TestTheSensorsComeFromTheReadings 传感器是监视数据里的一部分。
 func TestTheSensorsComeFromTheReadings(t *testing.T) {
 	service := newFakeService()
 	service.monitor = answer(map[string]any{
@@ -136,7 +131,6 @@ func TestTheSensorsComeFromTheReadings(t *testing.T) {
 	}
 }
 
-// TestTheReadingsThatCannotBeRead 读不到的时候要报错。
 func TestTheReadingsThatCannotBeRead(t *testing.T) {
 	service := newFakeService()
 	service.getErr = errors.New("服务不可达")

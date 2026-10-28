@@ -8,45 +8,39 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// The charging over USB belongs to the Quick Access service of the original
-// software, not to the gaming hardware.
-
-// fakeQuickAccess is a stand for the service.
 type fakeQuickAccess struct {
-	// chargeLimit is the charging limit in percent.
 	chargeLimit int
-	// chargeEnabled reports whether the charging over USB is allowed.
+
 	chargeEnabled bool
-	// displayMode is the graphics switch of the machine.
+
 	displayMode quickaccess.DisplayMode
-	// darkMode reports whether the dark mode of the system is on.
+
 	darkMode bool
-	// transparentEffect reports whether the windows are transparent.
+
 	transparentEffect bool
-	// autoHideTaskbar reports whether the taskbar hides itself.
+
 	autoHideTaskbar bool
-	// screenSaver reports whether the screen saver is switched on.
+
 	screenSaver bool
-	// screenSaverTimeout is the idle time before the screen saver starts.
+
 	screenSaverTimeout int
 
-	// writtenLimit records the limit that was written.
 	writtenLimit []int
-	// writtenEnabled records the switch that was written.
+
 	writtenEnabled []bool
-	// writtenDisplayMode records the graphics switch that was written.
+
 	writtenDisplayMode []quickaccess.DisplayMode
-	// writtenDarkMode records the dark mode that was written.
+
 	writtenDarkMode []bool
-	// writtenTransparent records the transparency that was written.
+
 	writtenTransparent []bool
-	// writtenAutoHide records the hiding of the taskbar that was written.
+
 	writtenAutoHide []bool
-	// writtenScreenSaver records the screen saver that was written.
+
 	writtenScreenSaver []bool
-	// writtenTimeout records the timeout of the screen saver that was written.
+
 	writtenTimeout []int
-	// closed reports whether the session was ended.
+
 	closed bool
 }
 
@@ -135,7 +129,6 @@ func (q *fakeQuickAccess) SetScreenSaverTimeout(seconds int) error {
 	return nil
 }
 
-// newAppWithQuick opens the program with a stand for the service.
 func newAppWithQuick(t *testing.T) (*App, *fakeQuickAccess) {
 	t.Helper()
 	store, err := config.OpenAt(filepath.Join(t.TempDir(), "config.json"))
@@ -195,9 +188,7 @@ func TestSetTheChargingOverUSBOfTheService(t *testing.T) {
 }
 
 func TestTheSettingsOfTheServiceWithoutTheService(t *testing.T) {
-	// The service of the original software is not running on every
-	// machine, the program has to say that it cannot answer. The session
-	// is pointed at a port that nothing listens on.
+
 	application := NewWithStore(mustStore(t))
 	application.SetQuickAccessOptions(quickaccess.Options{Address: "127.0.0.1:1"})
 

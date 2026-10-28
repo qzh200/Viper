@@ -9,14 +9,10 @@ import (
 	"viper/internal/machine"
 )
 
-// Machine is the part of the machine that the verification needs.
-//
-// The hardware layer of the program satisfies it, and a test can put a
-// stand in its place.
+// Machine 定义硬件自动化验证所依赖的设备控制接口集合。
 type Machine interface {
-	// Instance returns the object path of the gaming functions.
 	Instance() string
-	// Sensors reads the live temperatures and fan speeds.
+
 	Sensors() (hardware.Sensors, error)
 	Lighting() (hardware.RGBConfig, error)
 	SetLighting(config hardware.RGBConfig) error
@@ -34,53 +30,34 @@ type Machine interface {
 	SetFans(config hardware.FanConfig) error
 }
 
-// StepResult is what happened to one setting.
+// StepResult 记录单项功能测试与状态复原的执行结果。
 type StepResult struct {
-	// Name is the name of the setting.
-	Name string
-	// Skipped reports that the machine cannot do this setting at all.
-	Skipped bool
-	// ApplyErr is the error of the write itself.
-	ApplyErr error
-	// RestoreErr is the error of putting the old value back.
+	Name       string
+	Skipped    bool
+	ApplyErr   error
 	RestoreErr error
 }
 
-// OK reports whether the setting was written, checked and put back.
+// OK 检查测试步骤是否成功应用并成功恢复初始状态。
 func (r StepResult) OK() bool {
 	return r.ApplyErr == nil && r.RestoreErr == nil && !r.Skipped
 }
 
-// Original is the state of the machine before the verification.
+// Original 保存各项硬件控制功能在测试前的原始状态快照。
 type Original struct {
-	// Lighting is the keyboard lighting.
-	Lighting hardware.RGBConfig
-	// Backlight is the backlight of the keyboard.
+	Lighting  hardware.RGBConfig
 	Backlight hardware.BacklightState
-	// Power is the performance profile.
-	Power hardware.PowerMode
-	// Overdrive reports whether the display overdrive is on.
+	Power     hardware.PowerMode
 	Overdrive bool
-	// BootSound reports whether the sound at the start is on.
 	BootSound bool
-	// WinKey reports whether the Windows key is locked.
-	WinKey bool
-	// Fans is the fan configuration.
-	Fans hardware.FanState
+	WinKey    bool
+	Fans      hardware.FanState
 }
 
-// Verify changes every setting the hardware layer can write, reads it back
-// and puts the machine back where it was.
-//
-// The raw service is needed as well: the fans have to be written back
-// exactly as the service remembers them, which the semantic interface alone
-// cannot do.
-//
-// 这一项做完要读回来核对：机器没有接受就在结果里说清楚是哪一个。
+// Verify 执行全套硬件功能的读写校验流程：先备份现有状态，依次触发改动并校验，最后还原初始设定。
 func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 	var original Original
 
-	// 风扇要回到服务记着的每一个数值，只靠语义化的接口做不到。
 	originalFans, err := raw.Get(agentservice.FunctionFanControl)
 	if err != nil {
 		return original, nil, err
@@ -112,7 +89,6 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 	}
 	original.WinKey, err = device.WinKeyLocked()
 	if err != nil {
-		// 这一项要固件那一侧，没有管理员权限就读不到。
 		original.WinKey = false
 	}
 	original.Fans, err = device.Fans()
@@ -127,7 +103,6 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 	sound := original.BootSound
 	winKey := original.WinKey
 
-	// 分区颜色：四个分区写成纯蓝，再写回原来的样子。
 	zone := lighting
 	zone.PerZone = true
 	zone.Effect = hardware.EffectStatic
@@ -138,7 +113,6 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 		zone.Zones[i] = hardware.RGBColor{B: 255}
 	}
 
-	// 全局颜色：整块键盘写成纯绿。
 	global := lighting
 	global.PerZone = false
 	global.Effect = hardware.EffectStatic
@@ -199,7 +173,6 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 				})
 			},
 			restore: func() error {
-				// 原样写回，服务记着的占空比也回到原来的值。
 				answer, err := raw.Set(agentservice.FunctionFanControl, originalFanPayload)
 				if err != nil {
 					return err

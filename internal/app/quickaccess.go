@@ -1,4 +1,3 @@
-// 原厂 Quick Access 服务管的那几项设置：USB 充电、显示模式等。
 package app
 
 import (
@@ -7,50 +6,28 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// QuickAccess is the set of abilities of the Quick Access service that
-// the program uses.
-//
-// The interface keeps the program testable: a test can hand the program
-// a stand for the service, so that the behaviour can be checked without
-// the service of the original software.
+// QuickAccess 定义与系统 QuickAccess 服务交互的抽象接口。
 type QuickAccess interface {
-	// USBChargeLimit reads the charging limit in percent.
 	USBChargeLimit() (int, error)
-	// SetUSBChargeLimit sets the charging limit in percent.
 	SetUSBChargeLimit(percent int) error
-	// USBChargeEnabled reports whether the charging over USB is allowed.
 	USBChargeEnabled() (bool, error)
-	// SetUSBChargeEnabled allows or forbids the charging over USB.
 	SetUSBChargeEnabled(enabled bool) error
-	// DisplayMode 读取机器的显卡切换方式。
 	DisplayMode() (quickaccess.DisplayMode, error)
-	// SetDisplayMode 选择机器的显卡切换方式。
 	SetDisplayMode(mode quickaccess.DisplayMode) error
-	// DarkMode 报告系统的深色模式是否打开。
 	DarkMode() (bool, error)
-	// SetDarkMode 打开或关闭系统的深色模式。
 	SetDarkMode(enabled bool) error
-	// TransparentEffect 报告系统的窗口是不是透明的。
 	TransparentEffect() (bool, error)
-	// SetTransparentEffect 打开或关闭窗口的透明效果。
 	SetTransparentEffect(enabled bool) error
-	// AutoHideTaskbar 报告任务栏是不是自己藏起来。
 	AutoHideTaskbar() (bool, error)
-	// SetAutoHideTaskbar 打开或关闭任务栏的自动隐藏。
 	SetAutoHideTaskbar(enabled bool) error
-	// ScreenSaver 报告屏幕保护程序是不是打开的。
 	ScreenSaver() (bool, error)
-	// SetScreenSaver 打开或关闭屏幕保护程序。
 	SetScreenSaver(enabled bool) error
-	// ScreenSaverTimeout 读取屏幕保护程序启动前的空闲时间，单位是秒。
 	ScreenSaverTimeout() (int, error)
-	// SetScreenSaverTimeout 设置屏幕保护程序启动前的空闲时间，单位是秒。
 	SetScreenSaverTimeout(seconds int) error
-	// Close ends the session.
 	Close() error
 }
 
-// USBChargeLimit reads the charging limit in percent.
+// USBChargeLimit 读取关机 USB 供电终止的电量阈值百分比。
 func (a *App) USBChargeLimit() (int, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -64,7 +41,7 @@ func (a *App) USBChargeLimit() (int, error) {
 	return limit, nil
 }
 
-// SetUSBChargeLimit sets the charging limit in percent.
+// SetUSBChargeLimit 设置关机 USB 充电截止电量百分比。
 func (a *App) SetUSBChargeLimit(percent int) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -77,7 +54,7 @@ func (a *App) SetUSBChargeLimit(percent int) error {
 	return nil
 }
 
-// USBChargeEnabled reports whether the charging over USB is allowed.
+// USBChargeEnabled 查询关机 USB 充电功能是否开启。
 func (a *App) USBChargeEnabled() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -91,7 +68,7 @@ func (a *App) USBChargeEnabled() (bool, error) {
 	return enabled, nil
 }
 
-// SetUSBChargeEnabled allows or forbids the charging over USB.
+// SetUSBChargeEnabled 开启或关闭关机 USB 充电。
 func (a *App) SetUSBChargeEnabled(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -104,10 +81,7 @@ func (a *App) SetUSBChargeEnabled(enabled bool) error {
 	return nil
 }
 
-// DisplayMode reads the graphics switch of the machine.
-//
-// The setting belongs to the Quick Access service of the original stack,
-// it is not part of the gaming hardware provider.
+// DisplayMode 查询当前的显示切换模式。
 func (a *App) DisplayMode() (quickaccess.DisplayMode, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -116,12 +90,12 @@ func (a *App) DisplayMode() (quickaccess.DisplayMode, error) {
 	defer release()
 	mode, err := client.DisplayMode()
 	if err != nil {
-		return quickaccess.DisplayModeHybrid, fmt.Errorf("app: 读取显卡切换方式失败: %w", err)
+		return quickaccess.DisplayModeHybrid, fmt.Errorf("app: 读取显示模式失败: %w", err)
 	}
 	return mode, nil
 }
 
-// SetDisplayMode selects the graphics switch of the machine.
+// SetDisplayMode 设置显卡显示模式。
 func (a *App) SetDisplayMode(mode quickaccess.DisplayMode) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -129,15 +103,12 @@ func (a *App) SetDisplayMode(mode quickaccess.DisplayMode) error {
 	}
 	defer release()
 	if err := client.SetDisplayMode(mode); err != nil {
-		return fmt.Errorf("app: 设置显卡切换方式失败: %w", err)
+		return fmt.Errorf("app: 设置显示模式失败: %w", err)
 	}
 	return nil
 }
 
-// DarkMode reports whether the dark mode of the system is switched on.
-//
-// The setting belongs to the Quick Access service of the original stack,
-// it is not part of the gaming hardware provider.
+// DarkMode 查询 Windows 深色模式开关。
 func (a *App) DarkMode() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -151,7 +122,7 @@ func (a *App) DarkMode() (bool, error) {
 	return enabled, nil
 }
 
-// SetDarkMode switches the dark mode of the system on or off.
+// SetDarkMode 开启或关闭深色主题模式。
 func (a *App) SetDarkMode(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -164,12 +135,7 @@ func (a *App) SetDarkMode(enabled bool) error {
 	return nil
 }
 
-// TransparentEffect reports whether the windows of the system are
-// transparent.
-//
-// The ability belongs to the Quick Access service of the original stack.
-// A service that does not know the command answers with an error, the
-// program never answers that the effect is switched off.
+// TransparentEffect 查询窗口透明度视觉特效开关。
 func (a *App) TransparentEffect() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -183,7 +149,7 @@ func (a *App) TransparentEffect() (bool, error) {
 	return enabled, nil
 }
 
-// SetTransparentEffect switches the transparency of the windows.
+// SetTransparentEffect 启用或关闭系统窗口透明效果。
 func (a *App) SetTransparentEffect(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -196,25 +162,21 @@ func (a *App) SetTransparentEffect(enabled bool) error {
 	return nil
 }
 
-// AutoHideTaskbar reports whether the taskbar hides itself.
-//
-// The ability belongs to the Quick Access service of the original stack.
-// A service that does not know the command answers with an error, the
-// program never answers that the taskbar does not hide itself.
+// AutoHideTaskbar 查询任务栏自动隐藏开关。
 func (a *App) AutoHideTaskbar() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
 		return false, err
 	}
 	defer release()
-	hidden, err := client.AutoHideTaskbar()
+	enabled, err := client.AutoHideTaskbar()
 	if err != nil {
 		return false, fmt.Errorf("app: 读取任务栏自动隐藏失败: %w", err)
 	}
-	return hidden, nil
+	return enabled, nil
 }
 
-// SetAutoHideTaskbar switches the automatic hiding of the taskbar.
+// SetAutoHideTaskbar 启用或关闭任务栏自动隐藏功能。
 func (a *App) SetAutoHideTaskbar(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -227,11 +189,7 @@ func (a *App) SetAutoHideTaskbar(enabled bool) error {
 	return nil
 }
 
-// ScreenSaver reports whether the screen saver is switched on.
-//
-// The ability belongs to the Quick Access service of the original stack.
-// A service that does not know the command answers with an error, the
-// program never answers that the screen saver is switched off.
+// ScreenSaver 查询屏幕保护程序是否启用。
 func (a *App) ScreenSaver() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -240,12 +198,12 @@ func (a *App) ScreenSaver() (bool, error) {
 	defer release()
 	enabled, err := client.ScreenSaver()
 	if err != nil {
-		return false, fmt.Errorf("app: 读取屏幕保护程序失败: %w", err)
+		return false, fmt.Errorf("app: 读取屏幕保护开关失败: %w", err)
 	}
 	return enabled, nil
 }
 
-// SetScreenSaver switches the screen saver on or off.
+// SetScreenSaver 开启或关闭屏幕保护程序。
 func (a *App) SetScreenSaver(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -253,31 +211,26 @@ func (a *App) SetScreenSaver(enabled bool) error {
 	}
 	defer release()
 	if err := client.SetScreenSaver(enabled); err != nil {
-		return fmt.Errorf("app: 设置屏幕保护程序失败: %w", err)
+		return fmt.Errorf("app: 设置屏幕保护开关失败: %w", err)
 	}
 	return nil
 }
 
-// ScreenSaverTimeout reads the idle time in seconds before the screen
-// saver starts.
-//
-// The ability belongs to the Quick Access service of the original stack.
-// A service that does not know the command answers with an error.
+// ScreenSaverTimeout 获取屏幕保护程序的超时时间（秒）。
 func (a *App) ScreenSaverTimeout() (int, error) {
 	client, release, err := a.quick()
 	if err != nil {
 		return 0, err
 	}
 	defer release()
-	timeout, err := client.ScreenSaverTimeout()
+	seconds, err := client.ScreenSaverTimeout()
 	if err != nil {
-		return 0, fmt.Errorf("app: 读取屏幕保护程序超时失败: %w", err)
+		return 0, fmt.Errorf("app: 读取屏幕保护时间失败: %w", err)
 	}
-	return timeout, nil
+	return seconds, nil
 }
 
-// SetScreenSaverTimeout sets the idle time in seconds before the screen
-// saver starts.
+// SetScreenSaverTimeout 设置屏幕保护程序的超时秒数。
 func (a *App) SetScreenSaverTimeout(seconds int) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -285,35 +238,24 @@ func (a *App) SetScreenSaverTimeout(seconds int) error {
 	}
 	defer release()
 	if err := client.SetScreenSaverTimeout(seconds); err != nil {
-		return fmt.Errorf("app: 设置屏幕保护程序超时失败: %w", err)
+		return fmt.Errorf("app: 设置屏幕保护时间失败: %w", err)
 	}
 	return nil
 }
 
-// quick opens a session with the Quick Access service of the original
-// stack.
-//
-// The service owns the settings that do not belong to the gaming
-// hardware, such as the charging over USB. It is not needed for the other
-// settings, so the session is only opened when one of them is used.
-//
-// 注入给程序的会话属于注入的人，程序不会关掉它。程序自己开的会话每次
-// 调用都用完就关，因为关掉的会话不能再用第二次。
-//
-// 返回的函数负责结束会话，用完之后必须调用。
 func (a *App) quick() (QuickAccess, func(), error) {
 	a.mu.Lock()
-	client := a.quickClient
+	if a.quickClient != nil {
+		client := a.quickClient
+		a.mu.Unlock()
+		return client, func() {}, nil
+	}
 	options := a.quickOptions
 	a.mu.Unlock()
 
-	if client != nil {
-		return client, func() {}, nil
-	}
-
-	owned, err := quickaccess.Connect(options)
+	client, err := quickaccess.Connect(options)
 	if err != nil {
-		return nil, nil, fmt.Errorf("app: 连不上原厂软件的 Quick Access 服务: %w", err)
+		return nil, nil, fmt.Errorf("app: 连接 Quick Access 服务失败: %w", err)
 	}
-	return owned, func() { _ = owned.Close() }, nil
+	return client, func() { client.Close() }, nil
 }

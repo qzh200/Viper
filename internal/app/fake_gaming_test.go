@@ -4,72 +4,64 @@ import (
 	"viper/internal/hardware"
 )
 
-// The fake gaming stands for the machine, so that the tests of the
-// program do not need the rights of an administrator and do not touch the
-// firmware.
-
-// fakeGaming is a machine that answers from a table.
 type fakeGaming struct {
-	// powerMode is the performance profile of the machine.
 	powerMode hardware.PowerMode
-	// gpuMode is the graphics switch of the machine.
+
 	gpuMode hardware.GPUMode
-	// brightness is the brightness of the keyboard.
+
 	brightness uint64
-	// sensors are the live readings of the machine.
+
 	sensors hardware.Sensors
-	// fans are the fan settings of the machine.
+
 	fans hardware.FanState
-	// backlight is the state of the keyboard backlight.
+
 	backlight hardware.BacklightState
-	// bootSound reports whether the sound at the start of the machine is on.
+
 	bootSound bool
-	// winKeyLocked reports whether the Windows key is locked.
+
 	winKeyLocked bool
-	// lcdOverdrive reports whether the display overdrive is active.
+
 	lcdOverdrive bool
-	// coolBoost reports whether the boost fan table is selected.
+
 	coolBoost bool
-	// fanTable is the table of the fans that the machine uses.
+
 	fanTable uint64
-	// discreteGPU reports the state of the discrete GPU switch.
+
 	discreteGPU bool
-	// overclockGPU reports whether the card can be overclocked.
+
 	overclockGPU bool
-	// overclockCPU reports whether the processor can be overclocked.
+
 	overclockCPU bool
-	// lighting is the lighting configuration of the machine.
+
 	lighting hardware.RGBConfig
-	// brightnessError is the failure of the brightness of the keyboard.
+
 	brightnessError error
-	// monitorError is the failure of the readings of the machine.
+
 	monitorError error
 
-	// closed reports whether the connection was released.
 	closed bool
-	// written records the lighting that was applied.
+
 	written []hardware.RGBConfig
-	// writtenFans records the fan configuration that was applied.
+
 	writtenFans []hardware.FanConfig
-	// writtenPower records the profile that was applied.
+
 	writtenPower []hardware.PowerMode
-	// writtenBacklight records the backlight that was applied.
+
 	writtenBacklight []int
-	// writtenTimeout records the automatic switch off that was applied.
+
 	writtenTimeout []bool
-	// writtenBootSound records the sound that was applied.
+
 	writtenBootSound []bool
-	// writtenWinKey records the lock of the Windows key that was applied.
+
 	writtenWinKey []bool
-	// writtenOverdrive records the overdrive that was applied.
+
 	writtenOverdrive []bool
-	// writtenCoolBoost records the boost that was applied.
+
 	writtenCoolBoost []bool
-	// writtenGPUMode records the graphics switch that was applied.
+
 	writtenGPUMode []hardware.GPUMode
 }
 
-// newFakeGaming builds a machine that answers with the defaults.
 func newFakeGaming() *fakeGaming {
 	return &fakeGaming{
 		powerMode:  hardware.PowerBalanced,
@@ -105,10 +97,6 @@ func (g *fakeGaming) LightingBrightness() (uint64, error) {
 	return g.brightness, nil
 }
 
-// Lighting returns the lighting of the machine.
-//
-// 原厂服务读得回分区颜色与灯效，所以替身也读得回：灯效与颜色是替身自己记着
-// 的那一份，亮度是 brightness。机器读不到的时候这里也读不到。
 func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) {
 	if g.brightnessError != nil {
 		return hardware.RGBConfig{}, g.brightnessError
@@ -122,14 +110,13 @@ func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) {
 
 func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
 	g.written = append(g.written, config)
-	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+
 	g.lighting = config
 	return nil
 }
 
 func (g *fakeGaming) ResetLighting() error {
-	// The machine returns the default appearance, a static white in every
-	// zone at full brightness.
+
 	white := hardware.RGBColor{R: 255, G: 255, B: 255}
 	config := hardware.RGBConfig{
 		Effect:     hardware.EffectStatic,
@@ -147,12 +134,8 @@ func (g *fakeGaming) ResetLighting() error {
 
 func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.backlight, nil }
 
-// BacklightBuffer reads the raw buffer of the keyboard backlight.
-//
-// The buffer is built by the hardware layer, so that the stand answers
-// in the same shape as the machine does.
 func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
-	// 缓冲区的形状与机器一样：亮度在第二个和第五个字节，第九个字节是一。
+
 	buffer := make([]byte, 16)
 	buffer[2] = byte(g.brightness)
 	buffer[5] = byte(g.brightness)
@@ -164,7 +147,7 @@ func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
 func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	g.writtenBacklight = append(g.writtenBacklight, brightness)
 	g.writtenTimeout = append(g.writtenTimeout, timeout)
-	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+
 	g.brightness = uint64(brightness)
 	g.backlight = hardware.BacklightState{
 		Brightness: brightness,
@@ -173,9 +156,6 @@ func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	return nil
 }
 
-// Monitor returns what the machine reports about itself.
-//
-// 原厂服务的监视数据：替身给的是一组固定的数。
 func (g *fakeGaming) Monitor() (hardware.MonitorData, error) {
 	if g.monitorError != nil {
 		return hardware.MonitorData{}, g.monitorError
@@ -198,10 +178,6 @@ func (g *fakeGaming) Monitor() (hardware.MonitorData, error) {
 	}, nil
 }
 
-// Fans returns the fan configuration of the machine.
-//
-// 加速就是全速：两个风扇都是全速的时候，加速才是开着的。替身跟机器一样
-// 这样算。
 func (g *fakeGaming) Fans() (hardware.FanState, error) {
 	state := g.fans
 	state.CoolBoost = state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax
@@ -210,7 +186,7 @@ func (g *fakeGaming) Fans() (hardware.FanState, error) {
 
 func (g *fakeGaming) SetFans(config hardware.FanConfig) error {
 	g.writtenFans = append(g.writtenFans, config)
-	// 机器写完之后读回来的是新值，替身也要这样，读写才有一致性。
+
 	g.fans = hardware.FanState{
 		CPUMode:    config.CPUMode,
 		GPUMode:    config.GPUMode,

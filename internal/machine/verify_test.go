@@ -10,10 +10,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// fastVerify shortens the wait of the read back check.
-//
-// 机器没有接受设置的时候，核对要等一会儿才放弃。用例里等三秒太慢，所以把
-// 等待的时间改短。
 func fastVerify(t *testing.T) {
 	t.Helper()
 
@@ -27,7 +23,6 @@ func fastVerify(t *testing.T) {
 	})
 }
 
-// TestThatTheLightingIsCheckedAfterTheWrite 写完灯效要读回核对。
 func TestThatTheLightingIsCheckedAfterTheWrite(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
@@ -46,11 +41,6 @@ func TestThatTheLightingIsCheckedAfterTheWrite(t *testing.T) {
 	}
 }
 
-// TestThatTheReadKeepsWaitingWhenTheServiceAnswersWithoutData 读不到的时候
-// 要继续等，不要立刻当成失败。
-//
-// 服务正忙着让刚写下的设置生效的时候，会偶发回一个没有数据的应答。那不是
-// "失败"，是"还没好"。
 func TestThatTheReadKeepsWaitingWhenTheServiceAnswersWithoutData(t *testing.T) {
 	fastVerify(t)
 
@@ -73,8 +63,6 @@ func TestThatTheReadKeepsWaitingWhenTheServiceAnswersWithoutData(t *testing.T) {
 	}
 }
 
-// TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing 一直读不到的时候
-// 要把最后的错误报出来。
 func TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing(t *testing.T) {
 	fastVerify(t)
 
@@ -89,10 +77,9 @@ func TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing(t *testing.T) {
 	}
 }
 
-// TestThatALightingThatWasNotAcceptedIsReported 机器没有接受的时候要报错。
 func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
-	// The service keeps reporting the old brightness.
+
 	service.answers[agentservice.FunctionLighting] = answer(
 		map[string]any{"brightness": 10}, agentservice.ResultOK)
 	service.stale = map[string]bool{agentservice.FunctionLighting: true}
@@ -110,7 +97,6 @@ func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatAColourThatWasNotAcceptedIsReported 分区颜色没有生效时要报错。
 func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionLighting] = answer(map[string]any{
@@ -140,7 +126,6 @@ func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatAnEffectThatWasNotAcceptedIsReported 灯效没有生效时要报错。
 func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionLighting] = answer(map[string]any{
@@ -168,7 +153,6 @@ func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatTheTimeoutThatWasNotAcceptedIsReported 超时开关没有生效时要报错。
 func TestThatTheTimeoutThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionLighting] = answer(
@@ -186,7 +170,6 @@ func TestThatTheTimeoutThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatTheProfileThatWasNotAcceptedIsReported 性能档位没有换时要报错。
 func TestThatTheProfileThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionOperatingMode] = answer(
@@ -205,7 +188,6 @@ func TestThatTheProfileThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatASwitchThatWasNotAcceptedIsReported 开关没有生效时要报错。
 func TestThatASwitchThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionWinKey] = answer(
@@ -234,10 +216,6 @@ func TestThatASwitchThatWasNotAcceptedIsReported(t *testing.T) {
 	}
 }
 
-// TestThatTheGraphicsModeIsNotCheckedAfterTheWrite 显卡模式不读回核对。
-//
-// 图形模式写进的是杂项设置表，机器要到重启才真的换过去，读回来的值说明不了
-// 什么，所以这一项只看服务有没有收下。
 func TestThatTheGraphicsModeIsNotCheckedAfterTheWrite(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionGPUMode] = answer(
@@ -254,15 +232,11 @@ func TestThatTheGraphicsModeIsNotCheckedAfterTheWrite(t *testing.T) {
 	}
 }
 
-// TestThatTheWindowsKeyGoesThroughTheService Windows 键问的是原厂服务。
-//
-// 实测：原厂服务收下 WIN_KEY 的请求，值却一直不变，所以写完的核对会把它
-// 报出来——不假装成功。
 func TestThatTheWindowsKeyGoesThroughTheService(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionWinKey] = answer(
 		map[string]any{"status": 1}, agentservice.ResultOK)
-	// 服务收了请求却没改状态：读回来还是老样子。
+
 	service.stale = map[string]bool{agentservice.FunctionWinKey: true}
 	backend := newBackend(t, service)
 
@@ -274,7 +248,6 @@ func TestThatTheWindowsKeyGoesThroughTheService(t *testing.T) {
 		t.Error("服务报的是这个键还能用")
 	}
 
-	// 服务的值没有跟着变，核对要报出来。
 	err = backend.SetWinKeyLocked(true)
 	if err == nil {
 		t.Error("服务没有接受这个锁，却报告成功")
@@ -284,7 +257,6 @@ func TestThatTheWindowsKeyGoesThroughTheService(t *testing.T) {
 	}
 }
 
-// TestThatTheResetOfTheLightingIsWrittenToTheService 复位灯效走原厂服务。
 func TestThatTheResetOfTheLightingIsWrittenToTheService(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
@@ -305,7 +277,6 @@ func TestThatTheResetOfTheLightingIsWrittenToTheService(t *testing.T) {
 	}
 }
 
-// TestThatTheOverclockCapabilityIsNotSupported 超频能力原厂服务不实现。
 func TestThatTheOverclockCapabilityIsNotSupported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.CapabilityOverclockingMode] = agentservice.Answer{

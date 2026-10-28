@@ -10,49 +10,31 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// The sticky keys live in the accessibility settings of the current user.
-//
-// The original application reaches them through the same system call, the
-// accessibility agent of Windows watches the setting and applies it without
-// a restart.
 const (
-	// spiGetStickyKeys reads the sticky key configuration.
 	spiGetStickyKeys = 0x003A
-	// spiSetStickyKeys writes the sticky key configuration.
 	spiSetStickyKeys = 0x003B
-	// spiUpdateIniFile stores the new value in the profile.
 	spiUpdateIniFile = 0x0001
-	// spiSendChange tells the running system about the new value.
-	spiSendChange = 0x0002
+	spiSendChange    = 0x0002
 )
 
-// The bits of the sticky key configuration.
 const (
-	// stickyKeysOn marks the sticky keys as switched on.
-	stickyKeysOn = 0x00000001
-	// stickyKeysAvailable marks the feature as present on this machine.
+	stickyKeysOn        = 0x00000001
 	stickyKeysAvailable = 0x00000002
 )
 
-// stickyKeysPath is where Windows keeps the state of the sticky keys.
 const stickyKeysPath = `Control Panel\Accessibility\StickyKeys`
 
-// user32 holds the system calls of the user interface library.
 var (
 	user32                    = syscall.NewLazyDLL("user32.dll")
 	procSystemParametersInfoW = user32.NewProc("SystemParametersInfoW")
 )
 
-// stickyKeys is the structure the system exchanges for the sticky keys.
-//
-// It carries the size of the structure and the flag word, the lowest bit of
-// the word carries the state of the switch.
 type stickyKeys struct {
 	size  uint32
 	flags uint32
 }
 
-// StickyKeys reports whether the sticky keys are switched on.
+// StickyKeys 查询 Windows 粘滞键当前是否处于开启状态。
 func StickyKeys() (bool, error) {
 	keys, err := readStickyKeys()
 	if err != nil {
@@ -61,10 +43,7 @@ func StickyKeys() (bool, error) {
 	return keys.flags&stickyKeysOn != 0, nil
 }
 
-// SetStickyKeys switches the sticky keys on or off.
-//
-// The change is written to the profile of the current user and announced to
-// the running system, so the keyboard reacts right away.
+// SetStickyKeys 启用或禁用 Windows 粘滞键功能。
 func SetStickyKeys(enabled bool) error {
 	keys, err := readStickyKeys()
 	if err != nil {
@@ -90,10 +69,6 @@ func SetStickyKeys(enabled bool) error {
 	return nil
 }
 
-// readStickyKeys reads the sticky key configuration.
-//
-// The system call is the accurate source, the registry is the fallback for
-// the rare case where the call is refused.
 func readStickyKeys() (stickyKeys, error) {
 	keys := stickyKeys{size: uint32(unsafe.Sizeof(stickyKeys{}))}
 
@@ -115,7 +90,6 @@ func readStickyKeys() (stickyKeys, error) {
 	return keys, nil
 }
 
-// registryStickyKeysFlags reads the sticky key flags from the profile.
 func registryStickyKeysFlags() (uint32, error) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, stickyKeysPath, registry.QUERY_VALUE)
 	if err != nil {
@@ -123,9 +97,14 @@ func registryStickyKeysFlags() (uint32, error) {
 	}
 	defer key.Close()
 
-	value, _, err := key.GetIntegerValue("Flags")
+	val, _, err := key.GetStringValue("Flags")
 	if err != nil {
-		return 0, fmt.Errorf("hardware: read the sticky keys setting: %w", err)
+		return 0, fmt.Errorf("hardware: read the sticky keys flags: %w", err)
 	}
-	return uint32(value), nil
+
+	var flags uint32
+	if _, err := fmt.Sscanf(val, "%d", &flags); err != nil {
+		return 0, fmt.Errorf("hardware: parse the sticky keys flags: %w", err)
+	}
+	return flags, nil
 }

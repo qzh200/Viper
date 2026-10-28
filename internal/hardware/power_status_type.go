@@ -4,50 +4,45 @@ import (
 	"fmt"
 )
 
-// The values of the line status of the power supply.
+// AC 电源连接状态常量。
 const (
-	// PowerOffline means that the machine runs on the battery.
 	ACLineOffline = 0
-	// PowerOnline means that the machine runs on the power supply.
-	ACLineOnline = 1
-	// PowerBackup means that the machine runs on a backup supply.
-	ACLineBackup = 2
-	// PowerUnknown means that the state cannot be told.
+	ACLineOnline  = 1
+	ACLineBackup  = 2
 	ACLineUnknown = 255
 )
 
-// The bits of the battery flag.
+// 电池标志位常量（对应 Win32 SYSTEM_POWER_STATUS.BatteryFlag）。
 const (
-	// BatteryHigh means that the battery is nearly full.
-	BatteryHigh = 1
-	// BatteryLow means that the battery is running low.
-	BatteryLow = 2
-	// BatteryCritical means that the battery is almost empty.
+	BatteryHigh     = 1
+	BatteryLow      = 2
 	BatteryCritical = 4
-	// BatteryCharging means that the battery is charged.
 	BatteryCharging = 8
-	// BatteryAbsent means that the machine has no battery.
-	BatteryAbsent = 128
+	BatteryAbsent   = 128
 )
 
-// PowerStatus describes the power supply of the machine.
+// PowerStatus 记录当前系统电源与电池充放电状态。
 type PowerStatus struct {
-	// OnAC reports whether the machine runs on the power supply.
+	// OnAC 标识当前是否连接交流适配器供电。
 	OnAC bool
-	// OnBattery reports whether the machine runs on the battery.
+
+	// OnBattery 标识当前是否仅依赖电池供电。
 	OnBattery bool
-	// BatteryPercent is the charge of the battery in percent, or 255 when
-	// the machine has no battery.
+
+	// BatteryPercent 记录当前电池剩余百分比 (0-100)。
 	BatteryPercent int
-	// Charging reports whether the battery is being charged.
+
+	// Charging 标识电池当前是否处于充电状态。
 	Charging bool
-	// BatteryLow reports whether the battery is running low.
+
+	// BatteryLow 标识电池电量是否偏低。
 	BatteryLow bool
-	// BatteryCritical reports whether the battery is almost empty.
+
+	// BatteryCritical 标识电池电量是否进入告急状态。
 	BatteryCritical bool
 }
 
-// String renders the power status for display.
+// String 返回电源状态的简要描述。
 func (p PowerStatus) String() string {
 	switch {
 	case p.OnAC:

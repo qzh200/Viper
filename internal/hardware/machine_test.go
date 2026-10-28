@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// 这一层的读是这台机器自己的：机器身份、电源状态、粘滞键。它们只读不写，
-// 所以用例可以直接问真的机器，问不到就跳过。
-
 func TestTheIdentityOfThisMachine(t *testing.T) {
 	identity, err := SystemInfo()
 	if err != nil {
@@ -56,7 +53,6 @@ func TestTheStickyKeysOfThisMachineCanBeSwitched(t *testing.T) {
 		t.Errorf("粘滞键还是 %v，没有变成 %v", current, !original)
 	}
 
-	// 改回原来的样子。
 	if err := SetStickyKeys(original); err != nil {
 		t.Fatalf("改回粘滞键失败: %v", err)
 	}

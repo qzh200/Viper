@@ -9,12 +9,11 @@ import (
 	"viper/internal/hardware"
 )
 
-// fakeService is a stand for the service of the original software.
 type fakeService struct {
 	answers map[string]json.RawMessage
 	written []string
 	fail    error
-	// setFails makes every write fail.
+
 	setFails bool
 }
 
@@ -52,7 +51,6 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 	return agentservice.Answer{Data: s.answers["monitor"], Result: "0"}, nil
 }
 
-// fakeMachine is a stand for the machine.
 type fakeMachine struct {
 	lighting  hardware.RGBConfig
 	backlight hardware.BacklightState
@@ -62,7 +60,7 @@ type fakeMachine struct {
 	bootSound bool
 	winKey    bool
 	fans      hardware.FanState
-	// failWith makes every read and write fail.
+
 	failWith error
 }
 
@@ -198,7 +196,6 @@ func (m *fakeMachine) SetFans(config hardware.FanConfig) error {
 
 func (m *fakeMachine) Close() {}
 
-// capture runs the tool with the output captured.
 func capture(t *testing.T, fn func()) string {
 	t.Helper()
 
@@ -211,7 +208,6 @@ func capture(t *testing.T, fn func()) string {
 	return buffer.String()
 }
 
-// TestRead asks the service for everything it tells.
 func TestRead(t *testing.T) {
 	service := newFakeService()
 	service.answer("monitor", `{"CPU_TEMPERATURE":89}`)
@@ -227,7 +223,6 @@ func TestRead(t *testing.T) {
 	}
 }
 
-// TestReadOfACommandThatIsNotThere covers the answer without a payload.
 func TestReadOfACommandThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 
@@ -237,8 +232,6 @@ func TestReadOfACommandThatIsNotThere(t *testing.T) {
 	}
 }
 
-// TestWriteWritesBackWhatTheServiceReports checks that the write mode leaves
-// the machine as it is.
 func TestWriteWritesBackWhatTheServiceReports(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionOperatingMode, `{"mode":1}`)
@@ -263,7 +256,6 @@ func TestWriteWritesBackWhatTheServiceReports(t *testing.T) {
 		}
 	}
 
-	// 灯效写回去的是服务报出来的颜色，不是空的分区数组。
 	for _, item := range service.written {
 		if item != agentservice.FunctionLighting {
 			continue
@@ -271,8 +263,6 @@ func TestWriteWritesBackWhatTheServiceReports(t *testing.T) {
 	}
 }
 
-// TestWriteOfAServiceThatDoesNotTakeTheWrite covers a write that does not
-// get through.
 func TestWriteOfAServiceThatDoesNotTakeTheWrite(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionOperatingMode, `{"mode":1}`)
@@ -284,19 +274,16 @@ func TestWriteOfAServiceThatDoesNotTakeTheWrite(t *testing.T) {
 	}
 }
 
-// TestWriteOfAServiceThatIsNotThere covers the service that does not answer.
 func TestWriteOfAServiceThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 	service.fail = errNotThere{}
 
-	// 服务不可达的时候一个请求也发不出去，程序不装样子说成功。
 	capture(t, func() { write(service) })
 	if len(service.written) != 0 {
 		t.Errorf("写了 %#v", service.written)
 	}
 }
 
-// TestReadMachine reads the machine through the hardware layer.
 func TestReadMachine(t *testing.T) {
 	device := newFakeMachine()
 
@@ -309,7 +296,6 @@ func TestReadMachine(t *testing.T) {
 	}
 }
 
-// TestReadMachineOfAMachineThatIsNotThere covers the reads that fail.
 func TestReadMachineOfAMachineThatIsNotThere(t *testing.T) {
 	device := newFakeMachine()
 	device.failWith = errNotThere{}
@@ -323,7 +309,6 @@ func TestReadMachineOfAMachineThatIsNotThere(t *testing.T) {
 	}
 }
 
-// TestReportOfARejectedWrite covers the answer that carries an error.
 func TestReportOfARejectedWrite(t *testing.T) {
 	out := capture(t, func() {
 		report("STICKY_KEY", agentservice.Answer{Result: "4"}, nil)
@@ -333,7 +318,6 @@ func TestReportOfARejectedWrite(t *testing.T) {
 	}
 }
 
-// TestReportOfAWriteThatFailed covers the write that does not get through.
 func TestReportOfAWriteThatFailed(t *testing.T) {
 	out := capture(t, func() {
 		report("LIGHTING", agentservice.Answer{}, errNotThere{})
@@ -343,7 +327,6 @@ func TestReportOfAWriteThatFailed(t *testing.T) {
 	}
 }
 
-// TestPrintJSON shows the payload of the service.
 func TestPrintJSON(t *testing.T) {
 	out := capture(t, func() { printJSON(json.RawMessage(`{"a":1}`)) })
 	if !contains(out, `"a": 1`) {
@@ -356,12 +339,10 @@ func TestPrintJSON(t *testing.T) {
 	}
 }
 
-// errNotThere is the error of a service that is not there.
 type errNotThere struct{}
 
 func (errNotThere) Error() string { return "服务不可达" }
 
-// contains reports whether the text holds the name.
 func contains(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {

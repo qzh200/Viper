@@ -4,44 +4,33 @@ import (
 	"fmt"
 )
 
-// rsmb is the four character code for the raw SMBIOS table.
-const rsmb = 0x52534D42
+// SMBIOS 固件表签名与类型常量。
+const (
+	rsmb                     = 0x52534D42 // 'RSMB' 提供者签名
+	systemInformationType    = 1          // Type 1: 系统信息
+	processorInformationType = 4          // Type 4: 处理器信息
+	memoryDeviceType         = 17         // Type 17: 内存设备信息
+)
 
-// systemInformationType is the SMBIOS structure type that carries the
-// manufacturer, the product name and the family.
-const systemInformationType = 1
-
-// processorInformationType is the SMBIOS structure type that carries the
-// clocks of the processor.
-const processorInformationType = 4
-
-// memoryDeviceType is the SMBIOS structure type that carries the speed of
-// the memory modules.
-const memoryDeviceType = 17
-
-// Identity describes the machine as reported by SMBIOS.
+// Identity 包含从 SMBIOS 提取的计算机硬件标识数据。
 type Identity struct {
-	// Manufacturer is the company that built the machine.
+	// Manufacturer 制造商名称。
 	Manufacturer string
-	// Product is the product name.
+
+	// Product 产品型号名称。
 	Product string
-	// Family is the product family, for example "Predator".
+
+	// Family 产品系列名称。
 	Family string
-	// Version is the product version.
+
+	// Version 硬件/主板版本。
 	Version string
-	// SerialNumber identifies the unit.
+
+	// SerialNumber 设备序列号。
 	SerialNumber string
 }
 
-// SystemIdentity reads the system information from the firmware tables.
-//
-// This is the only reliable way to tell a Predator from a Nitro: both
-// expose the same WMI provider, but only the Predator offers the turbo
-// performance profile.
-//
-// 三个返回值分别是机器的型号（固件里的产品名，例如 "Predator PHN16-71"）、
-// 产品系列（例如 "Predator"）和厂商（例如 "Acer"）。以前第三个返回值也是
-// 产品名，等于把型号说两遍，厂商从来没有被返回过。
+// SystemIdentity 返回简化的设备型号、产品家族与制造商。
 func SystemIdentity() (model, family, manufacturer string) {
 	identity, err := readIdentity()
 	if err != nil {
@@ -50,18 +39,17 @@ func SystemIdentity() (model, family, manufacturer string) {
 	return identity.Product, identity.Family, identity.Manufacturer
 }
 
-// SystemInfo reads the full system information block.
+// SystemInfo 从固件 SMBIOS 表中读取并解析系统身份信息。
 func SystemInfo() (Identity, error) {
 	return readIdentity()
 }
 
-// IsPredatorModel reports whether the machine belongs to the Predator
-// series.
+// IsPredatorModel 根据型号与系列字符串判断是否属于 Acer Predator（掠夺者）系列。
 func IsPredatorModel(model, family string) bool {
 	return containsFold(model, "predator") || containsFold(family, "predator")
 }
 
-// IsPredator reports whether this machine is a Predator.
+// IsPredator 检测当前机器是否属于 Acer Predator 系列。
 func IsPredator() bool {
 	identity, err := readIdentity()
 	if err != nil {
@@ -70,15 +58,6 @@ func IsPredator() bool {
 	return IsPredatorModel(identity.Product, identity.Family)
 }
 
-// getSystemFirmwareTable is declared in the files of the platforms, it
-// reads a raw firmware table.
-//
-// The function is not wrapped by golang.org/x/sys/windows, so it is
-// declared in firmware_windows.go. It is part of kernel32 and only reads the
-// tables the firmware already exposes, it never writes anything.
-
-// readIdentity parses the SMBIOS table looking for the system information
-// structure.
 func readIdentity() (Identity, error) {
 	identity := Identity{
 		Manufacturer: "Acer",
@@ -97,22 +76,22 @@ func readIdentity() (Identity, error) {
 	return found, nil
 }
 
-// Structure is one structure of a raw SMBIOS table.
+// Structure 表示解析后的单个 SMBIOS 结构体。
 type Structure struct {
-	// Type is the type of the structure.
+	// Type 结构体类型标识。
 	Type byte
-	// Data is the formatted area of the structure.
+
+	// Data 格式化数据区域。
 	Data []byte
-	// Offset is where the structure starts in the table.
+
+	// Offset 在原始表中的字节偏移。
 	Offset int
-	// Strings are the strings that follow the structure.
+
+	// Strings 附加的以 null 结尾的字符串表。
 	Strings []string
 }
 
-// Structures walks a raw SMBIOS table and returns the structures in it.
-//
-// 表是一段一段的，每一段后面跟着它的字符串表。身份解析与那个转储工具用的是
-// 同一份遍历。
+// Structures 解析 SMBIOS 原始字节数据，枚举出所有的 SMBIOS 结构单元。
 func Structures(table []byte) []Structure {
 	var out []Structure
 	for offset := 0; offset+4 <= len(table); {
@@ -133,9 +112,7 @@ func Structures(table []byte) []Structure {
 	return out
 }
 
-// RawFirmwareTable returns the raw system information block of the firmware.
-//
-// The data starts with an eight byte header, the structures follow behind it.
+// RawFirmwareTable 读取未经解析的 SMBIOS 固件原始表字节数据。
 func RawFirmwareTable() ([]byte, error) {
 	size := getSystemFirmwareTable(rsmb, 0, nil)
 	if size == 0 {
@@ -152,8 +129,6 @@ func RawFirmwareTable() ([]byte, error) {
 	return buffer[8:], nil
 }
 
-// parseIdentity walks the structures of a raw SMBIOS table and returns the
-// system information structure.
 func parseIdentity(table []byte) (Identity, bool) {
 	identity := Identity{
 		Manufacturer: "Acer",
@@ -177,27 +152,13 @@ func parseIdentity(table []byte) (Identity, bool) {
 	return identity, false
 }
 
-// ProcessorSpeed describes the clocks of the processor.
+// ProcessorSpeed 记录处理器主频信息。
 type ProcessorSpeed struct {
-	// MaxSpeedMHz is the highest clock the processor reaches.
-	MaxSpeedMHz int
-	// CurrentSpeedMHz is the clock the processor runs at.
+	MaxSpeedMHz     int
 	CurrentSpeedMHz int
 }
 
-// ProcessorClocks reads the clocks of the processor from the firmware.
-//
-// The firmware table carries the speeds of the processor, the highest one
-// is not stored anywhere else in a way that Windows keeps up to date.
-
-// MemoryFrequency reads the clock of the memory in megahertz.
-//
-// The firmware table carries the speed of the memory modules, the first
-// module of the machine is enough.
-
-// Word reads a little endian word out of a structure.
-//
-// 结构里的数是按字节摆的，读的时候按小端拼起来。
+// Word 从字节切片的指定偏移处读取 16 位小端无符号整数。
 func Word(data []byte, offset int) int {
 	if offset+2 > len(data) {
 		return -1
@@ -205,10 +166,7 @@ func Word(data []byte, offset int) int {
 	return int(data[offset]) | int(data[offset+1])<<8
 }
 
-// nextStructure advances past the current structure and its string table.
 func nextStructure(table []byte, offset, length int) int {
-	// The string table follows the formatted area and ends with a double
-	// null byte.
 	pos := offset + length
 	for pos < len(table) {
 		if table[pos] == 0 {
@@ -223,7 +181,6 @@ func nextStructure(table []byte, offset, length int) int {
 	return len(table)
 }
 
-// collectStrings reads the string table that follows a structure.
 func collectStrings(table []byte) []string {
 	var out []string
 	start := 0
@@ -242,7 +199,6 @@ func collectStrings(table []byte) []string {
 	return out
 }
 
-// pick returns the n-th string of the string table, or an empty string.
 func pick(strings []string, index byte) string {
 	if index == 0 || int(index) > len(strings) {
 		return ""
@@ -250,13 +206,11 @@ func pick(strings []string, index byte) string {
 	return strings[index-1]
 }
 
-// containsFold reports whether haystack contains needle, ignoring case.
 func containsFold(haystack, needle string) bool {
 	return len(needle) > 0 && len(haystack) >= len(needle) &&
 		indexFold(haystack, needle) >= 0
 }
 
-// indexFold finds needle inside haystack, ignoring case.
 func indexFold(haystack, needle string) int {
 	lowerHaystack := make([]byte, len(haystack))
 	for i := 0; i < len(haystack); i++ {
@@ -281,7 +235,6 @@ func indexFold(haystack, needle string) int {
 	return -1
 }
 
-// lower converts an ASCII letter to lower case.
 func lower(c byte) byte {
 	if c >= 'A' && c <= 'Z' {
 		return c + ('a' - 'A')

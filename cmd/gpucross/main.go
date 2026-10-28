@@ -1,11 +1,4 @@
-// Command gpucross compares the readings of the graphics card with the
-// ones of the original software.
-//
-// The original service reads the card through the interface of the driver,
-// Viper reads it through the management library. Both should tell the same
-// story.
-//
-// 协议走的是 internal/agentservice 的客户端，所以两边读的是同一个服务。
+// gpucross 用于对比直接调用 NVIDIA NVML 读取的显卡指标与 AcerAgentService 返回的监控数据。
 package main
 
 import (
@@ -18,7 +11,6 @@ import (
 	"viper/internal/probe"
 )
 
-// stdout is where the tool writes. 用例把它换成缓冲区。
 var stdout io.Writer = os.Stdout
 
 func main() {
@@ -47,7 +39,6 @@ func main() {
 	showService(client)
 }
 
-// showCards shows the cards as the management library reports them.
 func showCards(cards []nvidia.Telemetry) {
 	for i, card := range cards {
 		fmt.Fprintf(stdout, "  card %d: %s\n", i, card.Name)
@@ -59,7 +50,6 @@ func showCards(cards []nvidia.Telemetry) {
 	}
 }
 
-// showService shows the graphics card as the service reports it.
 func showService(client probe.Service) {
 	monitor, err := client.MonitorData()
 	if err != nil {

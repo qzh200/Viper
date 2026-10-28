@@ -9,37 +9,27 @@ import (
 	"viper/internal/hardware"
 )
 
-// fakeWrite is a write that reached the stand for the service.
 type fakeWrite struct {
-	// Function is the name of the setting.
 	Function string
-	// Parameter is the value that was written.
+
 	Parameter map[string]any
 }
 
-// fakeService is a stand for the AcerAgentService.
-//
-// The answers are given per function, a function without an answer is
-// answered with the value that was written to it, which is what the service
-// of the original software does.
 type fakeService struct {
-	// answers holds the answer of a function.
 	answers map[string]agentservice.Answer
-	// written holds the value that was written to a function.
+
 	written map[string]map[string]any
-	// monitor is the answer of the readings.
+
 	monitor agentservice.Answer
-	// writes holds the writes that arrived, in order.
+
 	writes []fakeWrite
-	// closed records that the session was ended.
+
 	closed bool
-	// getErr is the error of every read.
+
 	getErr error
-	// setErr is the error of every write.
+
 	setErr error
-	// stale names the functions whose readback stays at the programmed
-	// answer even after a write. It stands for a machine that did not
-	// take the setting.
+
 	stale map[string]bool
 }
 
@@ -50,7 +40,6 @@ func newFakeService() *fakeService {
 	}
 }
 
-// answer builds the answer of a request.
 func answer(data any, result string) agentservice.Answer {
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -59,16 +48,12 @@ func answer(data any, result string) agentservice.Answer {
 	return agentservice.Answer{Data: raw, Result: result}
 }
 
-// Get asks for the value of a setting.
 func (f *fakeService) Get(function string) (agentservice.Answer, error) {
 	if f.getErr != nil {
 		return agentservice.Answer{}, f.getErr
 	}
 	result, ok := f.answers[function]
-	// The service of the original software answers with the value that was
-	// written to it, so the stand does the same. A function that is marked
-	// as stale keeps the answer it was given, which stands for a machine
-	// that did not take the setting.
+
 	if values, written := f.written[function]; written && !f.stale[function] {
 		return answer(values, agentservice.ResultOK), nil
 	}
@@ -78,7 +63,6 @@ func (f *fakeService) Get(function string) (agentservice.Answer, error) {
 	return agentservice.Answer{Request: function, Result: agentservice.ResultFailed}, nil
 }
 
-// Set writes a setting.
 func (f *fakeService) Set(function string, parameter any) (agentservice.Answer, error) {
 	if f.setErr != nil {
 		return agentservice.Answer{}, f.setErr
@@ -91,12 +75,10 @@ func (f *fakeService) Set(function string, parameter any) (agentservice.Answer, 
 	if result, ok := f.answers[function]; ok {
 		return result, nil
 	}
-	// The service of the original software answers with the value that was
-	// written, so the stand does the same.
+
 	return answer(parameter, agentservice.ResultOK), nil
 }
 
-// MonitorData asks for the live numbers of the machine.
 func (f *fakeService) MonitorData() (agentservice.Answer, error) {
 	if f.getErr != nil {
 		return agentservice.Answer{}, f.getErr
@@ -104,18 +86,15 @@ func (f *fakeService) MonitorData() (agentservice.Answer, error) {
 	return f.monitor, nil
 }
 
-// Capability asks for an ability of the machine.
 func (f *fakeService) Capability(function string) (agentservice.Answer, error) {
 	return f.Get(function)
 }
 
-// Close ends the session.
 func (f *fakeService) Close() error {
 	f.closed = true
 	return nil
 }
 
-// newBackend builds a backend on top of the stand for the service.
 func newBackend(t *testing.T, service *fakeService) *Backend {
 	t.Helper()
 	return NewWithService(service)
@@ -585,7 +564,7 @@ func TestFansAreWrittenWithTheDutyCycles(t *testing.T) {
 
 func TestFansAreCheckedAfterTheWrite(t *testing.T) {
 	service := newFakeService()
-	// The service answers with another mode than the one that was written.
+
 	service.answers[agentservice.FunctionFanControl] = answer(
 		map[string]any{"mode": fanModeAuto}, agentservice.ResultOK)
 	service.stale = map[string]bool{agentservice.FunctionFanControl: true}

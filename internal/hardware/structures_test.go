@@ -2,8 +2,6 @@ package hardware
 
 import "testing"
 
-// TestWordReadsALittleEndianWord locks the way the numbers are taken out of
-// the structures of the firmware table.
 func TestWordReadsALittleEndianWord(t *testing.T) {
 	data := []byte{0xA0, 0x0F, 0x40, 0x00}
 
@@ -15,7 +13,6 @@ func TestWordReadsALittleEndianWord(t *testing.T) {
 	}
 }
 
-// TestWordOfAByteThatIsNotThere covers the read past the end of the data.
 func TestWordOfAByteThatIsNotThere(t *testing.T) {
 	if got := Word([]byte{0x01}, 0); got != -1 {
 		t.Errorf("读不到的时候该报 -1，是 %d", got)
@@ -25,9 +22,6 @@ func TestWordOfAByteThatIsNotThere(t *testing.T) {
 	}
 }
 
-// TestStructuresWalksTheTable locks the walk over the structures of a table.
-//
-// 表是一段一段的，每一段后面跟着它的字符串表，字符串表以两个零字节结束。
 func TestStructuresWalksTheTable(t *testing.T) {
 	first := make([]byte, 6)
 	first[0] = 4
@@ -39,7 +33,7 @@ func TestStructuresWalksTheTable(t *testing.T) {
 
 	table := []byte{}
 	table = append(table, first...)
-	table = append(table, 0x41, 0x42, 0x00, 0x00) // 字符串表
+	table = append(table, 0x41, 0x42, 0x00, 0x00)
 	table = append(table, second...)
 	table = append(table, 0x00, 0x00)
 
@@ -58,8 +52,6 @@ func TestStructuresWalksTheTable(t *testing.T) {
 	}
 }
 
-// TestStructuresOfATableThatEndsTooSoon covers the structure whose length
-// does not fit in the table.
 func TestStructuresOfATableThatEndsTooSoon(t *testing.T) {
 	table := []byte{4, 40, 0, 0}
 	if structures := Structures(table); len(structures) != 0 {

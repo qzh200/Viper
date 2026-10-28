@@ -8,9 +8,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// The scenes hold the lighting and the fans, so that every performance
-// profile can have its own look.
-
 func TestSaveScenarioKeepsTheScenes(t *testing.T) {
 	application := newTestApp(t)
 
@@ -57,9 +54,7 @@ func TestSaveScenarioReplacesTheSceneOfTheSameName(t *testing.T) {
 }
 
 func TestDeleteScenarioOfANameThatIsNotThere(t *testing.T) {
-	// A scene that does not exist cannot be removed, but the call must
-	// not fail either, the program asks for a removal of a scene that the
-	// user has just deleted in another window.
+
 	application := newTestApp(t)
 	if err := application.DeleteScenario("missing"); err != nil {
 		t.Errorf("the removal of a scene that is not there failed: %v", err)
@@ -102,8 +97,7 @@ func TestUnbindScenarioOfAProfileThatIsNotBound(t *testing.T) {
 }
 
 func TestBindScenarioTwice(t *testing.T) {
-	// A profile carries one scene, a second binding replaces the first
-	// one.
+
 	application := newTestApp(t)
 	if err := application.SaveScenario("game"); err != nil {
 		t.Fatal(err)
@@ -138,8 +132,7 @@ func TestTheSettingsPath(t *testing.T) {
 }
 
 func TestTheLightingOfTheStoredSettings(t *testing.T) {
-	// The firmware reports the brightness only, the effect and the
-	// colours come from the settings of Viper.
+
 	application, machine := newTestAppWith(t)
 	machine.brightness = 65
 	application.store.Update(func(s *config.Settings) {
@@ -164,8 +157,7 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 	if !lighting.PerZone {
 		t.Error("the per zone flag was lost")
 	}
-	// The firmware does not report the colours and the effect, the
-	// program has to keep its own record.
+
 	if lighting.ColourReadable {
 		t.Error("the firmware reports the colours")
 	}
@@ -175,7 +167,7 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 }
 
 func TestToStoredLightingKeepsTheDirection(t *testing.T) {
-	// The direction is a switch, both of its values are kept.
+
 	for _, direction := range []uint64{0, 1} {
 		stored := toStoredLighting(hardware.RGBConfig{Direction: direction})
 		if stored.Direction != direction {
@@ -185,8 +177,7 @@ func TestToStoredLightingKeepsTheDirection(t *testing.T) {
 }
 
 func TestToStoredLightingLimitsTheSpeed(t *testing.T) {
-	// The speed runs from one to nine, a speed of zero is not a speed
-	// that the keyboard can do.
+
 	stored := toStoredLighting(hardware.RGBConfig{Speed: 0})
 	if stored.Speed != 1 {
 		t.Errorf("the stored speed is %d, want 1", stored.Speed)

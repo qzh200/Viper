@@ -1,56 +1,64 @@
 package hardware
 
-// MonitorData is what the machine reports about itself.
-//
-// 读数来自原厂服务的监视数据：处理器的温度、使用率、频率与每核频率，显卡的
-// 温度、使用率与频率，内存的占用与频率，还有网络的上下行。
-//
-// 单位：温度是度，占用是百分比，频率是 MHz，内存总量是 MB——这些都核对过。
-// 网络那两个数是 kbps（官方软件用的就是这个单位）：实测下载时网卡走 17.9
-// KB/s = 143 kbps，服务报的是 121.5，对得上。
+// MonitorData 汇集整机实时硬件监控遥测指标。
 type MonitorData struct {
-	// CPUTemperatureC is the temperature of the processor in degrees.
+	// CPUTemperatureC 表示 CPU 封装温度（摄氏度）。
 	CPUTemperatureC int
-	// CPUFanRPM is the speed of the fan of the processor.
+
+	// CPUFanRPM 表示 CPU 风扇当前转速。
 	CPUFanRPM int
-	// CPUUsagePercent is the load of the processor in percent.
+
+	// CPUUsagePercent 表示 CPU 总体占用率百分比。
 	CPUUsagePercent float64
-	// CPUFrequencyMHz is the clock of the processor in megahertz.
+
+	// CPUFrequencyMHz 表示 CPU 当前运行频率（MHz）。
 	CPUFrequencyMHz int
-	// CPUMaxFrequencyMHz is the highest clock the processor reaches.
+
+	// CPUMaxFrequencyMHz 表示 CPU 理论最大主频（MHz）。
 	CPUMaxFrequencyMHz int
-	// CPUCoreFrequencyMHz is the clock of every core, in megahertz.
+
+	// CPUCoreFrequencyMHz 记录各 CPU 核心的即时频率。
 	CPUCoreFrequencyMHz []int
-	// SystemTempC is the temperature of the motherboard in degrees.
+
+	// SystemTempC 表示主板/系统综合温度。
 	SystemTempC int
-	// GPUTemperatureC is the temperature of the graphics card in degrees.
+
+	// GPUTemperatureC 表示独立 GPU 核心温度。
 	GPUTemperatureC int
-	// GPUFanRPM is the speed of the fan of the graphics card.
+
+	// GPUFanRPM 表示 GPU 风扇当前转速。
 	GPUFanRPM int
-	// GPUUsagePercent is the load of the graphics processor in percent.
+
+	// GPUUsagePercent 表示 GPU 核心负载百分比。
 	GPUUsagePercent int
-	// GPUFrequencyMHz is the clock of the graphics processor in megahertz.
+
+	// GPUFrequencyMHz 表示 GPU 核心当前时钟频率。
 	GPUFrequencyMHz int
-	// GPUMaxFrequencyMHz is the highest clock the graphics processor reaches.
+
+	// GPUMaxFrequencyMHz 表示 GPU 最大时钟频率。
 	GPUMaxFrequencyMHz int
-	// GPUIdle reports whether the graphics processor is doing nothing.
+
+	// GPUIdle 标识独立 GPU 当前是否处于空闲待机状态。
 	GPUIdle bool
-	// RAMTotalMB is the memory of the machine in megabytes.
+
+	// RAMTotalMB 表示物理内存总容量（MB）。
 	RAMTotalMB float64
-	// RAMUsagePercent is the load of the memory in percent.
+
+	// RAMUsagePercent 表示物理内存使用率百分比。
 	RAMUsagePercent float64
-	// RAMFrequencyMHz is the clock of the memory in megahertz.
+
+	// RAMFrequencyMHz 表示内存工作频率（MHz）。
 	RAMFrequencyMHz int
-	// WIFIDownloadKbps is the traffic of the wireless adapter in kilobits
-	// per second.
+
+	// WIFIDownloadKbps 记录无线网络即时下载速率（Kbps）。
 	WIFIDownloadKbps float64
-	// WIFIUploadKbps is the traffic of the wireless adapter in kilobits per
-	// second.
+
+	// WIFIUploadKbps 记录无线网络即时上传速率（Kbps）。
 	WIFIUploadKbps float64
-	// EthernetDownloadKbps is the traffic of the wired adapter in kilobits
-	// per second.
+
+	// EthernetDownloadKbps 记录有线以太网即时下载速率（Kbps）。
 	EthernetDownloadKbps float64
-	// EthernetUploadKbps is the traffic of the wired adapter in kilobits per
-	// second.
+
+	// EthernetUploadKbps 记录有线以太网即时上传速率（Kbps）。
 	EthernetUploadKbps float64
 }

@@ -1,11 +1,4 @@
-// Package app is the use case layer of Viper.
-//
-// It joins the hardware backend with the stored settings. The settings that
-// do not belong to the gaming hardware, such as the charging over USB, are
-// read from the service of the original software.
-//
-// 硬件层只有一条路：原厂程序。灯光、灯效、风扇、性能档位与传感器读数都问
-// 原厂服务，它以系统的身份运行，不用管理员权限。
+// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
 package app
 
 import (
@@ -18,10 +11,6 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// abilities is the set of abilities of the machine that the program uses.
-//
-// The program does not report the table of the fans, so it depends on the
-// small interfaces instead of the whole of the machine.
 type abilities interface {
 	hardware.ReadingsReader
 	hardware.PowerModeReader
@@ -34,63 +23,41 @@ type abilities interface {
 	hardware.FansWriter
 	hardware.CoolBoostReader
 	hardware.SwitchesReader
-	// Monitor reads everything the machine reports about itself: the
-	// temperatures, the loads, the clocks, the memory and the network.
+
 	Monitor() (hardware.MonitorData, error)
 }
 
-// The routes the program can reach the machine by.
 const (
-	// routeService goes through the service of the original software. It is
-	// the road of the command line, and it needs no rights of an
-	// administrator.
 	routeService = "原厂服务 AcerAgentService"
 )
 
-// App is the running program.
+// App 是 Viper 控制中心的核心应用实例，负责统一组织硬件交互与本地配置管理。
 type App struct {
-	// mu 看守着程序按需打开的连接。游戏硬件和 Quick Access 服务都是
-	// 第一次用到相关设置时才打开，所以不需要管理员权限的设置不会去
-	// 碰硬件。这把锁保证同时到来的两次调用不会各开一条连接，然后把
-	// 其中一条漏掉。
 	mu sync.Mutex
-	// backend 是到游戏硬件的连接。
+
 	backend abilities
-	// openBackend 打开到机器的连接。它是可变的，所以用例可以放一个替身
-	// 在真机器的位置上。
+
 	openBackend func() (hardware.Gaming, string, error)
-	// serviceAddress 是连原厂服务用的地址，空的就是本机默认的端口。
+
 	serviceAddress string
-	// route 记着程序走的是哪条路：原厂服务还是固件那一侧。
+
 	route string
-	// closed 记录程序是否已经关闭。关闭之后的程序不再打开硬件。
+
 	closed bool
-	// store 保存两次运行之间的设置。
+
 	store *config.Store
-	// quickClient 是与 Quick Access 服务的会话。它由测试注入，程序
-	// 自己每次调用都开一个新的会话。
+
 	quickClient QuickAccess
-	// quickOptions change the behaviour of the session with the Quick
-	// Access service.
+
 	quickOptions quickaccess.Options
 }
 
-// serviceAddress 是程序连原厂服务用的地址。
-//
-// 命令行只有一个 --service 选项，它要在程序开始时就定下来，所以它放在这里。
 var serviceAddress string
 
-// SetServiceAddress changes the address of the service of the original
-// software.
-//
-// 它要在程序开始时调用，早于任何一次连接。
+// SetServiceAddress 设置原厂服务 AcerAgentService 的默认监听地址。
 func SetServiceAddress(address string) { serviceAddress = address }
 
-// New opens the stored settings.
-//
-// The connection to the gaming hardware is opened on first use, the
-// settings of the original software do not need the rights that the
-// hardware needs.
+// New 创建使用默认用户配置的 App 实例。
 func New() (*App, error) {
 	store, err := config.Open()
 	if err != nil {
@@ -99,46 +66,29 @@ func New() (*App, error) {
 	return NewWithStore(store), nil
 }
 
-// NewWithStore opens the program with the given settings.
-//
-// It is used by the tests, so that they do not touch the settings of the
-// user.
+// NewWithStore 使用指定的配置存储实例构建 App。
 func NewWithStore(store *config.Store) *App {
 	return &App{store: store, serviceAddress: serviceAddress}
 }
 
-// NewWithBackend opens the program with the given hardware.
-//
-// It is used by the tests, so that they do not need the rights of an
-// administrator to talk to the firmware.
+// NewWithBackend 使用预置的硬件控制后端与配置存储构建 App。
 func NewWithBackend(store *config.Store, backend abilities) *App {
 	return &App{store: store, backend: backend}
 }
 
-// NewWithQuickAccess opens the program with the given session of the
-// Quick Access service.
-//
-// It is used by the tests, so that they do not need the service of the
-// original software.
+// NewWithQuickAccess 使用预置的 QuickAccess 客户端构建 App。
 func NewWithQuickAccess(store *config.Store, client QuickAccess) *App {
 	return &App{store: store, quickClient: client}
 }
 
-// SetQuickAccessOptions changes the way the program opens a session with
-// the Quick Access service.
-//
-// It has to be called before the first session is opened, an address
-// without the service of the original software makes every call of the
-// service fail.
-//
-// 这个入口让 quickOptions 不再是一个永远为零的字段。
+// SetQuickAccessOptions 设置 QuickAccess 连接选项。
 func (a *App) SetQuickAccessOptions(options quickaccess.Options) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.quickOptions = options
 }
 
-// Close releases the hardware.
+// Close 关闭应用并断开后端硬件服务连接。
 func (a *App) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -149,11 +99,6 @@ func (a *App) Close() {
 	a.closed = true
 }
 
-// hardware opens the connection to the gaming hardware.
-//
-// The connection is only made when a hardware setting is used, because
-// opening it takes a moment and the settings of the original software do
-// not need it.
 func (a *App) hardware() (abilities, error) {
 	return a.connect(func() (abilities, error) {
 		open := a.openBackend
@@ -172,13 +117,6 @@ func (a *App) hardware() (abilities, error) {
 	})
 }
 
-// openMachine opens the connection to the machine.
-//
-// 硬件层只有一条路：原厂 AcerAgentService。它不在的时候**没有第二条路**可
-// 走——直接操控固件那一整条路线已经删掉了。所以原厂服务不在，就把实情报给
-// 用的人。
-//
-// 第二个结果是程序走的是哪条路，命令行会把它报出来。
 func openMachine(address string) (hardware.Gaming, string, error) {
 	backend, err := machine.New(machine.Options{
 		Address: address,
@@ -191,15 +129,7 @@ func openMachine(address string) (hardware.Gaming, string, error) {
 	return backend, routeService, nil
 }
 
-// SetBackendOpener changes the way the program opens the connection to the
-// machine.
-//
-// It has to be called before the first connection is opened. The second
-// result is the name of the route the program is on, it is reported to the
-// user so that they know which road they are on.
-//
-// 这个入口让用例可以把一台机器的替身放在真机器的位置上，不用去碰真的
-// 机器。
+// SetBackendOpener 自定义硬件后端连接工厂函数，主要用于单元测试与模拟注入。
 func (a *App) SetBackendOpener(open func() (hardware.Gaming, string, error)) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -207,10 +137,7 @@ func (a *App) SetBackendOpener(open func() (hardware.Gaming, string, error)) {
 	a.openBackend = open
 }
 
-// Route returns the way the program reaches the machine.
-//
-// The connection is opened on first use, so before that the answer is that
-// the route is not known yet.
+// Route 返回当前与硬件后端建立连接的通道名称。
 func (a *App) Route() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -221,9 +148,6 @@ func (a *App) Route() string {
 	return a.route
 }
 
-// connect opens the connection to the gaming hardware once.
-//
-// 连接由锁守着，同时到来的两次调用不会开出两条连接然后漏掉其中一条。
 func (a *App) connect(open func() (abilities, error)) (abilities, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -241,5 +165,5 @@ func (a *App) connect(open func() (abilities, error)) (abilities, error) {
 	return backend, nil
 }
 
-// SettingsPath returns the location of the settings file.
+// SettingsPath 返回当前生效配置文件的物理路径。
 func (a *App) SettingsPath() string { return a.store.Path() }

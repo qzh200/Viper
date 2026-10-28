@@ -27,10 +27,7 @@ func TestDefaultSettings(t *testing.T) {
 }
 
 func TestTheDefaultSettingsCarryTheEnumeration(t *testing.T) {
-	// The settings carry the semantic enumeration of the hardware layer,
-	// never the codes that the firmware expects. The codes of the
-	// firmware are 0, 1, 4 and 5 for the profiles and 1, 2 and 3 for the
-	// fan behaviours.
+
 	settings := Default()
 	if settings.PowerMode == 4 || settings.PowerMode == 5 {
 		t.Errorf("the power mode is %d, want a value of the enumeration and not a code of the firmware",
@@ -90,7 +87,7 @@ func TestSettingsRoundTrip(t *testing.T) {
 }
 
 func TestBrokenSettingsFallBackToTheDefaults(t *testing.T) {
-	// A broken file must not stop the program.
+
 	var settings Settings
 	if err := json.Unmarshal([]byte("{not json"), &settings); err == nil {
 		t.Error("the broken file was accepted")

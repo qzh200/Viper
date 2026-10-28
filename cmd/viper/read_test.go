@@ -7,10 +7,6 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// TestReadTheSettingsOfTheQuickAccessService reads the settings that belong
-// to the Quick Access service.
-//
-// 这些命令只读，所以每一条都要报出机器现在的样子。
 func TestReadTheSettingsOfTheQuickAccessService(t *testing.T) {
 	installFakes(t)
 
@@ -39,7 +35,6 @@ func TestReadTheSettingsOfTheQuickAccessService(t *testing.T) {
 	}
 }
 
-// TestReadTheSwitchesOfTheMachine reads the switches of the machine.
 func TestReadTheSwitchesOfTheMachine(t *testing.T) {
 	installFakes(t)
 
@@ -54,7 +49,6 @@ func TestReadTheSwitchesOfTheMachine(t *testing.T) {
 	}
 }
 
-// TestReadTheBootSound reads the sound at the start.
 func TestReadTheBootSound(t *testing.T) {
 	installFakes(t)
 
@@ -67,8 +61,6 @@ func TestReadTheBootSound(t *testing.T) {
 	}
 }
 
-// TestReadTheBacklightTimeout reads the automatic switch off of the
-// backlight.
 func TestReadTheBacklightTimeout(t *testing.T) {
 	installFakes(t)
 
@@ -81,10 +73,6 @@ func TestReadTheBacklightTimeout(t *testing.T) {
 	}
 }
 
-// TestTheMachineThatCannotBeRead checks that a machine that is not there is
-// reported instead of being replaced by something else.
-//
-// 读不到的时候要报错，不拿别的东西顶替。
 func TestTheMachineThatCannotBeRead(t *testing.T) {
 	machine, _ := installFakes(t)
 	machine.lightingErr = errNotThere{}
@@ -101,12 +89,10 @@ func TestTheMachineThatCannotBeRead(t *testing.T) {
 	}
 }
 
-// errNotThere is the error of a machine that is not there.
 type errNotThere struct{}
 
 func (errNotThere) Error() string { return "机器不在那里" }
 
-// containsText reports whether the text holds the name.
 func containsText(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {
@@ -116,6 +102,5 @@ func containsText(text, name string) bool {
 	return false
 }
 
-// The modes of the graphics chip are the ones the machine reports.
 var _ = hardware.GPUModeDiscrete
 var _ = quickaccess.DisplayModeDiscrete

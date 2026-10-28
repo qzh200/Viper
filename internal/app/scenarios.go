@@ -1,4 +1,3 @@
-// 场景：把灯效与风扇打包，绑到性能档位上。
 package app
 
 import (
@@ -8,34 +7,17 @@ import (
 	"viper/internal/hardware"
 )
 
-// Scenarios returns the saved scenes.
-//
-// The scenes are a copy, the caller cannot change the stored scenes by
-// accident.
-//
-// 返回的是副本，调用方改不动里面的场景。
+// Scenarios 返回所有已保存的命名场景配置字典。
 func (a *App) Scenarios() map[string]config.Scenario {
 	return a.store.Settings().Scenarios
 }
 
-// Bindings returns the scenes that are bound to a performance profile.
-//
-// The bindings are a copy, the caller cannot change the stored bindings
-// by accident.
-//
-// 返回的是副本，调用方改不动里面的绑定。
+// Bindings 返回所有电源模式与场景的绑定关联映射。
 func (a *App) Bindings() map[string]string {
 	return a.store.Settings().Bindings
 }
 
-// SaveScenario stores the current lighting and fans under a name.
-//
-// The scene holds what the machine really does: the lighting and the fan
-// configuration are read from it.
-//
-// 场景存的是机器现在的样子。灯效与颜色从机器读（原厂服务读得回来），风扇也
-// 从机器读。背光自动熄灭的时候机器报的是零，那不是用户选的亮度，所以零的时
-// 候仍然用 Viper 自己记着的那一个。
+// SaveScenario 将当前的灯效与风扇状态保存为一个新的命名场景。
 func (a *App) SaveScenario(name string) error {
 	if name == "" {
 		return fmt.Errorf("app: 场景需要一个名字")
@@ -73,7 +55,7 @@ func (a *App) SaveScenario(name string) error {
 	return nil
 }
 
-// DeleteScenario removes a scene and the bindings that point to it.
+// DeleteScenario 删除指定名称的场景，并自动解除相关电源模式绑定。
 func (a *App) DeleteScenario(name string) error {
 	if err := a.store.Update(func(s *config.Settings) {
 		delete(s.Scenarios, name)
@@ -88,7 +70,7 @@ func (a *App) DeleteScenario(name string) error {
 	return nil
 }
 
-// ApplyScenario applies a scene to the machine.
+// ApplyScenario 根据名称加载并应用指定的场景配置。
 func (a *App) ApplyScenario(name string) error {
 	scenario, ok := a.store.Settings().Scenarios[name]
 	if !ok {
@@ -97,7 +79,6 @@ func (a *App) ApplyScenario(name string) error {
 	return a.applyScenario(scenario)
 }
 
-// applyScenario writes a scene to the machine and remembers it.
 func (a *App) applyScenario(scenario config.Scenario) error {
 	lighting := hardware.RGBConfig{
 		Effect:     hardware.LightingEffect(scenario.Lighting.Effect),
@@ -122,7 +103,7 @@ func (a *App) applyScenario(scenario config.Scenario) error {
 	})
 }
 
-// BindScenario ties a performance profile to a scene.
+// BindScenario 将指定的场景绑定到特定电源性能模式，在切换到该模式时自动应用该场景。
 func (a *App) BindScenario(profile, scene string) error {
 	if _, ok := a.store.Settings().Scenarios[scene]; !ok {
 		return fmt.Errorf("app: 没有叫 %q 的场景", scene)
@@ -135,12 +116,12 @@ func (a *App) BindScenario(profile, scene string) error {
 	return nil
 }
 
-// UnbindScenario removes the scene of a performance profile.
+// UnbindScenario 解除特定电源性能模式的场景绑定。
 func (a *App) UnbindScenario(profile string) error {
 	if err := a.store.Update(func(s *config.Settings) {
 		delete(s.Bindings, profile)
 	}); err != nil {
-		return fmt.Errorf("app: 删除档位 %q 的场景绑定失败: %w", profile, err)
+		return fmt.Errorf("app: 解绑档位 %q 的场景失败: %w", profile, err)
 	}
 	return nil
 }

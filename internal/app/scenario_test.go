@@ -7,12 +7,9 @@ import (
 	"viper/internal/hardware"
 )
 
-// newTestApp opens the program with settings in a temporary file.
 func TestSaveScenario(t *testing.T) {
 	application := newTestApp(t)
 
-	// The machine is not there in a test, so the scene keeps the settings
-	// that are stored.
 	application.store.Update(func(s *config.Settings) {
 		s.Lighting.Effect = uint64(hardware.EffectWave)
 		s.Lighting.Brightness = 80
@@ -56,7 +53,6 @@ func TestBindScenario(t *testing.T) {
 		t.Errorf("the binding is %v, want the scene game", application.Bindings())
 	}
 
-	// A scene that does not exist cannot be bound.
 	if err := application.BindScenario("quiet", "missing"); err == nil {
 		t.Error("a missing scene was bound")
 	}

@@ -2,14 +2,12 @@ package probe
 
 import "viper/internal/agentservice"
 
-// WinKeyStatus is the state of the Windows key lock.
-//
-// 编号 1 表示这个键还能用，所以锁住的时候是 0。
+// WinKeyStatus 表示 Win 键启用/锁定的状态码。
 type WinKeyStatus struct {
 	Status int `json:"status"`
 }
 
-// ReadWinKey asks the service about the Windows key.
+// ReadWinKey 读取当前的 Win 键状态。
 func ReadWinKey(service Service) (WinKeyStatus, error) {
 	answer, err := service.Get(agentservice.FunctionWinKey)
 	if err != nil {
@@ -23,12 +21,12 @@ func ReadWinKey(service Service) (WinKeyStatus, error) {
 	return status, nil
 }
 
-// WinKeyPayload builds the write of the Windows key lock.
+// WinKeyPayload 构造 Win 键状态写入请求体。
 func WinKeyPayload(status int) map[string]any {
 	return map[string]any{"status": status}
 }
 
-// WriteWinKey writes the Windows key lock.
+// WriteWinKey 向服务写入指定的 Win 键状态。
 func WriteWinKey(service Service, status int) error {
 	answer, err := service.Set(agentservice.FunctionWinKey, WinKeyPayload(status))
 	if err != nil {

@@ -8,10 +8,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// TestCoolBoostIsTheMaximumOfTheFans checks that the boost is the full speed
-// of the service.
-//
-// 加速就是原厂服务的全速模式，没有第二个实现。
 func TestCoolBoostIsTheMaximumOfTheFans(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionFanControl] = answer(map[string]any{
@@ -33,8 +29,6 @@ func TestCoolBoostIsTheMaximumOfTheFans(t *testing.T) {
 	}
 }
 
-// TestCoolBoostIsOffWhenTheControllerIsInCharge covers the fans that run
-// their own curve.
 func TestCoolBoostIsOffWhenTheControllerIsInCharge(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionFanControl] = answer(map[string]any{
@@ -56,7 +50,6 @@ func TestCoolBoostIsOffWhenTheControllerIsInCharge(t *testing.T) {
 	}
 }
 
-// TestCoolBoostFailsWhenTheServiceIsGone covers the read that fails.
 func TestCoolBoostFailsWhenTheServiceIsGone(t *testing.T) {
 	service := newFakeService()
 	service.getErr = errors.New("服务不可达")
@@ -68,7 +61,6 @@ func TestCoolBoostFailsWhenTheServiceIsGone(t *testing.T) {
 	}
 }
 
-// TestCoolBoostTurnsTheFansToFullSpeed checks the write of the boost.
 func TestCoolBoostTurnsTheFansToFullSpeed(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionFanControl] = answer(map[string]any{
@@ -92,7 +84,6 @@ func TestCoolBoostTurnsTheFansToFullSpeed(t *testing.T) {
 	}
 }
 
-// TestCoolBoostHandsTheFansBack checks that the boost can be switched off.
 func TestCoolBoostHandsTheFansBack(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionFanControl] = answer(map[string]any{
@@ -116,5 +107,4 @@ func TestCoolBoostHandsTheFansBack(t *testing.T) {
 	}
 }
 
-// The modes of the service are the ones the boost is written with.
 var _ = hardware.FanMax

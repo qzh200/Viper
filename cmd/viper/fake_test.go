@@ -10,10 +10,6 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// fakeMachine is a stand for the machine.
-//
-// 它跟真机器一样：写进去的值读回来还是新值，某一项读不到的时候读命令要
-// 报错。
 type fakeMachine struct {
 	power     hardware.PowerMode
 	gpu       hardware.GPUMode
@@ -24,11 +20,10 @@ type fakeMachine struct {
 	overdrive bool
 	bootSound bool
 	monitor   hardware.MonitorData
-	// lightingErr 让读灯效失败，用它测"机器读不到"的那条路。
+
 	lightingErr error
 }
 
-// newFakeMachine returns a machine in a known state.
 func newFakeMachine() *fakeMachine {
 	return &fakeMachine{
 		power:     hardware.PowerBalanced,
@@ -163,7 +158,6 @@ func (m *fakeMachine) SetBootSound(enabled bool) error {
 	return nil
 }
 
-// fakeQuick is a stand for the Quick Access service of the original software.
 type fakeQuick struct {
 	chargeLimit  int
 	chargeUSB    bool
@@ -242,11 +236,6 @@ func (q *fakeQuick) SetScreenSaverTimeout(seconds int) error {
 
 func (q *fakeQuick) Close() error { return nil }
 
-// installFakes puts the fakes in the place of the machine and of the Quick
-// Access service.
-//
-// 每一条命令都开一个自己的程序，所以这里每次都给一个新的程序，但它们共用
-// 同一台假机器和同一份设置。
 func installFakes(t *testing.T) (*fakeMachine, *fakeQuick) {
 	t.Helper()
 

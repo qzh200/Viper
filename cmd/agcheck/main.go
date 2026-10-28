@@ -1,11 +1,4 @@
-// Command agcheck talks to the original AcerAgentService through the client
-// of the program and shows what the service answers.
-//
-// The tool has two modes. The read mode only asks, so it never changes
-// anything. The write mode writes back the values that the service reports,
-// which leaves the machine as it is and proves that the writing works.
-//
-// 负载的形状在 internal/probe 里，这个工具只管把过程走一遍。
+// agcheck 是一款针对 AcerAgentService 通信协议与硬件读写能力的真机诊断与验证工具。
 package main
 
 import (
@@ -20,7 +13,6 @@ import (
 	"viper/internal/probe"
 )
 
-// stdout is where the tool writes. 用例把它换成缓冲区。
 var stdout io.Writer = os.Stdout
 
 func main() {
@@ -60,22 +52,12 @@ func main() {
 	}
 }
 
-// machineView is the part of the machine that the tool reads.
-//
-// The hardware layer of the program satisfies it, and a test can put a stand
-// in its place.
 type machineView interface {
 	probe.Machine
-	// GPUMode reads the graphics switch of the machine.
 	GPUMode() (hardware.GPUMode, error)
-	// Close releases the connection to the machine.
 	Close()
 }
 
-// readMachine reads the machine through the hardware layer of the program.
-//
-// 这一段走的是 internal/machine：原厂程序是主要依赖，固件那一侧只补原厂
-// 程序给不了的那几项。它是这一层与真机之间的验证。
 func readMachine(backend machineView) {
 	fmt.Fprintln(stdout, "机器:", backend.Instance())
 
@@ -136,7 +118,6 @@ func readMachine(backend machineView) {
 	}
 }
 
-// read asks the service for everything it tells.
 func read(client probe.Service) {
 	answer, err := client.MonitorData()
 	if err != nil {
@@ -170,13 +151,7 @@ func read(client probe.Service) {
 	}
 }
 
-// write writes back the values that the service reports.
-//
-// Nothing changes on the machine, the service is told what it already knows.
-//
-// 灯效那一项特别要小心：全局颜色与分区颜色分开写，少写一个另一个就被清掉。
 func write(client probe.Service) {
-	// 性能档位：写回当前档位。
 	if answer, err := client.Get(agentservice.FunctionOperatingMode); err == nil {
 		var data struct {
 			Mode int `json:"mode"`
@@ -188,7 +163,6 @@ func write(client probe.Service) {
 		}
 	}
 
-	// 图形模式：写回当前模式。
 	if answer, err := client.Get(agentservice.FunctionGPUMode); err == nil {
 		var data struct {
 			Mode int `json:"mode"`
@@ -200,7 +174,6 @@ func write(client probe.Service) {
 		}
 	}
 
-	// 开关类：写回当前状态。
 	for _, function := range []string{
 		agentservice.FunctionWinKey,
 		agentservice.FunctionLCDOverdrive,
@@ -218,12 +191,10 @@ func write(client probe.Service) {
 		}
 	}
 
-	// 粘滞键：原厂服务自己也不支持这一项。
 	if answer, err := client.Set(agentservice.FunctionStickyKey, map[string]any{"status": 0}); err == nil {
 		report(agentservice.FunctionStickyKey, answer, nil)
 	}
 
-	// 灯效：写回当前的分区颜色、效果、速度、方向与亮度。
 	if reading, err := probe.ReadLighting(client); err == nil {
 		if err := probe.WriteLighting(client, reading); err != nil {
 			fmt.Fprintf(stdout, "%s: 写入失败: %v\n", agentservice.FunctionLighting, err)
@@ -232,7 +203,6 @@ func write(client probe.Service) {
 		}
 	}
 
-	// 风扇：写回当前的模式与占空比。
 	if reading, err := probe.ReadFan(client); err == nil {
 		if err := probe.WriteFans(client, reading); err != nil {
 			fmt.Fprintf(stdout, "%s: 写入失败: %v\n", agentservice.FunctionFanControl, err)
@@ -242,7 +212,6 @@ func write(client probe.Service) {
 	}
 }
 
-// report shows the result of a write.
 func report(function string, answer agentservice.Answer, err error) {
 	if err != nil {
 		fmt.Fprintf(stdout, "%s: 写入失败: %v\n", function, err)
@@ -255,7 +224,6 @@ func report(function string, answer agentservice.Answer, err error) {
 	fmt.Fprintf(stdout, "%s: 写入成功 (结果 %s)\n", function, answer.Result)
 }
 
-// printJSON shows a payload of the service.
 func printJSON(data json.RawMessage) {
 	var value any
 	if err := json.Unmarshal(data, &value); err != nil {

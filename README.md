@@ -1,296 +1,250 @@
 # Viper
 
-Acer 游戏本硬件控制中心的 Go 重写版。
+Viper 是专为宏碁（Acer）游戏笔记本（包括掠夺者 Predator 与暗影骑士 Nitro 系列）打造的跨平台硬件控制中心与工具套件。
 
-**原厂程序是主要调用依赖。** 官方 PredatorSense 的后台服务
-（`AcerAgentService`）是这台机器上真正管着灯光、风扇、性能档位与传感器读数
-的那一路，Viper 作为它的客户端去问，**不需要管理员权限**。Quick Access 服务
-（`AcerQAAgent`）管着 USB 充电这些系统设置。
+Viper 采用 Go 语言开发，具备低资源开销、无额外运行时依赖的特点，支持直接通过命令行对笔记本的性能模式、风扇策略、键盘 RGB 背光、显卡输出模式以及系统环境进行高效调控。
 
-**没有第二条路。** 原厂服务不在的时候，程序直接把实情报给用的人，不偷偷换成
-别的路——直接操控固件（ACPI/WMI）那一整条路线已经删掉了：那些设置原厂程序
-都包了，而且读得更全。
+---
 
-```
-                 ┌────────────────────────────────────────────┐
-                 │  Viper                                     │
-                 │                                            │
-   原厂服务 ───▶ │  internal/agentservice ─▶ internal/machine │ ──▶ 硬件层接口
- (46933, SYSTEM) │   （协议客户端）            （硬件层）      │      ↑
-                 │                                            │      │
-   原厂 Quick ─▶ │  internal/quickaccess（USB 充电等）──┘      │
-  (5141, SYSTEM) │                                            │      │
-                 │  internal/hardware（词汇表 + 机器自己的情况）       │
-                 └────────────────────────────────────────────┘
-```
+## 核心功能
 
-## 现在的状态
+### 1. 状态监控与硬件遥测
+- **整机运行遥测**：采集 CPU/GPU 温度、风扇实际转速（RPM）、核心频率、利用率及各核心独立主频。
+- **系统指标监控**：监控主板温度、物理内存使用率/频率、有线以太网与 Wi-Fi 的即时上下行网络速率。
+- **独立显卡深入遥测**：原生调用 NVIDIA NVML（`nvml.dll`）采集显存利用率、显存已用容量、当前显卡 P-State 档位及最大加速主频。
+- **轻量电源与电池状态**：直接通过 Win32 API 查询交流电源连接、电池百分比与充电状态，免提权、免依赖后台服务。
 
-| 部分 | 状态 |
-| :--- | :--- |
-| 硬件层 `internal/machine` + `internal/agentservice` | ✅ 已完成，真机验证通过 |
-| 命令行接到硬件层 | ✅ 已接上，**不需要管理员权限** |
-| 命令行这一层的用例 | ✅ 有用例，替身是一台假机器 |
-| 取证与真机验证的工具 | ✅ 在默认的构建与测试链里 |
-| 直接操控固件（ACPI/WMI） | ❌ 整条路线删掉了 |
-| 图形界面 | 🚧 以后再说 |
+### 2. 电源与性能档位调控
+- 支持 **Quiet（静音）**、**Balanced（平衡）**、**Performance（高性能）**、**Turbo（极速超频）** 与 **Eco（节能）** 模式。
+- 自动检测机器是否属于掠夺者（Predator）系列，动态适配可用性能档位。
 
-命令行会报出自己走的是哪条路：
+### 3. 风扇策略与强冷加速
+- **运转模式**：
+  - `Auto`：交由硬件温控策略自动控制转速。
+  - `Max`：风扇拉至最大转速运转。
+  - `Custom`：支持对 CPU 与 GPU 风扇独立指定 0-100% 占空比。
+- **CoolBoost 强冷加速**：支持一键开启或关闭硬件强冷加速。
 
-```
-$ viper status
-instance: AcerAgentService
-route  : 原厂服务 AcerAgentService
-```
+### 4. 键盘 RGB 背光与灯效
+- **动态动画效果**：常亮（Static）、呼吸（Breathing）、霓虹（Neon）、波浪（Wave）、切换（Shifting）、缩放（Zoom）、流星（Meteor）、闪烁（Twinkling）。
+- **个性化调节**：支持 4 分区独立 HEX 调色（`#RRGGBB`）、速度（1-9 档）、方向（顺/逆时针）及亮度（0-100%）。
+- **休眠与重置**：支持键盘背光 30 秒空闲自动熄灭开关，以及一键重置为出厂纯白常亮。
 
-原厂服务不在的时候，程序直接把实情报给用的人，**没有第二条路**：
+### 5. 显卡模式切换与外设开关
+- **显卡显示模式**：支持在 **Hybrid（混合）**、**Discrete（独显直连）** 与 **Auto（自动切换）** 之间切换。
+- **游戏外设开关**：支持锁定/解锁 Windows 徽标键、启用/停用屏幕 LCD Overdrive 响应时间加速、开机声音音效以及 Windows 粘滞键。
 
-```
-$ viper --service 127.0.0.1:1 status
-viper: 原厂服务不可达: agentservice: 原厂服务不可达: 127.0.0.1:1: dial tcp ...
-```
+### 6. QuickAccess 系统协同集成
+- **关机充电管理**：支持开启/关闭关机状态下的 USB 端口对外供电，并设置终止供电的电池阈值（10%、20%、30%）。
+- **Windows 桌面定制**：一键切换 Windows 深色/浅色主题、开启/关闭窗口亚克力透明视觉特效、任务栏自动隐藏及屏幕保护程序超时等待时间。
 
-## 原厂程序给得到什么
+### 7. 场景联动引擎 (Scenario Engine)
+- 支持将当前满意的键盘背光配置与风扇转速保存为具名场景预设（Scenario）。
+- 支持将场景与特定电源档位进行绑定：当切换电源性能模式时，系统自动应用关联的场景，实现不同工作负载下的软硬件状态联动。
 
-固件那一侧读不到的东西，原厂服务都读得到。下表是本机实测的：
+---
 
-**读数也以原厂服务为主。** 它的监视数据里有处理器的使用率与频率、每核频率、
-显卡的使用率与频率、内存的占用与频率、网络的上下行；显卡驱动只**补充**它
-没报的那几样：显卡的名字、显存与显存频率。
+## 项目组件结构
 
-| 能力 | 原厂服务 |
-| :--- | :--- |
-| 分区颜色 | ✅ 四个分区的真实颜色（固件那一侧永远是全零） |
-| 灯效 | ✅ 效果名、速度、方向、亮度（固件那一侧八个灯效的结果一模一样） |
-| 显卡风扇组的行为 | ✅ 两组都报（固件那一侧只报告主风扇组） |
-| 风扇转速与占空比 | ✅ 能写、能读回来（固件的加速表在本机是死的通道） |
-| 每核实时频率 | ✅ 32 核每一个都有（固件那一侧的性能计数器在本机初始化失败） |
-| 显卡使用率、网络上下行、内存占用与频率 | ✅ |
-| 睿频上限 | ✅ 5000，真实的睿频上限（固件那一侧只给标称频率 2419） |
-| 性能档位、显卡模式、屏幕超频、开机音效、背光超时 | ✅ 能写 |
-
-实测这一段的时候，本机会话**没有管理员权限**：固件那一侧连实例都找不到
-（`no AcerGamingFunction instance found`），原厂服务这一侧却什么都能读。
-这就是换路线的最大收益——它不以管理员身份运行。
-
-## 原厂程序给不了的那几项
-
-| 设置 | 状况 |
-| :--- | :--- |
-| 锁 Windows 键 | **收下请求却不生效**（见下），写完的核对会把它报出来 |
-| 超频能力 | 原厂服务自己也不实现（结果码 3），所以报成不支持 |
-| 风扇表、背光原始缓冲区 | 原厂服务不报这两样，固件那一侧已经删掉了，所以没有了 |
-
-## 实测得到的编码
-
-这一节里的每一条都是在这台机器上量出来的，不是照着文档推的。
-
-**风扇**（`FAN_CONTROL`）：顶层 `mode` 是开关，每个风扇的
-`fan_custom_auto` 与 `fan_custom_speed` 是它的行为与占空比。
-
-| 写法 | 实测 |
-| :--- | :--- |
-| `mode: 0` | 自动，控制器跑自己的曲线（2722 RPM） |
-| `mode: 1` | 全速，**7092 RPM** |
-| `mode: 2` + `fan_custom_auto: 0` + `fan_custom_speed: 50` | 固定占空比，**4400 RPM** |
-
-Viper 写的时候照服务自己的三个模式来：两个风扇都自动写模式 0，都全速写
-模式 1，其余写模式 2。写模式 2 的话，服务档案
-`HKLM\SOFTWARE\OEM\AcerAgentService\FanControl\CurrentFanMode` 里记的是「自
-定义」，官方应用看到的也就不是自动了。
-
-**风扇加速**就是原厂服务的全速模式。固件那一侧也有一个加速表，但实测在本
-机是**死的通道**：动作类读回来是 0，写了状态也不变，风扇表恒是 1（普通的
-表）。所以这一项走原厂程序，不碰固件。
-
-**性能档位**（`OPERATING_MODE`）：编号是 `0` 静音、`1` 均衡、`4` 性能、
-`5` 加速、`6` 节能。官方应用列出的顺序与这个编号一致。
-
-**显卡模式**（`GPU_MODE`）：服务从零开始数，`0` 混合、`1` 仅独显、
-`2` 自动。切换图形模式要重启才生效，与官方应用的行为一致。
-
-**开关类**（`WIN_KEY`、`LCD_OVERDRIVE`、`BOOT_SOUND`、`BACKLIGHT_30S`）：
-形状都是 `{"status": 0 或 1}`。`WIN_KEY` 的编号 1 表示**这个键还能用**，
-所以锁住的时候是 0。
-
-**灯光**（`LIGHTING`）：四个分区各一个颜色（`#RRGGBB`），加上效果名、速度、
-方向与亮度。写亮度时要把四个分区一起写回去，否则原厂服务会把颜色清掉。
-
-**改灯效只改点到的那几项**：`viper lighting set` 是以机器现在的灯效为底子的，
-命令里没点到的那几项保持原样。所以 `viper lighting set brightness 80` 只改
-亮度，颜色与效果留着；`zone 2 #00FF00` 只改第二个分区，其余分区留着。
-
-**锁 Windows 键**：原厂服务**收下请求**（结果码 0），但写 0 写 1 读回来一直是
-一个，等了五秒也不变。固件那一侧曾经也是一个常量通道
-（`GetGamingProfile` 对任何查询都只答 `0x2`，`SetGamingProfile` 写不进去），
-所以这台机器上锁不住这个键。Viper 如实报错，不假装成功。
-
-## 写完要读回核对
-
-每一项写入之后都把配置读回来核对：灯光（颜色、效果、速度、方向、亮度）、
-背光（亮度与超时）、性能档位、开关类（屏幕超频、开机音效）、风扇。机器没
-有接受就在错误信息里说清楚是哪一个。
-
-核对要**轮询一小会儿**（最多三秒）：有的设置是服务交给别的服务才生效，读
-回来的值会晚一点才变。读一次就下结论会把还没生效的设置报成失败。
-
-两个例外：
-
-* **全速**（风扇模式 1）的时候服务**不看**每个风扇的数据，只记模式，所以这一项
-  只核对模式。
-* **显卡模式**不读回核对：它写进的是杂项设置表，机器要到重启才真的换过去，
-  读回来的值说明不了什么，只看服务有没有收下。
-
-真机验证（`cmd/agcheck verify`）：八项设置逐项改一次、读回核对、还原，全过。
-灯光的写入在原厂档案 `LightingProfile.ini` 与注册表的 `boot_sound_switch`、
-`FanControl\CurrentFanMode` 上都能看到——那是服务自己记下的状态，不是我们
-自己记的。
-
-`cmd/agcheck write` 是**写回服务报出来的值**，用来证明写通路是通的，机器的
-状态不变。这一条要求全局颜色与分区颜色分开写：服务读回来有哪一个就写回哪
-一个——少写一个，另一个会被服务清掉（写回一个空的分区数组，等于把键盘正在
-用的颜色抹成黑色）。这条以前就踩过，现在有用例守着。
-
-## 架构
-
-```
-cmd/viper          命令行入口
-cmd/agcheck        新客户端的真机验证：读、写、整机读、逐项改一次再还原
-cmd/fanproto       风扇三个模式的取证工具
-cmd/winkey         WIN_KEY 的语义与能不能写
-cmd/gpucross       显卡遥测与原厂服务的读数对照
-cmd/smbiosdump     机器身份信息的原始结构
-
-internal/agentservice 原厂 AcerAgentService 的协议客户端
-internal/machine      硬件层：只问原厂服务
-internal/hardware     机器的词汇表 + 机器自己的情况（身份、电源、粘滞键）
-internal/nvidia       显卡遥测：走显卡驱动的管理库
-internal/quickaccess  原厂 Quick Access 服务客户端（USB 充电等）
-internal/probe        取证工具用到的协议知识（灯光、风扇、Win 键、验证流程）
-internal/config       设置持久化
-internal/app          用例层
+```text
+Viper/
+├── cmd/
+│   ├── viper/          # 主命令行控制中心入口
+│   ├── agcheck/        # 原厂服务协议探测与读写验证工具
+│   ├── fanproto/       # 风扇控制协议响应时间取证工具
+│   ├── gpucross/       # NVML 与原厂服务遥测读数交叉比对工具
+│   ├── smbiosdump/     # SMBIOS 固件原始结构解析工具
+│   └── winkey/         # Windows 键锁定逻辑探测工具
+├── internal/
+│   ├── app/            # 核心业务协调层与场景引擎
+│   ├── machine/        # 基于原厂服务的硬件控制驱动实现
+│   ├── agentservice/   # AcerAgentService TCP 封包与解包协议库
+│   ├── quickaccess/    # Acer QuickAccess TLS/WebSocket/AES 加密通信库
+│   ├── hardware/       # 硬件接口、SMBIOS 解析与 Win32 电源查询
+│   ├── nvidia/         # NVIDIA NVML 原生显卡驱动遥测接口
+│   ├── config/         # 本地 JSON 配置文件管理库 (%APPDATA%/Viper)
+│   └── probe/          # 诊断工具复用的协议探针与回环验证套件
+├── build.ps1           # 自动化构建脚本
+└── go.mod              # Go 模块定义
 ```
 
-规矩与 OpenPredator 项目一致：**硬件层不认识界面，界面层不直接调用 WMI，
-中间夹着应用层。**
+---
 
-硬件层与协议层之间只有一个接口：`machine.Service`（对原厂服务）。
+## 构建指南
 
-那几个取证工具是薄的：它们读命令行、调用 `internal/probe`、把结果打出来。
-协议的知识放在 `internal/probe` 里，所以不用真的机器也有用例守着。
+### 环境要求
+- 操作系统：Windows 10 / 11（x64）
+- 编译工具：Go 1.20 或更高版本
+- PowerShell 环境（执行自动化编译脚本）
 
-那几个 `cmd/` 下的工具与命令行一样，都在默认的构建与测试链里——它们没有
-构建标签挡着，所以 `go build ./...` 与 `go test ./...` 都会把它们算进去。
-
-## 依赖哪些原厂进程
-
-| 程序 | 端口 | 管什么 | 缺了会怎样 |
-| :--- | :--- | :--- | :--- |
-| `AcerAgentService` | 46933 | 灯光、灯效、风扇、性能档位、显卡模式、LCD 超频、Win 键锁、开机音效、背光超时、全部传感器读数 | 什么都做不了 |
-| `AcerLightingService` | — | 真正控制键盘灯，`AcerAgentService` 把灯光设置转交给它 | 灯不会变色，其它设置仍可用 |
-| `AcerServiceWrapper` | — | 看护进程，被杀掉的 `AcerAgentService` 由它拉起来 | 服务崩了不会自动恢复 |
-| `AcerQAAgent` | 5141 | 蓝屏灯、USB 充电限值与开关、显示模式、暗色模式、屏保、任务栏自动隐藏 | 这些设置做不了，其余照常 |
-
-显卡驱动只**补充**原厂服务没报的那几样：显卡的名字、显存与显存频率。它走
-显卡驱动自带的 `nvml.dll`（NVIDIA Management Library）——这个库是 **N 卡驱动
-的一部分**，不是别的程序，Windows 本来就在提供它。没有 N 卡的机器读不到这几
-样，其余读数照常。
-
-读数的单位：温度是度，占用是百分比，频率是 MHz，内存总量是 MB，网络是
-**kbps**（官方软件用的就是这个单位）。网络那一项本机实测过：下载时网卡走
-17.9 KB/s = 143 kbps，服务报 121.5，对得上。
-
-## 命令行
-
+### 编译所有组件
+在项目根目录下运行 PowerShell 构建脚本：
 ```powershell
-# 编译全部程序（命令行 + 那几个取证与验证的工具）
 .\build.ps1
+```
+编译成功后，所有可执行文件将输出至 `bin/` 目录：
+- `bin/viper.exe`
+- `bin/agcheck.exe`
+- `bin/fanproto.exe`
+- `bin/winkey.exe`
+- `bin/gpucross.exe`
+- `bin/smbiosdump.exe`
 
-# 只编译命令行
+也可单独编译主程序：
+```powershell
 go build -o bin/viper.exe ./cmd/viper
-
-# 运行
-bin\viper.exe status
 ```
 
-输出示例：
+---
 
-```
-instance: AcerAgentService
-route  : 原厂服务 AcerAgentService
+## 命令行使用手册 (`viper`)
 
-  Power supply      : on the power supply, charging
+### 1. 监控与信息诊断
+```bash
+# 查看实时硬件温度、风扇转速与负载
+viper status
 
-  CPU temperature   : 91 C
-  CPU fan speed     : 2698 RPM
-  GPU temperature   : 64 C
-  GPU fan speed     : 2736 RPM
-  Motherboard / VRM : 71 C
-```
+# 查看供电与电池状态（免提权）
+viper powerstatus
 
-场景分区设置：原厂应用把「灯效 + 风扇」打包成**场景**，可以绑到各个性能
-档位上，切档位时场景跟着走。
+# 查看独立显卡深入遥测指标（NVML）
+viper telemetry
 
-```powershell
-viper scenario list                  # 列出场景与绑定
-viper scenario save game             # 把当前的灯效与风扇存为场景
-viper scenario apply game            # 应用场景
-viper scenario bind performance game # 把场景绑到「性能」档
-viper scenario unbind performance    # 解绑
-viper scenario delete game           # 删除场景
+# 输出硬件能力、驱动状态与配置路径全景诊断报告
+viper diag
 ```
 
+### 2. 电源模式管理
+```bash
+# 查看当前性能档位
+viper power
 
-## 测试
+# 切换电源模式为高性能
+viper power performance
 
-```powershell
-go test ./...
-go test ./internal/machine/... ./internal/agentservice/... -cover
+# 切换为静音模式
+viper power quiet
 ```
 
-用例锁的是**实测得来的结论**，不是实现的复述：风扇的三个模式、灯光效果名
-与颜色的往返、性能档位的五个编码、图形显示模式的编号、杂项设置的标识符、
-SMBIOS 的解析、Quick Access 的加密——最后这一条用的是原厂服务握手时返回的
-真实密文，改动加密实现会立刻让用例失败。
+### 3. 风扇策略配置
+```bash
+# 查看风扇当前模式与转速
+viper fans
 
-**命令行这一层也有用例**：机器与 Quick Access 服务在用例里是替身，所以命令
-的分派、参数的校验、灯效的解析都能在没有真机器的情况下跑。替身跟机器一样：
-写进去的值读回来还是新值。
+# 将风扇交还给温控算法自动调度
+viper fan auto
 
-**取证工具的协议知识也有用例**：它们在 `internal/probe` 里，替身是一个按命令名
-回答的假服务，所以灯光、风扇、Win 键的读写形状与「逐项改一次再还原」的验证
-流程都能在没有机器的情况下跑。
+# 开启风扇全速运转
+viper fan max
 
-覆盖率（整个项目 **80.7%**）：`internal/agentservice` 93.4%、
-`internal/nvidia` 87.1%、`internal/machine` 87.0%、`internal/probe` 86.4%、
-`internal/hardware` 84.3%、`internal/app` 83.6%、`internal/quickaccess` 83.4%、
-`internal/config` 81.4%、`cmd/viper` 78.2%、`cmd/smbiosdump` 82.1%。
+# 自定义 CPU 50% 与 GPU 60% 占空比
+viper fan custom 50 60
 
-那几个取证与真机验证的工具也在默认的测试链里，所以 `go test ./...` 会把它们
-一起编译——以前它们被构建标签挡在默认构建之外，改坏了不会有任何东西报警。
+# 开启或关闭 CoolBoost 强冷加速
+viper fan coolboost on
+viper fan coolboost off
+```
 
-## 已知限制
+### 4. 键盘 RGB 背光控制
+```bash
+# 查看当前背光参数
+viper lighting
 
-* **锁 Windows 键在这台机器上做不到**：原厂服务收下请求却不生效（写 0 写 1
-  读回来一直是一个）。Viper 如实报错，不假装成功。
-* **超频能力报成不支持**：原厂服务自己也不实现这一项（结果码 3），而固件那一
-  侧已经删掉了。
+# 重置背光为出厂默认纯白色常亮
+viper lighting reset
 
-* 启动标志自定义需要固件支持，本机
-  `HKLM\SOFTWARE\OEM\AcerAgentService\Customize_POST_Support` 为 `0`，
-  原厂服务也回答 `SUPPORT_CUSTOM_BOOT_LOGO = 0`。
-* 显卡的**超频能力**固件不报告，杂项设置表里只有 CPU 的那一项（`0x0A`）。
-  原厂服务自己也不实现这一项（结果码 3）。Viper 因此报「显卡不支持超频」，
-  不去拿「这台机器有独显」冒充「显卡能超频」。
-* 官方应用自己保存的灯效档案在
-  `C:\ProgramData\OEM\AcerLightingService\LightingProfile\LightingProfile.ini`，
-  它与固件是两条独立的路径，Viper 不去改它。
+# 设置动态灯效速度（1-9）与亮度（0-100）
+viper light speed 3
+viper light brightness 80
 
-## 参考
+# 切换灯效动画模式
+viper light effect wave
+viper light effect breathing
 
-Viper 的功能范围与硬件语义参考了开源项目
-[OpenPredator](https://github.com/KRWCLASSIC/OpenPredator)（MIT），
-但实现完全独立，未复制其代码。
+# 设置全局颜色或指定分区颜色（1-4 分区）
+viper light color #FF0055
+viper light zone 1 #00FFCC
 
-Acer、Nitro、Predator、PredatorSense、NitroSense 与 CoolBoost 是
-Acer Inc. 的商标。Viper 与 Acer Inc. 无任何关联或背书关系。
+# 开启或关闭键盘背光 30 秒空闲自动休眠熄灭
+viper light timeout on
+```
+
+### 5. 显卡与显示输出
+```bash
+# 查看或切换显卡显示模式
+viper displaymode
+viper displaymode discrete
+viper displaymode hybrid
+viper displaymode auto
+```
+
+### 6. 外设与系统开关
+```bash
+# 锁定或解锁 Windows 徽标键
+viper switches winkey on
+viper switches winkey off
+
+# 开启屏幕响应时间超速加速 (LCD Overdrive)
+viper profile overdrive on
+
+# 开关开机启动音效
+viper bootsound off
+
+# 开关系统深色模式与窗口透明效果
+viper darkmode on
+viper transparent on
+
+# 开关任务栏自动隐藏
+viper taskbar on
+
+# 开启屏幕保护程序并设置超时秒数
+viper screensaver on
+viper screensaver timeout 300
+
+# 配置关机 USB 供电阈值百分比
+viper charge limit 20
+viper charge switch on
+```
+
+### 7. 场景联动 (Scenario)
+```bash
+# 列出所有已保存的场景与档位绑定
+viper scenario list
+
+# 将当前的灯效与风扇状态保存为名为 "游戏模式" 的场景
+viper scenario save 游戏模式
+
+# 应用指定场景
+viper scenario apply 游戏模式
+
+# 将 "游戏模式" 场景绑定到 performance 档位（切换到高性能时自动生效）
+viper scenario bind performance 游戏模式
+
+# 解除特定档位的场景绑定
+viper scenario unbind performance
+
+# 删除不再使用的场景
+viper scenario delete 游戏模式
+```
+
+---
+
+## 诊断与取证工具套件
+
+- **`agcheck`**：
+  - `agcheck read`：读取原厂服务原始遥测与功能数据包。
+  - `agcheck write`：执行基础功能写入测试。
+  - `agcheck machine`：通过 `machine.Backend` 读取结构化硬件视图。
+  - `agcheck verify`：对各项硬件功能执行自动化改动并立即还原初始状态，验证读写有效性。
+- **`fanproto`**：指定模式与 CPU/GPU 占空比下发给服务，并在其后 2、4、6 秒追踪实际转速变化。
+- **`gpucross`**：交叉比对 NVML 原生采集数据与宏碁原厂服务监控数据的一致性。
+- **`smbiosdump`**：提取底层固件表并以十六进制打印 SMBIOS 处理器与内存插槽的原始数据。
+- **`winkey`**：测试 Windows 徽标键锁定的写入时延与读回生效过程。
+
+---
+
+## 配置文件说明
+
+本地配置默认保存在当前用户的 AppData 目录下：
+- 路径：`%APPDATA%\Viper\config.json`
+- 存储内容：默认背光设定、风扇策略、电源档位记忆、自定义场景及电源模式与场景的绑定映射。

@@ -22,8 +22,7 @@ func TestPowerStatusString(t *testing.T) {
 }
 
 func TestSystemPowerStatus(t *testing.T) {
-	// The kernel always answers on a machine that runs on a battery or on
-	// the power supply.
+
 	status, err := SystemPowerStatus()
 	if err != nil {
 		t.Fatal(err)

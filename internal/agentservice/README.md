@@ -1,75 +1,88 @@
-# internal/agentservice
+# agentservice
 
-原厂 **AcerAgentService** 的协议客户端。
+`agentservice` 实现了与宏碁原厂服务 `AcerAgentService` 的底层 TCP 网络通信客户端与二进制帧协议解包封装。
 
-这个服务是这台机器上真正管着灯光、风扇、性能档位与传感器读数的那一路，它
-以**系统的身份**运行，所以问它不需要管理员权限。这个包只管协议，不认识
-硬件：它把一个 JSON 负载送出去，把一个 JSON 文档收回来，不解释里面的意思。
+## 通信协议架构
 
-## 协议
+`AcerAgentService` 是宏碁游戏笔记本（Predator / Nitro 系列）在后台运行的 Windows 服务进程，监听本地 TCP 端口。客户端通过标准 TCP Socket 与之建立长连接进行指令交互。
 
-```
-请求： "ACER" + uint32(小端) 包标识 + JSON 负载
-应答： 纯 JSON 文档 {"data":…,"request":"…","result":"0"}
-```
+### 连接参数
 
-| 包标识 | 问什么 |
-| :--- | :--- |
-| 0 | 机器的能力（`SUPPORT_OPERATING_MODE_CAPABILITY` 之类） |
-| 10 | 监视数据（温度、风扇转速、每核频率、显卡使用率……） |
-| 20 | 一个设置的值（`LIGHTING`、`FAN_CONTROL`、`OPERATING_MODE`……） |
-| 30 | 带着灯光的设备 |
-| 40 | 灯效的能力（原厂服务不实现，只给一个空应答） |
-| 100 | 写一个设置 |
+- **默认地址**：`127.0.0.1:46933`
+- **默认超时**：`5 秒`（支持自定义）
+- **自动重连**：当请求写入或读取断开时，客户端自动尝试重建 TCP 连接重试一次。
 
-| 结果码 | 意思 |
-| :--- | :--- |
-| `0` | 成功，`data` 里有东西 |
-| `3` | 这个请求服务不实现（应答里**没有** data 字段） |
-| `4` | 这个请求服务没有执行（应答里**没有** data 字段） |
+### 报文封包格式
 
-## 几个细节
+客户端向服务端发送的数据帧结构如下：
 
-* **一条连接带多个请求。** 服务读一个请求、答一个，然后等下一个。客户端
-  保持着连接，断掉之后自己重开一次，所以服务重启不会把程序带下去。
-* **应答是连续的 JSON 文档**，靠大括号配对切分。字符串里的括号不算，字符串
-  里的引号与转义也要算进去。
-* **结果码不是成功就是失败。** `Answer.Err()` 把 `3` 变成 `ErrUnsupported`、
-  其它编号变成 `ErrFailed`，调用方分得清「服务不认识这个请求」与「服务没
-  做成这件事」。
-* **应答可以没有数据。** 结果码 `3` 与 `4` 的应答只有 `request` 与 `result`
-  两个字段，`Answer.Decode` 会把这种应答报成错，不会当成读到了一组空值。
+| 字段 | 长度 | 编码方式 | 说明 |
+| :--- | :--- | :--- | :--- |
+| Magic | 4 字节 | ASCII | 固定为 `"ACER"` |
+| PacketType | 4 字节 | uint32 (小端序) | 数据包操作类型 |
+| Payload | 变长 | UTF-8 JSON | 请求体内容，格式为 `{"Function":"...", "Parameter":...}` |
 
-## 用法
+### 响应帧解析机制
+
+服务端应答直接返回 JSON 文本，由于原生协议未在前置头声明内容长度，客户端采用流式花括号深度计数（Bracket Depth Counter）机制：
+- 跟踪字符串转义与双引号状态；
+- 当首个 `{` 出现开始计数，至对应的 `}` 归零时完成单帧 JSON 数据的完整提取。
+
+## 数据包类型 (PacketType)
+
+| 常量 | 数值 | 说明 |
+| :--- | :--- | :--- |
+| `PacketInitialization` | `0` | 查询功能能力与支持状态 (`Capability`) |
+| `PacketMonitorData` | `10` | 获取系统实时温度、频率、转速等遥测数据 (`MonitorData`) |
+| `PacketGetUpdatedData` | `20` | 查询指定硬件功能的当前设定值 (`Get`) |
+| `PacketGetConnectedDevice` | `30` | 枚举当前接入的设备列表 (`Devices`) |
+| `PacketGetLightingEffect` | `40` | 查询支持的灯效预设配置 |
+| `PacketSetDeviceData` | `100` | 向目标硬件功能下发写入新参数 (`Set`) |
+
+## 支持的功能标识 (Function)
+
+- `OPERATING_MODE`：电源/性能档位（Quiet, Balanced, Performance, Turbo, Eco）
+- `GPU_MODE`：显卡直连与混合模式（Hybrid, Discrete, Auto）
+- `LIGHTING`：键盘 RGB 背光颜色、模式、速度与方向
+- `FAN_CONTROL`：风扇模式（Auto, Max, Custom）及 CPU/GPU 独立转速
+- `WIN_KEY`：Windows 徽标键锁定开关
+- `LCD_OVERDRIVE`：屏幕响应时间超速加速开关
+- `BOOT_SOUND`：开机启动声音音效开关
+- `BACKLIGHT_30S`：键盘背光 30 秒无操作自动熄灭开关
+- `STICKY_KEY`：粘滞键开关状态
+- `BATTERY_BOOST`：电池续航加速支持
+- `SOUND_MODE`：音效情景模式
+- `CUSTOM_BOOT_LOGO`：自定义开机 Logo
+- `ADAPTOR_STATUS`：电源适配器连接状态
+
+## 响应状态码 (Result)
+
+- `"0"`：操作成功执行 (`ResultOK`)
+- `"3"`：功能不受支持 (`ResultUnsupported` -> `ErrUnsupported`)
+- `"4"`：执行失败 (`ResultFailed` -> `ErrFailed`)
+
+## 使用示例
 
 ```go
-client, err := agentservice.Connect(agentservice.Options{})
-if err != nil {
-	return err
-}
-defer client.Close()
+package main
 
-answer, err := client.Get(agentservice.FunctionLighting)
-if err != nil {
-	return err
-}
-if err, failed := answer.Err(); failed {
-	return err
-}
+import (
+	"fmt"
+	"viper/internal/agentservice"
+)
 
-var data struct {
-	Brightness int `json:"brightness"`
-}
-if err := answer.Decode(&data); err != nil {
-	return err
+func main() {
+	client, err := agentservice.Connect(agentservice.Options{})
+	if err != nil {
+		panic(err)
+	}
+	defer client.Close()
+
+	// 查询性能模式
+	answer, err := client.Get(agentservice.FunctionOperatingMode)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("响应数据:", string(answer.Data))
 }
 ```
-
-## 测试
-
-```powershell
-go test ./internal/agentservice/... -cover
-```
-
-用例里的替身服务说同一套协议，所以握手、帧的形状、结果码、断线重开、字符串
-里的括号与引号都能在没有原厂服务的情况下跑完。覆盖率 93.4%。

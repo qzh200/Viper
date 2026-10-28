@@ -8,8 +8,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// newTestAppWith opens the program with a machine that answers from a
-// table.
 func newTestAppWith(t *testing.T) (*App, *fakeGaming) {
 	t.Helper()
 	store, err := config.OpenAt(filepath.Join(t.TempDir(), "config.json"))
@@ -43,8 +41,6 @@ func TestSetLightingRemembersTheLighting(t *testing.T) {
 		t.Errorf("the written effect is %d, want %d", machine.written[0].Effect, hardware.EffectWave)
 	}
 
-	// The lighting is remembered, so that the program can report it even
-	// though the firmware does not.
 	stored := application.store.Settings().Lighting
 	if stored.Effect != uint64(hardware.EffectWave) {
 		t.Errorf("the stored effect is %d, want %d", stored.Effect, hardware.EffectWave)
@@ -58,7 +54,7 @@ func TestSetLightingRemembersTheLighting(t *testing.T) {
 }
 
 func TestSetLightingLimitsTheStoredValues(t *testing.T) {
-	// The stored settings must never claim more than the keyboard can do.
+
 	application, _ := newTestAppWith(t)
 
 	if err := application.SetLighting(hardware.RGBConfig{
@@ -175,8 +171,7 @@ func TestSetPowerModeRemembersTheProfile(t *testing.T) {
 }
 
 func TestSetPowerModeAppliesTheBoundScene(t *testing.T) {
-	// A profile that carries a scene brings it with it, so that every
-	// profile has its own lighting and its own fans.
+
 	application, machine := newTestAppWith(t)
 
 	if err := application.SaveScenario("game"); err != nil {
@@ -207,8 +202,7 @@ func TestSetPowerModeWithoutABoundScene(t *testing.T) {
 }
 
 func TestSetPowerModeOfAProfileThatIsNotBound(t *testing.T) {
-	// The binding points at a scene that does not exist, the profile
-	// still has to be applied.
+
 	application, _ := newTestAppWith(t)
 	application.store.Update(func(s *config.Settings) {
 		s.Bindings["turbo"] = "missing"
@@ -238,8 +232,7 @@ func TestApplyScenarioWritesTheLightingAndTheFans(t *testing.T) {
 }
 
 func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
-	// The firmware reports the fans and the brightness, so the scene holds
-	// what the machine really does.
+
 	application, machine := newTestAppWith(t)
 	machine.fans = hardware.FanState{
 		CPUMode:    hardware.FanCustom,
@@ -267,8 +260,7 @@ func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
 }
 
 func TestSaveScenarioKeepsTheBrightnessOfTheSettings(t *testing.T) {
-	// The firmware reports a level of zero while the backlight has
-	// switched itself off, a zero is not the level the user has chosen.
+
 	application, machine := newTestAppWith(t)
 	machine.brightness = 0
 	application.store.Update(func(s *config.Settings) {
@@ -304,7 +296,7 @@ func TestSetBacklightTimeoutKeepsTheBrightness(t *testing.T) {
 }
 
 func TestSetBacklightTimeoutOfAMachineWithoutTheKeyboard(t *testing.T) {
-	// The brightness cannot be read, so the change is not carried out.
+
 	application := newTestAppWithoutMachine(t)
 	if err := application.SetBacklightTimeout(true); err == nil {
 		t.Error("the change was accepted although the brightness cannot be read")
@@ -317,11 +309,10 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	machine.winKeyLocked = true
 	machine.lcdOverdrive = true
 	machine.discreteGPU = true
-	// 固件根本不报告显卡的超频能力，硬件层那一项恒为不支持，替身不能
-	// 报出机器上不会出现的能力。
+
 	machine.overclockGPU = false
 	machine.overclockCPU = true
-	// 加速就是全速：两个风扇都是全速的时候，加速才是开着的。
+
 	machine.fans = hardware.FanState{CPUMode: hardware.FanMax, GPUMode: hardware.FanMax}
 	machine.backlight = hardware.BacklightState{Timeout: true}
 
@@ -352,7 +343,7 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 固件不报告显卡的超频能力，只有处理器的那一项。
+
 	if gpu || !cpu {
 		t.Errorf("the overclocking of the card is %v and of the processor is %v", gpu, cpu)
 	}
@@ -410,13 +401,13 @@ func TestCloseReleasesTheMachine(t *testing.T) {
 }
 
 func TestCloseWithoutAMachine(t *testing.T) {
-	// A program that never touched the hardware has nothing to release.
+
 	application := newTestAppWithoutMachine(t)
 	application.Close()
 }
 
 func TestTheLightingComesFromTheMachine(t *testing.T) {
-	// 原厂服务读得回分区颜色与灯效，所以整个灯效都是机器的，不是设置文件里的。
+
 	application, machine := newTestAppWith(t)
 	machine.brightness = 80
 	machine.lighting = hardware.RGBConfig{
@@ -440,7 +431,6 @@ func TestTheLightingComesFromTheMachine(t *testing.T) {
 	}
 }
 
-// mustStore opens the settings in a temporary file.
 func mustStore(t *testing.T) *config.Store {
 	t.Helper()
 	store, err := config.OpenAt(filepath.Join(t.TempDir(), "config.json"))

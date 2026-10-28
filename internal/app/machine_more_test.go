@@ -9,17 +9,8 @@ import (
 	"viper/internal/hardware"
 )
 
-// The parts of the program that do not need the gaming provider are read
-// from the machine itself.
-//
-// The readings are only possible on the system that the firmware belongs
-// to, so a test that finds no reading skips itself instead of failing.
-// That keeps the suite green on the other systems without hiding a real
-// failure on this one.
-
 func TestThePowerStatusOfTheMachine(t *testing.T) {
-	// The information comes from the kernel of Windows, so it works
-	// without the rights that the hardware needs.
+
 	application := newTestAppWithoutMachine(t)
 
 	status, err := application.PowerStatus()
@@ -44,21 +35,19 @@ func TestTheIdentityOfTheMachine(t *testing.T) {
 }
 
 func TestTheStickyKeysOfTheMachine(t *testing.T) {
-	// The sticky keys belong to the accessibility settings of the user.
+
 	application := newTestAppWithoutMachine(t)
 
 	enabled, err := application.StickyKeys()
 	if err != nil {
 		t.Skipf("the sticky keys cannot be read on this system: %v", err)
 	}
-	// The state is a switch, the call answers with one of the two.
+
 	_ = enabled
 }
 
 func TestTheGraphicsTelemetryOfTheMachine(t *testing.T) {
-	// A machine without the driver of the vendor has no telemetry from the
-	// card, that is not an error. The readings of the service are still
-	// there.
+
 	application := newTestAppWithoutMachine(t)
 
 	telemetry, err := application.Telemetry()
@@ -79,7 +68,7 @@ func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
 	if len(modes) == 0 {
 		t.Fatal("the machine offers no profile")
 	}
-	// The quiet profile and the balanced one are offered everywhere.
+
 	found := map[hardware.PowerMode]bool{}
 	for _, mode := range modes {
 		found[mode] = true
@@ -93,8 +82,7 @@ func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
 }
 
 func TestTheSettingsOfTheMachineWithoutTheGamingProvider(t *testing.T) {
-	// The provider refuses the calls without the rights of an
-	// administrator, so the program cannot read the fans.
+
 	application := newTestAppWithoutMachine(t)
 
 	if _, err := application.Fans(); err == nil {
@@ -162,10 +150,7 @@ func TestTheSettingsThatAreWrittenWithoutTheGamingProvider(t *testing.T) {
 }
 
 func TestTheNewProgram(t *testing.T) {
-	// The program opens the settings of the user, the test points the
-	// profile at a temporary directory. The name of the variable that
-	// holds the directory of the settings differs between the systems, so
-	// all of them are set.
+
 	home := t.TempDir()
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("LOCALAPPDATA", home)
@@ -178,8 +163,6 @@ func TestTheNewProgram(t *testing.T) {
 	}
 	defer application.Close()
 
-	// The settings have to be inside the temporary directory, otherwise
-	// the test would read the settings of the user.
 	if !strings.HasPrefix(application.SettingsPath(), home) {
 		t.Errorf("the settings are at %q, want them inside %q", application.SettingsPath(), home)
 	}

@@ -6,43 +6,31 @@ import (
 	"strings"
 )
 
-// The commands of the service that Viper uses.
+// QuickAccess 服务支持的功能命令常量。
 const (
-	// CommandUSBCharge holds the charging limit in percent.
-	CommandUSBCharge = "USBCharge"
-	// CommandUSBChargeSwitch allows the charging over USB.
-	CommandUSBChargeSwitch = "USBChargeSwitch"
-	// CommandDisplayMode selects the graphics switch of the machine.
-	CommandDisplayMode = "DisplayModeSwitch"
-	// CommandDarkMode switches the dark mode of the system.
-	CommandDarkMode = "DarkMode"
-	// CommandTransparentEffect switches the transparent effect of the
-	// system.
-	CommandTransparentEffect = "TransparentEffect"
-	// CommandAutoHideTaskbar switches the automatic hiding of the taskbar.
-	CommandAutoHideTaskbar = "AutoHideTaskbar"
-	// CommandScreenSaver switches the screen saver of the system.
-	CommandScreenSaver = "ScreenSaver"
-	// CommandScreenSaverTimeout holds the idle time before the screen
-	// saver starts.
+	CommandUSBCharge          = "USBCharge"
+	CommandUSBChargeSwitch    = "USBChargeSwitch"
+	CommandDisplayMode        = "DisplayModeSwitch"
+	CommandDarkMode           = "DarkMode"
+	CommandTransparentEffect  = "TransparentEffect"
+	CommandAutoHideTaskbar    = "AutoHideTaskbar"
+	CommandScreenSaver        = "ScreenSaver"
 	CommandScreenSaverTimeout = "ScreenSaverTimeout"
 )
 
-// DisplayMode is the way the machine drives the graphics chip.
+// DisplayMode 表示显卡显示输出工作模式。
 type DisplayMode int
 
-// The display modes the service offers.
 const (
-	// DisplayModeHybrid keeps the integrated graphics in charge.
+	// DisplayModeHybrid 混合输出模式。
 	DisplayModeHybrid DisplayMode = 1
-	// DisplayModeDiscrete hands the display over to the dedicated
-	// graphics.
+	// DisplayModeDiscrete 独立显卡直连模式。
 	DisplayModeDiscrete DisplayMode = 2
-	// DisplayModeAuto lets the system pick the mode on its own.
+	// DisplayModeAuto 自动显示切换模式。
 	DisplayModeAuto DisplayMode = 3
 )
 
-// String renders the mode for display.
+// String 返回显示模式的文本表示。
 func (d DisplayMode) String() string {
 	switch d {
 	case DisplayModeHybrid:
@@ -56,10 +44,7 @@ func (d DisplayMode) String() string {
 	}
 }
 
-// ParseDisplayMode maps a command line word onto a display mode.
-//
-// The words are the ones that the hardware layer uses for the same
-// setting, so that a user does not have to learn two vocabularies.
+// ParseDisplayMode 解析显示模式字符串。
 func ParseDisplayMode(name string) (DisplayMode, bool) {
 	switch name {
 	case "hybrid", "optimus", "mshybrid":
@@ -73,9 +58,7 @@ func ParseDisplayMode(name string) (DisplayMode, bool) {
 	}
 }
 
-// USBChargeLimit reads the charging limit in percent.
-//
-// The service offers the limits ten, twenty and thirty percent.
+// USBChargeLimit 查询关机 USB 供电电量下限阈值百分比。
 func (c *Client) USBChargeLimit() (int, error) {
 	result, err := c.Get(CommandUSBCharge)
 	if err != nil {
@@ -88,7 +71,7 @@ func (c *Client) USBChargeLimit() (int, error) {
 	return value, nil
 }
 
-// SetUSBChargeLimit sets the charging limit in percent.
+// SetUSBChargeLimit 设置关机 USB 供电终止的电池百分比下限（通常为 10, 20 或 30）。
 func (c *Client) SetUSBChargeLimit(percent int) error {
 	switch percent {
 	case 10, 20, 30:
@@ -98,7 +81,7 @@ func (c *Client) SetUSBChargeLimit(percent int) error {
 	return c.Set(CommandUSBCharge, percent)
 }
 
-// USBChargeEnabled reports whether the charging over USB is allowed.
+// USBChargeEnabled 查询关机 USB 供电功能是否开启。
 func (c *Client) USBChargeEnabled() (bool, error) {
 	result, err := c.Get(CommandUSBChargeSwitch)
 	if err != nil {
@@ -111,12 +94,12 @@ func (c *Client) USBChargeEnabled() (bool, error) {
 	return value, nil
 }
 
-// SetUSBChargeEnabled allows or forbids the charging over USB.
+// SetUSBChargeEnabled 启用或停用关机状态下的 USB 端口充电功能。
 func (c *Client) SetUSBChargeEnabled(enabled bool) error {
 	return c.Set(CommandUSBChargeSwitch, enabled)
 }
 
-// DisplayMode reads the graphics switch of the machine.
+// DisplayMode 查询当前的显卡显示模式。
 func (c *Client) DisplayMode() (DisplayMode, error) {
 	result, err := c.Get(CommandDisplayMode)
 	if err != nil {
@@ -129,7 +112,7 @@ func (c *Client) DisplayMode() (DisplayMode, error) {
 	return DisplayMode(value), nil
 }
 
-// SetDisplayMode selects the graphics switch of the machine.
+// SetDisplayMode 设置显卡显示模式。
 func (c *Client) SetDisplayMode(mode DisplayMode) error {
 	switch mode {
 	case DisplayModeHybrid, DisplayModeDiscrete, DisplayModeAuto:
@@ -139,7 +122,7 @@ func (c *Client) SetDisplayMode(mode DisplayMode) error {
 	return c.Set(CommandDisplayMode, int(mode))
 }
 
-// DarkMode reports whether the dark mode of the system is switched on.
+// DarkMode 查询 Windows 深色模式开关。
 func (c *Client) DarkMode() (bool, error) {
 	result, err := c.Get(CommandDarkMode)
 	if err != nil {
@@ -152,15 +135,12 @@ func (c *Client) DarkMode() (bool, error) {
 	return value, nil
 }
 
-// SetDarkMode switches the dark mode of the system on or off.
+// SetDarkMode 设置系统深色/浅色模式。
 func (c *Client) SetDarkMode(enabled bool) error {
 	return c.Set(CommandDarkMode, enabled)
 }
 
-// TransparentEffect reports whether the transparent effect of the system is
-// switched on.
-//
-// The service reports this state as a number, one for on and zero for off.
+// TransparentEffect 查询系统窗口背景透明视觉特效开关。
 func (c *Client) TransparentEffect() (bool, error) {
 	result, err := c.Get(CommandTransparentEffect)
 	if err != nil {
@@ -173,18 +153,12 @@ func (c *Client) TransparentEffect() (bool, error) {
 	return value, nil
 }
 
-// SetTransparentEffect switches the transparent effect of the system on or
-// off.
-//
-// The service keeps this state as the number that it reports itself, one
-// for on and zero for off, so that is what is written.
+// SetTransparentEffect 启用或关闭系统窗口透明视觉特效。
 func (c *Client) SetTransparentEffect(enabled bool) error {
 	return c.Set(CommandTransparentEffect, switchNumber(enabled))
 }
 
-// AutoHideTaskbar reports whether the taskbar of the system hides itself.
-//
-// The service reports this state as a number, one for on and zero for off.
+// AutoHideTaskbar 查询任务栏自动隐藏设置。
 func (c *Client) AutoHideTaskbar() (bool, error) {
 	result, err := c.Get(CommandAutoHideTaskbar)
 	if err != nil {
@@ -197,18 +171,12 @@ func (c *Client) AutoHideTaskbar() (bool, error) {
 	return value, nil
 }
 
-// SetAutoHideTaskbar hides the taskbar of the system or shows it again.
-//
-// The service keeps this state as the number that it reports itself, one
-// for hidden and zero for shown, so that is what is written.
+// SetAutoHideTaskbar 启用或关闭任务栏自动隐藏功能。
 func (c *Client) SetAutoHideTaskbar(enabled bool) error {
 	return c.Set(CommandAutoHideTaskbar, switchNumber(enabled))
 }
 
-// ScreenSaver reports whether the screen saver of the system is switched
-// on.
-//
-// The service reports this state as a switch, not as a number.
+// ScreenSaver 查询屏幕保护程序是否开启。
 func (c *Client) ScreenSaver() (bool, error) {
 	result, err := c.Get(CommandScreenSaver)
 	if err != nil {
@@ -221,15 +189,12 @@ func (c *Client) ScreenSaver() (bool, error) {
 	return value, nil
 }
 
-// SetScreenSaver switches the screen saver of the system on or off.
+// SetScreenSaver 启用或停用屏幕保护程序。
 func (c *Client) SetScreenSaver(enabled bool) error {
 	return c.Set(CommandScreenSaver, enabled)
 }
 
-// ScreenSaverTimeout reads the idle time in seconds before the screen saver
-// of the system starts.
-//
-// The service answers with zero while the screen saver is switched off.
+// ScreenSaverTimeout 获取屏幕保护程序的超时等待秒数。
 func (c *Client) ScreenSaverTimeout() (int, error) {
 	result, err := c.Get(CommandScreenSaverTimeout)
 	if err != nil {
@@ -242,11 +207,7 @@ func (c *Client) ScreenSaverTimeout() (int, error) {
 	return value, nil
 }
 
-// SetScreenSaverTimeout sets the idle time in seconds before the screen
-// saver of the system starts.
-//
-// The official application always writes six hundred seconds, the service
-// takes any number of seconds.
+// SetScreenSaverTimeout 设置屏幕保护程序激活前的空闲超时等待秒数。
 func (c *Client) SetScreenSaverTimeout(seconds int) error {
 	if seconds < 0 {
 		return fmt.Errorf("quickaccess: 屏保时间 %d 秒不是正数", seconds)
@@ -254,11 +215,6 @@ func (c *Client) SetScreenSaverTimeout(seconds int) error {
 	return c.Set(CommandScreenSaverTimeout, seconds)
 }
 
-// switchValue reads a switch of an answer.
-//
-// The service uses both shapes: some commands answer with a switch and some
-// answer with a number, one for on and zero for off. Both are taken for a
-// switch.
 func switchValue(result Result) (bool, error) {
 	switch value := result.Value.(type) {
 	case bool:
@@ -278,7 +234,6 @@ func switchValue(result Result) (bool, error) {
 	return false, fmt.Errorf("服务答话 %v 不是开关", result.Value)
 }
 
-// switchNumber turns a switch into the number that the service uses.
 func switchNumber(enabled bool) int {
 	if enabled {
 		return 1
@@ -286,7 +241,6 @@ func switchNumber(enabled bool) int {
 	return 0
 }
 
-// intValue reads the number of an answer.
 func intValue(result Result) (int, error) {
 	switch value := result.Value.(type) {
 	case float64:

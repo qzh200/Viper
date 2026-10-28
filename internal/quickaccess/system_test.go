@@ -4,13 +4,6 @@ import (
 	"testing"
 )
 
-// 本机原厂 Quick Access 服务支持的另外几项设置：透明效果、任务栏自动
-// 隐藏、屏保与屏保时间。
-//
-// 服务自己报出来的形状是照着本机实测的应答写的：透明效果与任务栏自动
-// 隐藏报的是数字（1 开、0 关），屏保报的是开关，屏保时间报的是秒数。
-
-// TestTheTransparentEffect 透明效果读回来是个数字。
 func TestTheTransparentEffect(t *testing.T) {
 	cases := map[float64]bool{1: true, 0: false}
 
@@ -33,7 +26,6 @@ func TestTheTransparentEffect(t *testing.T) {
 	}
 }
 
-// TestTheAutoHideTaskbar 任务栏自动隐藏读回来是个数字。
 func TestTheAutoHideTaskbar(t *testing.T) {
 	cases := map[float64]bool{1: true, 0: false}
 
@@ -56,7 +48,6 @@ func TestTheAutoHideTaskbar(t *testing.T) {
 	}
 }
 
-// TestTheScreenSaver 屏保读回来是个开关。
 func TestTheScreenSaver(t *testing.T) {
 	cases := map[bool]bool{true: true, false: false}
 
@@ -79,7 +70,6 @@ func TestTheScreenSaver(t *testing.T) {
 	}
 }
 
-// TestTheScreenSaverTimeout 屏保时间读回来是秒数。
 func TestTheScreenSaverTimeout(t *testing.T) {
 	server := newTestServer(t)
 	server.answer(CommandScreenSaverTimeout, 600)
@@ -99,7 +89,6 @@ func TestTheScreenSaverTimeout(t *testing.T) {
 	}
 }
 
-// TestTheWriteOfTheNewCommands 写下去的值要跟服务自己报的形状一样。
 func TestTheWriteOfTheNewCommands(t *testing.T) {
 	server := newTestServer(t)
 
@@ -149,7 +138,6 @@ func TestTheWriteOfTheNewCommands(t *testing.T) {
 	}
 }
 
-// TestSetTheScreenSaverTimeoutOfANegativeTime 负的秒数在出门之前就被拒绝。
 func TestSetTheScreenSaverTimeoutOfANegativeTime(t *testing.T) {
 	server := newTestServer(t)
 
@@ -167,7 +155,6 @@ func TestSetTheScreenSaverTimeoutOfANegativeTime(t *testing.T) {
 	}
 }
 
-// TestSwitchValueOfTheKinds 服务有的报开关，有的报数字。
 func TestSwitchValueOfTheKinds(t *testing.T) {
 	cases := []struct {
 		value any
@@ -198,7 +185,6 @@ func TestSwitchValueOfTheKinds(t *testing.T) {
 	}
 }
 
-// TestSwitchValueOfSomethingElse 不是开关的值要被拒绝。
 func TestSwitchValueOfSomethingElse(t *testing.T) {
 	cases := []any{nil, []any{1}, map[string]any{}, "perhaps"}
 	for _, value := range cases {
@@ -208,7 +194,6 @@ func TestSwitchValueOfSomethingElse(t *testing.T) {
 	}
 }
 
-// TestSwitchNumber 开关变成服务用的数字。
 func TestSwitchNumber(t *testing.T) {
 	if switchNumber(true) != 1 {
 		t.Error("开着的开关不是 1")

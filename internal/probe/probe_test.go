@@ -10,19 +10,14 @@ import (
 	"viper/internal/machine"
 )
 
-// fakeService is a stand for the service of the original software.
-//
-// 它按命令名回答，答案可以由用例写好。
 type fakeService struct {
-	// answers holds the payload of the answer of every command.
 	answers map[string]json.RawMessage
-	// written records the writes in the order they happened.
+
 	written []written
-	// fail makes every call fail.
+
 	fail error
 }
 
-// written is one write that happened.
 type written struct {
 	function string
 	value    any
@@ -32,7 +27,6 @@ func newFakeService() *fakeService {
 	return &fakeService{answers: map[string]json.RawMessage{}}
 }
 
-// answer sets the payload of the answer of a command.
 func (s *fakeService) answer(function, payload string) {
 	s.answers[function] = json.RawMessage(payload)
 }
@@ -63,11 +57,6 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 	return agentservice.Answer{Data: s.answers["monitor"], Result: "0"}, nil
 }
 
-// TestLightingPayloadKeepsTheGlobalColour locks the write that leaves the
-// lighting as it is.
-//
-// 全局颜色与分区颜色是两回事。少写一个，另一个就被服务清掉——写回一个空的
-// 分区数组，实测会把键盘正在用的颜色抹成黑色。
 func TestLightingPayloadKeepsTheGlobalColour(t *testing.T) {
 	payload := LightingPayload(LightingReading{
 		Color:      "#00AEC7",
@@ -88,7 +77,6 @@ func TestLightingPayloadKeepsTheGlobalColour(t *testing.T) {
 	}
 }
 
-// TestLightingPayloadKeepsTheZones locks the write of the zone colours.
 func TestLightingPayloadKeepsTheZones(t *testing.T) {
 	payload := LightingPayload(LightingReading{
 		LEDs: []LightingLED{
@@ -118,7 +106,6 @@ func TestLightingPayloadKeepsTheZones(t *testing.T) {
 	}
 }
 
-// TestReadLighting reads the lighting the way the service reports it.
 func TestReadLighting(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionLighting,
@@ -136,7 +123,6 @@ func TestReadLighting(t *testing.T) {
 	}
 }
 
-// TestReadLightingOfACommandThatIsNotThere covers the answer without a payload.
 func TestReadLightingOfACommandThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 
@@ -145,7 +131,6 @@ func TestReadLightingOfACommandThatIsNotThere(t *testing.T) {
 	}
 }
 
-// TestWriteLighting checks that the lighting is written back as it was read.
 func TestWriteLighting(t *testing.T) {
 	service := newFakeService()
 	reading := LightingReading{Color: "#00AEC7", Brightness: 5, Effect: "WAVE"}
@@ -168,7 +153,6 @@ func TestWriteLighting(t *testing.T) {
 	}
 }
 
-// TestFanPayload locks the shape of the fan write.
 func TestFanPayload(t *testing.T) {
 	payload := FanPayload(2,
 		FanData{Name: "CPU", Auto: 0, Speed: 50, Index: 0},
@@ -197,7 +181,6 @@ func TestFanPayload(t *testing.T) {
 	}
 }
 
-// TestReadFan reads the fans the way the service reports them.
 func TestReadFan(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl,
@@ -215,7 +198,6 @@ func TestReadFan(t *testing.T) {
 	}
 }
 
-// TestWriteFans checks that every fan is written back as it was read.
 func TestWriteFans(t *testing.T) {
 	service := newFakeService()
 	reading := FanReading{
@@ -246,7 +228,6 @@ func TestWriteFans(t *testing.T) {
 	}
 }
 
-// TestWinKey locks the shape and the reading of the Windows key.
 func TestWinKey(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionWinKey, `{"status":1}`)
@@ -272,7 +253,6 @@ func TestWinKey(t *testing.T) {
 	}
 }
 
-// TestGraphicsLines picks the lines of the monitor data that carry the card.
 func TestGraphicsLines(t *testing.T) {
 	data := json.RawMessage(`{
 		"CPU_TEMPERATURE": 89,
@@ -296,14 +276,12 @@ func TestGraphicsLines(t *testing.T) {
 	}
 }
 
-// TestGraphicsLinesOfSomethingBroken covers a payload that is not a document.
 func TestGraphicsLinesOfSomethingBroken(t *testing.T) {
 	if lines := GraphicsLines(json.RawMessage("not a document")); lines != nil {
 		t.Errorf("该读不出来: %#v", lines)
 	}
 }
 
-// TestMonitorValue reads one value out of the monitor data.
 func TestMonitorValue(t *testing.T) {
 	data := json.RawMessage(`{"CPU_FANSPEED": 2719, "CPU_TEMPERATURE": 89}`)
 
@@ -322,7 +300,6 @@ func TestMonitorValue(t *testing.T) {
 	}
 }
 
-// contains reports whether the text holds the name.
 func contains(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {
@@ -332,7 +309,6 @@ func contains(text, name string) bool {
 	return false
 }
 
-// fakeMachine is a stand for the machine.
 type fakeMachine struct {
 	lighting  hardware.RGBConfig
 	backlight hardware.BacklightState
@@ -341,9 +317,9 @@ type fakeMachine struct {
 	bootSound bool
 	winKey    bool
 	fans      hardware.FanState
-	// failWith makes every write fail with this error.
+
 	failWith error
-	// applied records the writes in the order they happened.
+
 	applied []string
 }
 
@@ -438,7 +414,6 @@ func (m *fakeMachine) SetFans(config hardware.FanConfig) error {
 	return nil
 }
 
-// TestVerifyChangesAndRestores checks the whole round of the verification.
 func TestVerifyChangesAndRestores(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl, `{"mode":0,"custom_fan_data":[]}`)
@@ -457,8 +432,6 @@ func TestVerifyChangesAndRestores(t *testing.T) {
 		}
 	}
 
-	// 每一项都写了一次，也都还原了一次——风扇的还原走的是原始服务，
-	// 因为占空比要按服务记着的样子写回去。
 	writes := map[string]int{}
 	for _, name := range device.applied {
 		writes[name]++
@@ -482,7 +455,6 @@ func TestVerifyChangesAndRestores(t *testing.T) {
 		t.Error("风扇没有按服务记着的样子写回去")
 	}
 
-	// 机器回到了原来的样子。
 	if device.lighting.Effect != original.Lighting.Effect {
 		t.Errorf("灯效没有还原: %v", device.lighting.Effect)
 	}
@@ -494,7 +466,6 @@ func TestVerifyChangesAndRestores(t *testing.T) {
 	}
 }
 
-// TestVerifyReportsAFailedWrite covers a machine that does not take a write.
 func TestVerifyReportsAFailedWrite(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl, `{"mode":0,"custom_fan_data":[]}`)
@@ -512,8 +483,6 @@ func TestVerifyReportsAFailedWrite(t *testing.T) {
 	}
 }
 
-// TestVerifySkipsTheSettingThatNeedsTheFirmware covers the Windows key when
-// the firmware cannot be reached.
 func TestVerifySkipsTheSettingThatNeedsTheFirmware(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl, `{"mode":0,"custom_fan_data":[]}`)
@@ -530,8 +499,6 @@ func TestVerifySkipsTheSettingThatNeedsTheFirmware(t *testing.T) {
 	}
 }
 
-// TestVerifyReportsAMissingFanPayload covers a fan payload that is not a
-// document.
 func TestVerifyReportsAMissingFanPayload(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionFanControl, `not a document`)
@@ -542,8 +509,6 @@ func TestVerifyReportsAMissingFanPayload(t *testing.T) {
 	}
 }
 
-// The machine layer of the program has to satisfy the interface of the probe.
 var _ Machine = (*machine.Backend)(nil)
 
-// The client of the service has to satisfy the interface of the probe.
 var _ Service = (*agentservice.Client)(nil)

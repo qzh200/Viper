@@ -9,7 +9,6 @@ import (
 	"viper/internal/nvidia"
 )
 
-// fakeService is a stand for the service of the original software.
 type fakeService struct {
 	answers map[string]json.RawMessage
 	fail    error
@@ -37,7 +36,6 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 	return agentservice.Answer{Data: s.answers["monitor"], Result: "0"}, nil
 }
 
-// capture runs the tool with the output captured.
 func capture(t *testing.T, fn func()) string {
 	t.Helper()
 
@@ -50,7 +48,6 @@ func capture(t *testing.T, fn func()) string {
 	return buffer.String()
 }
 
-// TestShowCards shows the cards as the management library reports them.
 func TestShowCards(t *testing.T) {
 	cards := []nvidia.Telemetry{{
 		Name:                "NVIDIA GeForce RTX 4060 Laptop GPU",
@@ -78,7 +75,6 @@ func TestShowCards(t *testing.T) {
 	}
 }
 
-// TestShowService shows the graphics lines of the monitor data.
 func TestShowService(t *testing.T) {
 	service := newFakeService()
 	service.answers["monitor"] = json.RawMessage(`{"GPU1_FANSPEED":2729,"CPU_TEMPERATURE":89}`)
@@ -92,8 +88,6 @@ func TestShowService(t *testing.T) {
 	}
 }
 
-// TestShowServiceOfAServiceThatIsNotThere covers the service that does not
-// answer.
 func TestShowServiceOfAServiceThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 	service.fail = errNotThere{}
@@ -104,12 +98,10 @@ func TestShowServiceOfAServiceThatIsNotThere(t *testing.T) {
 	}
 }
 
-// errNotThere is the error of a service that is not there.
 type errNotThere struct{}
 
 func (errNotThere) Error() string { return "服务不可达" }
 
-// contains reports whether the text holds the name.
 func contains(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {

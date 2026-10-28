@@ -6,9 +6,7 @@ import (
 )
 
 func TestEncryptAESMatchesTheOriginal(t *testing.T) {
-	// The answer of the original service, captured while the handshake
-	// was running. The service sends the question back encrypted with the
-	// second key, so the cipher has to produce exactly this text.
+
 	const want = "g59El+p9nk0T6rt09R81GNLIQ3zCypACuJEjqudWGZGcIAGd7W7+tam+Lv4jdCnOScRIRXh8goNMXzZAuPjvMg=="
 
 	sealed, err := encryptAES([]byte(question), []byte(keyB))
@@ -22,7 +20,7 @@ func TestEncryptAESMatchesTheOriginal(t *testing.T) {
 }
 
 func TestEncryptAESLength(t *testing.T) {
-	// The cipher works in ECB mode, so the text is padded to whole blocks.
+
 	for _, length := range []int{0, 1, 15, 16, 17, 45} {
 		sealed, err := encryptAES(make([]byte, length), []byte(keyA))
 		if err != nil {
@@ -81,7 +79,7 @@ func TestResultOf(t *testing.T) {
 }
 
 func TestResultOfIgnoresNotifications(t *testing.T) {
-	// The service sends notifications of its own beside the answers.
+
 	answer := map[string]any{
 		"PacketType": float64(3),
 		"Command":    "USBCharge",

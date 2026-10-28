@@ -11,7 +11,7 @@ import (
 )
 
 func TestTheNamesOfThePatterns(t *testing.T) {
-	// 实测：原厂服务用这九个名字，编号与官方应用列出的顺序一致。
+
 	names := map[string]hardware.LightingEffect{
 		"STATIC":    hardware.EffectStatic,
 		"BREATHING": hardware.EffectBreathing,
@@ -32,7 +32,6 @@ func TestTheNamesOfThePatterns(t *testing.T) {
 		}
 	}
 
-	// 不认识的名字按静态处理，官方应用也只认这九个。
 	if got := serviceEffect("DIRECT"); got != hardware.EffectStatic {
 		t.Errorf("DIRECT 对应的是 %v，不是静态", got)
 	}
@@ -45,7 +44,7 @@ func TestTheNamesOfThePatterns(t *testing.T) {
 }
 
 func TestTheNumberOfTheGraphicsModes(t *testing.T) {
-	// 原厂服务从零开始数：0 是混合，1 是仅独显，2 是自动。
+
 	if got := serviceGPUMode(0); got != hardware.GPUModeHybrid {
 		t.Errorf("编号 0 是 %v，不是混合", got)
 	}
@@ -69,7 +68,6 @@ func TestColoursThatAreNotColours(t *testing.T) {
 		t.Errorf("颜色是 %#v，不是纯绿", colour)
 	}
 
-	// 不认识的样子直接丢掉，不去猜它是怎么排的。
 	for _, text := range []string{"", "#12345", "#GGGGGG", "#00FF0000", "红色"} {
 		if _, ok := parseColour(text); ok {
 			t.Errorf("%q 不该被当成颜色", text)
@@ -191,7 +189,7 @@ func TestAReadThatDoesNotHappen(t *testing.T) {
 }
 
 func TestTheFanOfTheOtherGroup(t *testing.T) {
-	// 服务报的风扇组名字不是 CPU 就是 GPU，别的一律不看。
+
 	service := newFakeService()
 	service.answers[agentservice.FunctionFanControl] = answer(map[string]any{
 		"mode": 2,

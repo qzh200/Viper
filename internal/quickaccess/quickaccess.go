@@ -1,16 +1,4 @@
-// Package quickaccess talks to the Acer Quick Access service.
-//
-// The service is part of the original PredatorSense stack. It owns the
-// settings that do not belong to the gaming hardware provider, such as the
-// charging over USB.
-//
-// 这个包是原厂软件 Quick Access 服务的客户端，管的是那些不属于游戏硬件的
-// 设置，比如 USB 充电。
-//
-// The service listens on a local port and speaks the WebSocket protocol
-// over TLS. The first packet of a session is an authentication packet whose
-// payload is sealed with AES in ECB mode, the packets that follow carry a
-// command and an action.
+// Package quickaccess 实现与 Acer QuickAccess 服务的 TLS/WebSocket 安全握手与命令交互。
 package quickaccess
 
 import (
@@ -28,64 +16,45 @@ import (
 	"time"
 )
 
-// The constants of the protocol.
-//
-// They are the same for every service of the original stack, only the
-// question of the handshake differs.
 const (
-	// defaultPort is the port of the Quick Access service.
 	defaultPort = 5141
 
-	// packetAuth is the type of the authentication packet.
-	packetAuth = 1
-	// packetRequest is the type of a request packet.
-	packetRequest = 2
-	// packetResponse is the type of an answer packet.
+	packetAuth     = 1
+	packetRequest  = 2
 	packetResponse = 3
 
-	// keyA seals the authentication packet.
 	keyA = "A6052DC8A6E44210"
-	// keyB is the key that the service uses for its answer.
 	keyB = "AB252AB73BED1CDB"
 
-	// question is the text that both sides encrypt to prove that they
-	// share the same keys.
 	question = "AcerQuickAccessFunctionalityTests_HandshakingQuestion"
 
-	// defaultTimeout is the time that a single request may take.
 	defaultTimeout = 5 * time.Second
 )
 
-// The actions of a request packet.
+// 交互操作动作标识。
 const (
-	// ActionGet asks for the current value of a command.
+	// ActionGet 表示查询状态操作。
 	ActionGet = "Get"
-	// ActionSet changes the value of a command.
+	// ActionSet 表示写入设置操作。
 	ActionSet = "Set"
 )
 
-// Client is a connection to the Quick Access service.
+// Client 维护与 Acer QuickAccess 服务的加密连接。
 type Client struct {
 	conn net.Conn
 	read *bufio.Reader
 	host string
-	// timeout limits the time of a single request.
+
 	timeout time.Duration
 }
 
-// Options change the behaviour of a client.
+// Options 定义连接 QuickAccess 服务的可选配置。
 type Options struct {
-	// Address is the address of the service. The default is the local
-	// port of the Quick Access service.
 	Address string
-	// Timeout limits the time of a single request.
 	Timeout time.Duration
 }
 
-// Connect opens a session with the Quick Access service.
-//
-// The session is authenticated right away, a service that does not know
-// the shared keys refuses the connection.
+// Connect 建立与 QuickAccess 服务的 TLS 连接，完成 WebSocket 升级并执行 AES 鉴权握手。
 func Connect(options Options) (*Client, error) {
 	address := options.Address
 	if address == "" {
@@ -123,10 +92,6 @@ func Connect(options Options) (*Client, error) {
 	return client, nil
 }
 
-// upgrade turns the connection into a WebSocket session.
-//
-// The service only speaks the WebSocket protocol, the plain stream is
-// refused.
 func (c *Client) upgrade() error {
 	key := make([]byte, 16)
 	if _, err := rand.Read(key); err != nil {
@@ -140,80 +105,71 @@ func (c *Client) upgrade() error {
 		"Sec-WebSocket-Key: " + base64.StdEncoding.EncodeToString(key) + "\r\n" +
 		"Sec-WebSocket-Version: 13\r\n\r\n"
 
-	if _, err := c.conn.Write([]byte(request)); err != nil {
-		return fmt.Errorf("quickaccess: the handshake failed: %w", err)
+	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	if _, err := io.WriteString(c.conn, request); err != nil {
+		return fmt.Errorf("quickaccess: write websocket upgrade: %w", err)
 	}
 
+	c.conn.SetReadDeadline(time.Now().Add(c.timeout))
 	status, err := c.read.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("quickaccess: the service did not answer the handshake: %w", err)
+		return fmt.Errorf("quickaccess: read websocket upgrade status: %w", err)
 	}
 	if !strings.Contains(status, "101") {
-		return fmt.Errorf("quickaccess: the service refused the handshake: %s", strings.TrimSpace(status))
+		return fmt.Errorf("quickaccess: upgrade rejected: %s", strings.TrimSpace(status))
 	}
+
 	for {
 		line, err := c.read.ReadString('\n')
 		if err != nil {
-			return fmt.Errorf("quickaccess: the service did not answer the handshake: %w", err)
+			return fmt.Errorf("quickaccess: read websocket upgrade header: %w", err)
 		}
-		if strings.TrimSpace(line) == "" {
+		if line == "\r\n" || line == "\n" {
 			break
 		}
 	}
 	return nil
 }
 
-// Close ends the session.
-func (c *Client) Close() error { return c.conn.Close() }
-
-// handshake performs the authentication of the session.
 func (c *Client) handshake() error {
-	payload, err := json.Marshal(map[string]string{
-		"Question": question,
-		"Key":      keyB,
-	})
+	encrypted, err := encryptAES([]byte(question), []byte(keyA))
 	if err != nil {
-		return err
-	}
-	sealed, err := encryptAES(payload, []byte(keyA))
-	if err != nil {
-		return err
+		return fmt.Errorf("quickaccess: encrypt the handshaking question: %w", err)
 	}
 
 	err = c.writeJSON(map[string]any{
 		"PacketType": packetAuth,
-		"Session":    sessionID(),
 		"Version":    1,
-		"Data":       base64.StdEncoding.EncodeToString(sealed),
+		"Session":    sessionID(),
+		"Command":    "AuthKey",
+		"Param1":     base64.StdEncoding.EncodeToString(encrypted),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("quickaccess: write auth key: %w", err)
 	}
 
 	answer, err := c.readJSON()
 	if err != nil {
-		return fmt.Errorf("quickaccess: the service did not answer the authentication: %w", err)
+		return fmt.Errorf("quickaccess: read auth response: %w", err)
 	}
-	data, _ := answer["Data"].(string)
-	expected, err := encryptAES([]byte(question), []byte(keyB))
-	if err != nil {
-		return err
-	}
-	if data != base64.StdEncoding.EncodeToString(expected) {
-		return fmt.Errorf("quickaccess: the service answered the authentication with an unknown question")
+	if intType, _ := answer["PacketType"].(float64); int(intType) != packetAuth {
+		return fmt.Errorf("quickaccess: auth response unexpected type %v", answer["PacketType"])
 	}
 	return nil
 }
 
-// Get asks for the current value of a command.
-//
-// The answer carries the value in the field Result, the service describes
-// the value in the fields Text and Description.
-//
-// The service sends notifications of its own beside the answers, they are
-// skipped until the answer of the command arrives. A command that the
-// service does not know is not answered at all, the wait ends with an
-// error instead of blocking the caller forever.
+// Close 关闭与 QuickAccess 服务的连接。
+func (c *Client) Close() error {
+	if c.conn == nil {
+		return nil
+	}
+	err := c.conn.Close()
+	c.conn = nil
+	c.read = nil
+	return err
+}
+
+// Get 向服务发送获取指定命令参数的请求。
 func (c *Client) Get(command string) (Result, error) {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -227,30 +183,26 @@ func (c *Client) Get(command string) (Result, error) {
 	}
 
 	deadline := c.deadline()
-	for {
+	for time.Now().Before(deadline) {
 		c.conn.SetReadDeadline(deadline)
 
 		answer, err := c.readJSON()
 		if err != nil {
 			return Result{}, fmt.Errorf("quickaccess: %s: %w", command, err)
 		}
-		result, ok, err := resultOf(answer, command)
+
+		result, matched, err := resultOf(answer, command)
 		if err != nil {
 			return Result{}, err
 		}
-		if ok {
+		if matched {
 			return result, nil
 		}
-		if !time.Now().Before(deadline) {
-			return Result{}, fmt.Errorf("quickaccess: %s: 服务没有回答这个请求", command)
-		}
 	}
+	return Result{}, fmt.Errorf("quickaccess: %s: 服务没有回答这个请求", command)
 }
 
-// Set changes the value of a command.
-//
-// The service answers with a notification first and repeats the new value
-// afterwards, the answer that carries the value ends the request.
+// Set 向服务发送设置命令及新值。
 func (c *Client) Set(command string, value any) error {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -279,7 +231,6 @@ func (c *Client) Set(command string, value any) error {
 	return fmt.Errorf("quickaccess: %s: 服务没有回答这个写入", command)
 }
 
-// deadline returns the time until a request has to be given up.
 func (c *Client) deadline() time.Time {
 	timeout := c.timeout
 	if timeout <= 0 {
@@ -288,10 +239,6 @@ func (c *Client) deadline() time.Time {
 	return time.Now().Add(timeout)
 }
 
-// answersCommand reports whether an answer belongs to a command.
-//
-// The service answers a request with the packet type of a response and
-// the name of the command, the action tells what kind of answer it is.
 func answersCommand(answer map[string]any, command string) bool {
 	if kind, _ := answer["PacketType"].(float64); int(kind) != packetResponse {
 		return false
@@ -300,20 +247,13 @@ func answersCommand(answer map[string]any, command string) bool {
 	return name == "" || name == command
 }
 
-// Result is the value of a command.
+// Result 承载 QuickAccess 查询返回的值与描述信息。
 type Result struct {
-	// Value is the raw value of the command.
-	Value any
-	// Text describes the value.
-	Text string
-	// Description describes the value.
+	Value       any
+	Text        string
 	Description string
 }
 
-// resultOf reads the answer of a command.
-//
-// The second result is false when the answer belongs to another command,
-// the service sends notifications of its own beside the answers.
 func resultOf(answer map[string]any, command string) (Result, bool, error) {
 	if !answersCommand(answer, command) {
 		return Result{}, false, nil
@@ -333,8 +273,6 @@ func resultOf(answer map[string]any, command string) (Result, bool, error) {
 		result.Text, _ = typed["Text"].(string)
 		result.Description, _ = typed["Description"].(string)
 	case []any:
-		// The answer of a command that reports several values carries the
-		// one that is marked as the current value.
 		for _, entry := range typed {
 			entryMap, ok := entry.(map[string]any)
 			if !ok {
@@ -356,7 +294,13 @@ func resultOf(answer map[string]any, command string) (Result, bool, error) {
 	return result, true, nil
 }
 
-// writeJSON sends one text frame.
+const (
+	opcodeText  = 1
+	opcodeClose = 8
+	opcodePing  = 9
+	opcodePong  = 10
+)
+
 func (c *Client) writeJSON(value any) error {
 	payload, err := json.Marshal(value)
 	if err != nil {
@@ -365,45 +309,48 @@ func (c *Client) writeJSON(value any) error {
 	return c.writeFrame(opcodeText, payload)
 }
 
-// writeFrame sends one frame.
 func (c *Client) writeFrame(opcode byte, payload []byte) error {
-	frame := []byte{0x80 | opcode} // the last frame of a message
-	switch length := len(payload); {
-	case length < 126:
-		frame = append(frame, byte(0x80|length))
-	case length < 65536:
-		frame = append(frame, 0x80|126, byte(length>>8), byte(length))
+	var header [10]byte
+	header[0] = 0x80 | (opcode & 0x0F)
+
+	length := len(payload)
+	headerLen := 2
+	switch {
+	case length <= 125:
+		header[1] = 0x80 | byte(length)
+	case length <= 65535:
+		header[1] = 0x80 | 126
+		binary.BigEndian.PutUint16(header[2:4], uint16(length))
+		headerLen = 4
 	default:
-		frame = append(frame, 0x80|127)
-		var extended [8]byte
-		binary.BigEndian.PutUint64(extended[:], uint64(length))
-		frame = append(frame, extended[:]...)
+		header[1] = 0x80 | 127
+		binary.BigEndian.PutUint64(header[2:10], uint64(length))
+		headerLen = 10
 	}
 
-	mask := make([]byte, 4)
-	if _, err := rand.Read(mask); err != nil {
+	var mask [4]byte
+	if _, err := rand.Read(mask[:]); err != nil {
 		return err
 	}
-	frame = append(frame, mask...)
-	for i, b := range payload {
-		frame = append(frame, b^mask[i%4])
+
+	masked := make([]byte, length)
+	for i := range payload {
+		masked[i] = payload[i] ^ mask[i%4]
 	}
 
-	_, err := c.conn.Write(frame)
-	return err
+	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	if _, err := c.conn.Write(header[:headerLen]); err != nil {
+		return err
+	}
+	if _, err := c.conn.Write(mask[:]); err != nil {
+		return err
+	}
+	if _, err := c.conn.Write(masked); err != nil {
+		return err
+	}
+	return nil
 }
 
-// The opcodes of the WebSocket protocol.
-const (
-	opcodeContinuation = 0x0
-	opcodeText         = 0x1
-	opcodeBinary       = 0x2
-	opcodeClose        = 0x8
-	opcodePing         = 0x9
-	opcodePong         = 0xA
-)
-
-// readJSON reads one text message.
 func (c *Client) readJSON() (map[string]any, error) {
 	var message []byte
 	for {
@@ -412,8 +359,8 @@ func (c *Client) readJSON() (map[string]any, error) {
 			return nil, err
 		}
 		switch opcode {
-		case opcodeText, opcodeBinary, opcodeContinuation:
-			message = append(message, payload...)
+		case opcodeText:
+			message = payload
 		case opcodePing:
 			if err := c.writeFrame(opcodePong, payload); err != nil {
 				return nil, err
@@ -439,7 +386,6 @@ func (c *Client) readJSON() (map[string]any, error) {
 	return answer, nil
 }
 
-// readFrame reads one frame.
 func (c *Client) readFrame() (byte, []byte, error) {
 	header := make([]byte, 2)
 	if _, err := io.ReadFull(c.read, header); err != nil {
@@ -484,10 +430,6 @@ func (c *Client) readFrame() (byte, []byte, error) {
 	return opcode, payload, nil
 }
 
-// encryptAES seals a text with AES in ECB mode.
-//
-// The padding is the one of the original service, every block that is not
-// full is filled up to the block size.
 func encryptAES(plain []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -507,7 +449,6 @@ func encryptAES(plain []byte, key []byte) ([]byte, error) {
 	return out, nil
 }
 
-// sessionID builds the identifier of a packet.
 func sessionID() string {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {

@@ -1,4 +1,3 @@
-// 开关类的设置：屏幕超频、Windows 键、开机音效、显卡模式。
 package app
 
 import (
@@ -7,7 +6,7 @@ import (
 	"viper/internal/hardware"
 )
 
-// LCDOverdrive reports whether the display overdrive is active.
+// LCDOverdrive 查询屏幕响应时间超速加速功能是否开启。
 func (a *App) LCDOverdrive() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -16,7 +15,7 @@ func (a *App) LCDOverdrive() (bool, error) {
 	return backend.LCDOverdrive()
 }
 
-// SetLCDOverdrive enables or disables the display overdrive.
+// SetLCDOverdrive 设置屏幕 LCD Overdrive 响应时间加速开关。
 func (a *App) SetLCDOverdrive(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -28,7 +27,7 @@ func (a *App) SetLCDOverdrive(enabled bool) error {
 	return nil
 }
 
-// WinKeyLocked reports whether the Windows key is locked.
+// WinKeyLocked 查询 Windows 徽标键是否处于锁定禁用状态。
 func (a *App) WinKeyLocked() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -37,7 +36,7 @@ func (a *App) WinKeyLocked() (bool, error) {
 	return backend.WinKeyLocked()
 }
 
-// SetWinKeyLocked locks or unlocks the Windows key.
+// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
 func (a *App) SetWinKeyLocked(locked bool) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -49,16 +48,13 @@ func (a *App) SetWinKeyLocked(locked bool) error {
 	return nil
 }
 
-// StickyKeys reports whether the sticky keys are switched on.
-//
-// The sticky keys belong to the accessibility settings of the current
-// user, they are not part of the gaming hardware.
+// StickyKeys 查询操作系统粘滞键当前状态。
 func (a *App) StickyKeys() (bool, error) { return hardware.StickyKeys() }
 
-// SetStickyKeys switches the sticky keys on or off.
+// SetStickyKeys 启用或停用操作系统粘滞键。
 func (a *App) SetStickyKeys(enabled bool) error { return hardware.SetStickyKeys(enabled) }
 
-// DiscreteGPU reports the state of the discrete GPU switch.
+// DiscreteGPU 查询当前是否工作在纯独显直连模式。
 func (a *App) DiscreteGPU() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -67,7 +63,7 @@ func (a *App) DiscreteGPU() (bool, error) {
 	return backend.DiscreteGPU()
 }
 
-// OverclockCapability reports which overclocking features the machine has.
+// OverclockCapability 检测 GPU 与 CPU 的超频支持能力。
 func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -76,7 +72,7 @@ func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 	return backend.OverclockCapability()
 }
 
-// GPUMode reads the graphics mode of the machine.
+// GPUMode 查询当前的显卡工作模式。
 func (a *App) GPUMode() (hardware.GPUMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -85,7 +81,7 @@ func (a *App) GPUMode() (hardware.GPUMode, error) {
 	return backend.GPUMode()
 }
 
-// SetGPUMode selects the graphics mode of the machine.
+// SetGPUMode 切换显卡模式（混合/独显直连/自动）。
 func (a *App) SetGPUMode(mode hardware.GPUMode) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -97,7 +93,7 @@ func (a *App) SetGPUMode(mode hardware.GPUMode) error {
 	return nil
 }
 
-// BootSound reports whether the sound at the start of the machine is on.
+// BootSound 查询开机启动音效是否开启。
 func (a *App) BootSound() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -106,7 +102,7 @@ func (a *App) BootSound() (bool, error) {
 	return backend.BootSound()
 }
 
-// SetBootSound switches the sound at the start of the machine on or off.
+// SetBootSound 设置开机启动音效开关。
 func (a *App) SetBootSound(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {

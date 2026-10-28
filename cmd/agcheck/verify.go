@@ -1,12 +1,3 @@
-// Command verify changes every setting the hardware layer can write, reads
-// it back and puts the machine back where it was.
-//
-// The hardware layer checks every write against the answer of the service,
-// so a setting that the machine did not take is reported as an error. This
-// command proves that on the real machine: it changes a setting, checks it
-// and restores the old value.
-//
-// 流程在 internal/probe 里，这个工具只负责把结果打出来。
 package main
 
 import (
@@ -26,8 +17,6 @@ func verify() {
 	}
 	defer backend.Close()
 
-	// 原样写回用的会话：风扇要回到服务记着的每一个数值，只靠语义化的
-	// 接口做不到。
 	raw, err := agentservice.Connect(agentservice.Options{})
 	if err != nil {
 		fmt.Fprintln(stdout, "连接原厂服务失败:", err)

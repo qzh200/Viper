@@ -3,8 +3,7 @@ package hardware
 import "testing"
 
 func TestParseIdentity(t *testing.T) {
-	// A system information structure with a string table behind it. The
-	// format matches the table of a Predator Helios Neo 16.
+
 	table := buildSystemTable()
 
 	identity, ok := parseIdentity(table)
@@ -29,7 +28,7 @@ func TestParseIdentity(t *testing.T) {
 }
 
 func TestParseIdentityWithoutFamily(t *testing.T) {
-	// A short structure carries no family, the field stays empty.
+
 	table := buildSystemTable(0x1A)
 
 	identity, ok := parseIdentity(table)
@@ -81,12 +80,11 @@ func TestPick(t *testing.T) {
 }
 
 func TestNextStructure(t *testing.T) {
-	// The string table ends with a double null byte, the next structure
-	// starts right behind it.
+
 	table := []byte{
-		0x02, 0x08, 0x00, 0x00, 'x', 'y', 0x00, 0x00, // formatted area
-		'a', 'b', 0x00, 0x00, // string table
-		0x01, 0x08, // the next structure
+		0x02, 0x08, 0x00, 0x00, 'x', 'y', 0x00, 0x00,
+		'a', 'b', 0x00, 0x00,
+		0x01, 0x08,
 	}
 	next := nextStructure(table, 0, 8)
 	if next != 12 {
@@ -97,10 +95,6 @@ func TestNextStructure(t *testing.T) {
 	}
 }
 
-// buildSystemTable builds a raw table with a single system information
-// structure and a string table behind it.
-//
-// The length of the structure decides whether it carries the family.
 func buildSystemTable(length ...int) []byte {
 	size := 0x1B
 	if len(length) > 0 {
@@ -110,14 +104,14 @@ func buildSystemTable(length ...int) []byte {
 	structure := make([]byte, size)
 	structure[0] = systemInformationType
 	structure[1] = byte(size)
-	structure[2] = 0x01 // handle
-	structure[3] = 0x00 // reserved
-	structure[4] = 1    // manufacturer
-	structure[5] = 2    // product
-	structure[6] = 3    // version
-	structure[7] = 4    // serial number
+	structure[2] = 0x01
+	structure[3] = 0x00
+	structure[4] = 1
+	structure[5] = 2
+	structure[6] = 3
+	structure[7] = 4
 	if size >= 0x1B {
-		structure[0x1A] = 5 // family
+		structure[0x1A] = 5
 	}
 
 	strings := []byte("Acer\x00Predator PHN16-71\x001.0\x00SN12345\x00")

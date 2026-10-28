@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// The service speaks the WebSocket protocol over TLS. The frames below
-// carry the commands and the answers of the service.
-
 func TestDisplayModeNames(t *testing.T) {
 	cases := map[DisplayMode]string{
 		DisplayModeHybrid:   "hybrid",
@@ -26,8 +23,7 @@ func TestDisplayModeNames(t *testing.T) {
 }
 
 func TestIntValueOfTheKinds(t *testing.T) {
-	// The service answers with a number, but the type of the number
-	// depends on the way it was read.
+
 	cases := []struct {
 		value any
 		want  int
@@ -74,8 +70,7 @@ func TestSetDisplayModeRejectsTheOtherModes(t *testing.T) {
 }
 
 func TestSessionID(t *testing.T) {
-	// The identifier of a packet is a UUID of the fourth version, the
-	// service uses it to tell the sessions apart.
+
 	id := sessionID()
 	if len(id) != 36 {
 		t.Fatalf("the identifier is %q, want 36 characters", id)
@@ -88,22 +83,20 @@ func TestSessionID(t *testing.T) {
 	if id[14] != '4' {
 		t.Errorf("the identifier %q is not of the fourth version", id)
 	}
-	// The variant of the fourth version is one of eight, nine, a and b.
+
 	switch id[19] {
 	case '8', '9', 'a', 'b':
 	default:
 		t.Errorf("the identifier %q does not carry the variant of the fourth version", id)
 	}
 
-	// Two identifiers are never the same.
 	if sessionID() == id {
 		t.Error("two identifiers are the same")
 	}
 }
 
 func TestFrameRoundTrip(t *testing.T) {
-	// A frame that is written by the client is read by the service, so
-	// the reader has to undo the mask that the writer put on it.
+
 	cases := []string{
 		"",
 		"short",
@@ -140,8 +133,7 @@ func TestFrameRoundTrip(t *testing.T) {
 }
 
 func TestReadFrameOfALongMessage(t *testing.T) {
-	// A message that is longer than sixty five thousand five hundred and
-	// thirty five characters carries its length in eight bytes.
+
 	text := make([]byte, 70000)
 	for i := range text {
 		text[i] = byte('a' + i%26)
@@ -180,8 +172,7 @@ func TestReadFrameOfALongMessage(t *testing.T) {
 }
 
 func TestReadFrameOfAnUnmaskedMessage(t *testing.T) {
-	// The service answers without a mask, only the client masks its
-	// frames.
+
 	frame := []byte{0x81, 0x05}
 	frame = append(frame, "hello"...)
 
@@ -207,7 +198,7 @@ func TestReadFrameOfAnUnmaskedMessage(t *testing.T) {
 }
 
 func TestResultOfAnAnswerWithoutAValue(t *testing.T) {
-	// A command that carries no value answers with an empty result.
+
 	answer := map[string]any{
 		"PacketType": float64(3),
 		"Command":    "DarkMode",
@@ -227,8 +218,7 @@ func TestResultOfAnAnswerWithoutAValue(t *testing.T) {
 }
 
 func TestResultOfAListOfValues(t *testing.T) {
-	// A command that reports several values carries the one that is
-	// marked as the current value.
+
 	answer := map[string]any{
 		"PacketType": float64(3),
 		"Command":    "USBCharge",
@@ -264,7 +254,7 @@ func TestResultOfAListOfValues(t *testing.T) {
 }
 
 func TestResultOfAPlainValue(t *testing.T) {
-	// A command that carries a switch answers with the switch itself.
+
 	answer := map[string]any{
 		"PacketType": float64(3),
 		"Command":    "USBChargeSwitch",
@@ -286,8 +276,7 @@ func TestResultOfAPlainValue(t *testing.T) {
 }
 
 func TestResultOfAnotherCommand(t *testing.T) {
-	// The service sends notifications of its own beside the answers, they
-	// belong to another command.
+
 	answer := map[string]any{
 		"PacketType": float64(3),
 		"Command":    "DarkMode",

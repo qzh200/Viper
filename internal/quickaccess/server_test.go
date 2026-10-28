@@ -19,33 +19,22 @@ import (
 	"time"
 )
 
-// The service of the original stack speaks the WebSocket protocol over
-// TLS. The server below stands for it, so that the tests can drive the
-// whole session without the service of the vendor.
-
-// testServer is a stand for the Quick Access service.
 type testServer struct {
-	// listener accepts the connections.
 	listener net.Listener
-	// answers holds the answer of every command, keyed by the name of
-	// the command.
+
 	answers map[string]map[string]any
-	// requests records the requests that were received.
+
 	requests []map[string]any
-	// mutex guards the answers and the requests, because the handler
-	// runs in the goroutine of the connection and the test reads them
-	// from another one.
+
 	mutex sync.Mutex
-	// refuseHandshake makes the server refuse the WebSocket handshake.
+
 	refuseHandshake bool
-	// wrongQuestion makes the server answer the authentication with
-	// something else than the question.
+
 	wrongQuestion bool
-	// closeAfterHandshake makes the server close the session.
+
 	closeAfterHandshake bool
 }
 
-// newTestServer starts a server on a free port of the loopback.
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 
@@ -66,10 +55,8 @@ func newTestServer(t *testing.T) *testServer {
 	return server
 }
 
-// address returns the address of the server.
 func (s *testServer) address() string { return s.listener.Addr().String() }
 
-// answer sets the answer of a command.
 func (s *testServer) answer(command string, value any) *testServer {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -77,7 +64,6 @@ func (s *testServer) answer(command string, value any) *testServer {
 	return s
 }
 
-// serve accepts the connections until the listener is closed.
 func (s *testServer) serve() {
 	for {
 		conn, err := s.listener.Accept()
@@ -88,13 +74,11 @@ func (s *testServer) serve() {
 	}
 }
 
-// handle answers one session.
 func (s *testServer) handle(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
 
-	// The WebSocket handshake.
 	if _, err := reader.ReadString('\n'); err != nil {
 		return
 	}
@@ -113,7 +97,6 @@ func (s *testServer) handle(conn net.Conn) {
 	}
 	conn.Write([]byte("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
 
-	// The first packet of the session is the authentication.
 	opcode, payload, err := readServerFrame(reader)
 	if err != nil {
 		return
@@ -143,7 +126,6 @@ func (s *testServer) handle(conn net.Conn) {
 		return
 	}
 
-	// The requests that follow.
 	for {
 		opcode, payload, err := readServerFrame(reader)
 		if err != nil {
@@ -179,7 +161,6 @@ func (s *testServer) handle(conn net.Conn) {
 	}
 }
 
-// receivedRequests returns the requests that the service received so far.
 func (s *testServer) receivedRequests() []map[string]any {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -188,9 +169,6 @@ func (s *testServer) receivedRequests() []map[string]any {
 	return out
 }
 
-// readServerFrame reads one frame that the client sent.
-//
-// The client masks its frames, so the mask has to be taken off.
 func readServerFrame(reader *bufio.Reader) (byte, []byte, error) {
 	header := make([]byte, 2)
 	if _, err := reader.Read(header); err != nil {
@@ -234,9 +212,6 @@ func readServerFrame(reader *bufio.Reader) (byte, []byte, error) {
 	return opcode, payload, nil
 }
 
-// serverFrame builds a frame that the service sends.
-//
-// The service does not mask its frames.
 func serverFrame(payload []byte) []byte {
 	frame := []byte{0x80 | opcodeText}
 	switch length := len(payload); {
@@ -253,7 +228,6 @@ func serverFrame(payload []byte) []byte {
 	return append(frame, payload...)
 }
 
-// selfSigned builds a certificate for the test server.
 func selfSigned(t *testing.T) tls.Certificate {
 	t.Helper()
 

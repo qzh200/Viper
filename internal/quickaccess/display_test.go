@@ -2,9 +2,6 @@ package quickaccess
 
 import "testing"
 
-// TestParseDisplayMode locks the words of the command line.
-//
-// 硬件层与这一层用的是同一套词汇，所以用户不用学两遍。
 func TestParseDisplayMode(t *testing.T) {
 	cases := map[string]DisplayMode{
 		"hybrid":    DisplayModeHybrid,

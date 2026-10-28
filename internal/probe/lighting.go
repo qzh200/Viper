@@ -2,31 +2,23 @@ package probe
 
 import "viper/internal/agentservice"
 
-// LightingLED is the colour of one lighting zone.
+// LightingLED 表示单个背光分区 LED 的 ID 与 HEX 颜色。
 type LightingLED struct {
-	// LEDID is the number of the zone.
-	LEDID int `json:"LED_id"`
-	// Color is the colour of the zone, "#RRGGBB".
+	LEDID int    `json:"LED_id"`
 	Color string `json:"color"`
 }
 
-// LightingReading is what the service reports about the keyboard lighting.
-//
-// 全局颜色与分区颜色是两回事：服务读回来有哪一个就写回哪一个。
+// LightingReading 记录从服务获取的原始灯效完整参数。
 type LightingReading struct {
-	// LEDs are the colours of the zones. The service leaves the list empty
-	// when the lighting is set as a whole.
-	LEDs []LightingLED `json:"LEDs"`
-	// Color is the global colour. The service uses it when there are no
-	// zones of its own.
-	Color      string `json:"color"`
-	Brightness int    `json:"brightness"`
-	Effect     string `json:"effect"`
-	Speed      int    `json:"speed"`
-	Direction  int    `json:"direction"`
+	LEDs       []LightingLED `json:"LEDs"`
+	Color      string        `json:"color"`
+	Brightness int           `json:"brightness"`
+	Effect     string        `json:"effect"`
+	Speed      int           `json:"speed"`
+	Direction  int           `json:"direction"`
 }
 
-// ReadLighting asks the service what the lighting looks like.
+// ReadLighting 读取当前的原始键盘灯效参数。
 func ReadLighting(service Service) (LightingReading, error) {
 	answer, err := service.Get(agentservice.FunctionLighting)
 	if err != nil {
@@ -40,11 +32,7 @@ func ReadLighting(service Service) (LightingReading, error) {
 	return reading, nil
 }
 
-// LightingPayload builds the write that leaves the lighting as it is.
-//
-// 服务读回来有哪一个就写回哪一个。少写一个，另一个就被服务清掉——写回一个空的
-// 分区数组，等于把全局颜色抹成黑色。实测过：这一条以前让「写回原值」把键盘的
-// 颜色清掉了。
+// LightingPayload 构造用于写入原厂服务的灯效字典。
 func LightingPayload(reading LightingReading) map[string]any {
 	payload := map[string]any{
 		"brightness": reading.Brightness,
@@ -70,9 +58,7 @@ func LightingPayload(reading LightingReading) map[string]any {
 	return payload
 }
 
-// WriteLighting writes the lighting back the way the service reported it.
-//
-// 它证明写通路是通的，机器的状态不变。
+// WriteLighting 向服务下发原始灯效数据。
 func WriteLighting(service Service, reading LightingReading) error {
 	answer, err := service.Set(agentservice.FunctionLighting, LightingPayload(reading))
 	if err != nil {

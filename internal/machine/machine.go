@@ -1,20 +1,4 @@
-// Package machine reaches the machine through the services of the original
-// software.
-//
-// The original AcerAgentService is the main road. It owns the keyboard
-// lighting, the fans, the performance profiles, the graphics switch and the
-// readings of the machine, and it runs as the system, so the program needs
-// no rights of an administrator to use it.
-//
-// The settings the service does not know are asked from the ACPI provider:
-// the boost of the fans, the table of the fans, the overclocking ability and
-// the raw buffer of the backlight. That road needs the rights of an
-// administrator and it is opened on first use, so a machine without the
-// rights still gets everything the service knows.
-//
-// 实测结论：原厂服务的风扇参数有三个模式，0 是自动，1 是全速，2 是固定
-// 占空比。全速时风扇从 2722 RPM 升到 7092 RPM，固定占空比时占空比写在每个
-// 风扇的 fan_custom_speed 里，fan_custom_auto 为零。
+// Package machine 基于 AcerAgentService 实现 hardware.Gaming 接口。
 package machine
 
 import (
@@ -26,51 +10,30 @@ import (
 	"viper/internal/hardware"
 )
 
-// ErrNoProvider says that a setting needs the ACPI provider and that the
-// provider cannot be reached.
+// ErrNoProvider 表示目标功能缺少底层固件或服务驱动支持。
 var ErrNoProvider = errors.New("machine: 这一项需要固件接口，原厂服务不提供，需要管理员权限")
 
-// Service is the set of abilities of the AcerAgentService that the program
-// uses.
-//
-// The interface keeps the program testable: a test can hand the program a
-// stand for the service, so that the behaviour can be checked without the
-// service of the original software.
+// Service 定义与原厂服务交互的通信接口抽象。
 type Service interface {
-	// Get asks for the value of a setting.
 	Get(function string) (agentservice.Answer, error)
-	// Set writes a setting.
 	Set(function string, parameter any) (agentservice.Answer, error)
-	// MonitorData asks for the live numbers of the machine.
 	MonitorData() (agentservice.Answer, error)
-	// Capability asks for an ability of the machine.
 	Capability(function string) (agentservice.Answer, error)
-	// Close ends the session.
 	Close() error
 }
 
-// Options change the behaviour of a backend.
+// Options 定义初始化机器控制后端的选项。
 type Options struct {
-	// Address is the address of the AcerAgentService. The default is the
-	// local port of the service.
 	Address string
-	// Timeout limits the time of a single request.
 	Timeout time.Duration
 }
 
-// Backend reaches the machine.
-//
-// The service of the original software answers everything: the readings, the
-// settings, the lighting. There is no second road.
+// Backend 封装针对 Acer 笔记本硬件的具体控制逻辑。
 type Backend struct {
 	service Service
 }
 
-// New opens the connection to the AcerAgentService.
-//
-// The service has to be running. A machine without it is answered with an
-// error that says so, the program does not fall back to the firmware on its
-// own, because the caller has to know which road it is on.
+// New 创建并连接至 AcerAgentService 的硬件控制后端。
 func New(options Options) (*Backend, error) {
 	client, err := agentservice.Connect(agentservice.Options{
 		Address: options.Address,
@@ -83,28 +46,23 @@ func New(options Options) (*Backend, error) {
 	return &Backend{service: client}, nil
 }
 
-// NewWithService opens the program with the given session of the service.
-//
-// It is used by the tests, so that they do not need the service of the
-// original software.
+// NewWithService 使用已初始化的 Service 实例构建后端。
 func NewWithService(service Service) *Backend {
 	return &Backend{service: service}
 }
 
-// The backend reaches the whole of the machine.
 var _ hardware.Gaming = (*Backend)(nil)
 
-// Instance returns the name of the service that holds the machine.
+// Instance 返回当前后端的标识名称。
 func (b *Backend) Instance() string { return "AcerAgentService" }
 
-// Close releases the connection.
+// Close 关闭后端并释放底层服务连接。
 func (b *Backend) Close() {
 	if b.service != nil {
 		b.service.Close()
 	}
 }
 
-// get asks the service for the value of a setting.
 func (b *Backend) get(function string) (agentservice.Answer, error) {
 	answer, err := b.service.Get(function)
 	if err != nil {
@@ -116,7 +74,6 @@ func (b *Backend) get(function string) (agentservice.Answer, error) {
 	return answer, nil
 }
 
-// set writes a setting.
 func (b *Backend) set(function string, parameter any) error {
 	answer, err := b.service.Set(function, parameter)
 	if err != nil {
@@ -128,10 +85,7 @@ func (b *Backend) set(function string, parameter any) error {
 	return nil
 }
 
-// Monitor reads everything the machine reports about itself.
-//
-// 原厂服务的监视数据里有：处理器的温度、使用率、频率与每核频率，显卡的温度、
-// 使用率与频率，内存的占用与频率，网络的上下行。它们直接来自机器。
+// Monitor 获取全套硬件运行状态与指标监控数据。
 func (b *Backend) Monitor() (hardware.MonitorData, error) {
 	answer, err := b.service.MonitorData()
 	if err != nil {
@@ -194,10 +148,7 @@ func (b *Backend) Monitor() (hardware.MonitorData, error) {
 	return result, nil
 }
 
-// Sensors reads the current temperatures and fan speeds.
-//
-// 它是监视数据里的一部分，其余的读数（使用率、频率、内存、网络）在 Monitor
-// 里。
+// Sensors 读取基本的 CPU/GPU 温度及风扇转速。
 func (b *Backend) Sensors() (hardware.Sensors, error) {
 	data, err := b.Monitor()
 	if err != nil {
@@ -213,7 +164,7 @@ func (b *Backend) Sensors() (hardware.Sensors, error) {
 	}, nil
 }
 
-// PowerMode returns the performance profile.
+// PowerMode 查询当前电源性能模式。
 func (b *Backend) PowerMode() (hardware.PowerMode, error) {
 	answer, err := b.get(agentservice.FunctionOperatingMode)
 	if err != nil {
@@ -229,12 +180,7 @@ func (b *Backend) PowerMode() (hardware.PowerMode, error) {
 	return hardware.DecodePowerMode(uint64(data.Mode)), nil
 }
 
-// SetPowerMode applies a performance profile.
-//
-// 原厂服务用的编号是 0 静音、1 均衡、4 性能、5 加速、6 节能，和固件那一侧
-// 的编号一样，所以两边对同一个数字的理解不会差开。
-//
-// 写完读回来核对：机器没有换档，就在错误信息里说清楚。
+// SetPowerMode 设置并校验目标电源性能模式。
 func (b *Backend) SetPowerMode(mode hardware.PowerMode) error {
 	code := hardware.PowerModeCode(mode)
 	if err := b.set(agentservice.FunctionOperatingMode, map[string]any{
@@ -245,9 +191,6 @@ func (b *Backend) SetPowerMode(mode hardware.PowerMode) error {
 	return b.verifyPowerMode(int(code))
 }
 
-// verifyPowerMode reads the performance profile back.
-//
-// 性能档位的载荷里是 mode，不是开关那几个设置共用的 status，所以它自己核对。
 func (b *Backend) verifyPowerMode(expected int) error {
 	current := -1
 	read := func() (bool, error) {
@@ -277,9 +220,7 @@ func (b *Backend) verifyPowerMode(expected int) error {
 	return nil
 }
 
-// GPUMode returns the graphics switch of the machine.
-//
-// 原厂服务从零开始数，Viper 从一开始数，所以这里的编号要差一。
+// GPUMode 查询显卡直连/混合切换模式。
 func (b *Backend) GPUMode() (hardware.GPUMode, error) {
 	answer, err := b.get(agentservice.FunctionGPUMode)
 	if err != nil {
@@ -295,14 +236,7 @@ func (b *Backend) GPUMode() (hardware.GPUMode, error) {
 	return serviceGPUMode(data.Mode), nil
 }
 
-// SetGPUMode selects the graphics switch of the machine.
-//
-// 写入编号 0 是混合、1 是仅独显、2 是自动。切换图形模式要重启才生效，这与
-// 官方应用的行为一致。
-//
-// 这一项**不读回核对**：图形模式写进的是杂项设置表，机器要到重启才真的
-// 换过去，服务的结果码就是「收到了」的凭据。读回来的值在这一项上说明不了
-// 什么。
+// SetGPUMode 设置显卡工作模式。
 func (b *Backend) SetGPUMode(mode hardware.GPUMode) error {
 	code := int(mode)
 	if code < 1 {
@@ -313,7 +247,6 @@ func (b *Backend) SetGPUMode(mode hardware.GPUMode) error {
 	})
 }
 
-// serviceGPUMode maps the number of the service onto a graphics mode.
 func serviceGPUMode(value int) hardware.GPUMode {
 	switch value {
 	case 0:
@@ -327,9 +260,7 @@ func serviceGPUMode(value int) hardware.GPUMode {
 	}
 }
 
-// DiscreteGPU reports the state of the discrete graphics switch.
-//
-// 原厂服务报告图形模式，独显模式就是独显已经接管，所以这一项不用问固件。
+// DiscreteGPU 判断当前是否工作在纯独显直连模式。
 func (b *Backend) DiscreteGPU() (bool, error) {
 	mode, err := b.GPUMode()
 	if err != nil {
@@ -338,20 +269,13 @@ func (b *Backend) DiscreteGPU() (bool, error) {
 	return mode == hardware.GPUModeDiscrete, nil
 }
 
-// OverclockCapability reports which overclocking features the machine
-// supports.
-//
-// 原厂服务自己也不实现这一项，它的应答是失败码 3，所以这一项问固件。
-// OverclockCapability reports which overclocking features the machine supports.
-//
-// 原厂服务自己也不实现这一项（结果码 3），所以这一项报成不支持。
+// OverclockCapability 探测 GPU 与 CPU 的超频支持能力。
 func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 	answer, err := b.service.Capability(agentservice.CapabilityOverclockingMode)
 	if err != nil {
 		return false, false, fmt.Errorf("machine: 读取超频能力失败: %w", err)
 	}
 	if err, failed := answer.Err(); failed {
-		// 服务不实现这一项：它报的是"不支持"，不是出错。
 		if errors.Is(err, agentservice.ErrUnsupported) {
 			return false, false, nil
 		}
@@ -360,11 +284,7 @@ func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 	return false, false, nil
 }
 
-// WinKeyLocked reports whether the Windows key is locked.
-//
-// 实测：原厂服务的 WIN_KEY **写不动**——它收下请求（结果码 0），但读回来的
-// 值一直是一个，写 0 写 1 都一样。所以这一项走固件那一侧（锁是固件档案里的
-// 一个位），那一边需要管理员权限。
+// WinKeyLocked 查询 Windows 按键锁定状态。
 func (b *Backend) WinKeyLocked() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionWinKey)
 	if err != nil {
@@ -373,9 +293,7 @@ func (b *Backend) WinKeyLocked() (bool, error) {
 	return status == 0, nil
 }
 
-// SetWinKeyLocked locks or unlocks the Windows key.
-//
-// 这一项走固件那一侧，理由见 WinKeyLocked。
+// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
 func (b *Backend) SetWinKeyLocked(locked bool) error {
 	status := 1
 	if locked {
@@ -384,11 +302,11 @@ func (b *Backend) SetWinKeyLocked(locked bool) error {
 	if err := b.set(agentservice.FunctionWinKey, map[string]any{"status": status}); err != nil {
 		return err
 	}
-	// 写完要读回核对：实测这台机器上服务收下请求却不生效，核对会把它报出来。
+
 	return b.verifyStatus(agentservice.FunctionWinKey, status)
 }
 
-// LCDOverdrive reports whether the display overdrive is active.
+// LCDOverdrive 查询屏幕 LCD Overdrive 响应时间超速开关。
 func (b *Backend) LCDOverdrive() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionLCDOverdrive)
 	if err != nil {
@@ -397,7 +315,7 @@ func (b *Backend) LCDOverdrive() (bool, error) {
 	return status == 1, nil
 }
 
-// SetLCDOverdrive enables or disables the display overdrive.
+// SetLCDOverdrive 设置屏幕 LCD Overdrive 开关。
 func (b *Backend) SetLCDOverdrive(enabled bool) error {
 	status := boolStatus(enabled)
 	if err := b.set(agentservice.FunctionLCDOverdrive, map[string]any{"status": status}); err != nil {
@@ -406,7 +324,7 @@ func (b *Backend) SetLCDOverdrive(enabled bool) error {
 	return b.verifyStatus(agentservice.FunctionLCDOverdrive, status)
 }
 
-// BootSound reports whether the sound at the start of the machine is on.
+// BootSound 查询开机启动音效开关状态。
 func (b *Backend) BootSound() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionBootSound)
 	if err != nil {
@@ -415,7 +333,7 @@ func (b *Backend) BootSound() (bool, error) {
 	return status == 1, nil
 }
 
-// SetBootSound switches the sound at the start of the machine on or off.
+// SetBootSound 设置开机启动音效开关。
 func (b *Backend) SetBootSound(enabled bool) error {
 	status := boolStatus(enabled)
 	if err := b.set(agentservice.FunctionBootSound, map[string]any{"status": status}); err != nil {
@@ -424,9 +342,6 @@ func (b *Backend) SetBootSound(enabled bool) error {
 	return b.verifyStatus(agentservice.FunctionBootSound, status)
 }
 
-// verifyStatus reads a switch back and compares it with what was written.
-//
-// 原厂服务把写下的状态原样报回来，所以读回来的不一样，就是机器没有接受。
 func (b *Backend) verifyStatus(function string, expected int) error {
 	match := false
 	read := func() (bool, error) {
@@ -450,14 +365,6 @@ func (b *Backend) verifyStatus(function string, expected int) error {
 	return nil
 }
 
-// poll calls a reading until it agrees with what was written.
-//
-// 有的设置不是立刻生效的：服务把它交给别的服务或者写进固件，读回来的值会
-// 晚一点才变。所以读回核对要等一小会儿，而不是读一次就下结论。
-//
-// 服务正忙着让刚写下的设置生效的时候，会偶发回一个没有数据的应答。那不是
-// "失败"，是"还没好"：把它当成还没生效，继续等。等到期限过了，再把最后一次
-// 的错误报出来。
 func poll(read func() (bool, error)) (bool, error) {
 	deadline := time.Now().Add(verifyTimeout)
 	var lastErr error
@@ -478,18 +385,11 @@ func poll(read func() (bool, error)) (bool, error) {
 	}
 }
 
-// The times of the read back check.
-//
-// 写进机器的设置有的要过别的服务才生效，读回来会晚一点。这两个值是可变的，
-// 测试会把等待的时间改短。
 var (
 	verifyTimeout  = 3 * time.Second
 	verifyInterval = 100 * time.Millisecond
 )
 
-// switchStatus reads the state of a switch.
-//
-// 原厂服务的开关类设置都用同一个形状：状态是零或者一。
 func (b *Backend) switchStatus(function string) (int, error) {
 	answer, err := b.get(function)
 	if err != nil {
@@ -505,7 +405,6 @@ func (b *Backend) switchStatus(function string) (int, error) {
 	return data.Status, nil
 }
 
-// boolStatus turns a switch into the number the service uses.
 func boolStatus(enabled bool) int {
 	if enabled {
 		return 1

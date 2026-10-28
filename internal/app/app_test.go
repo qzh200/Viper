@@ -7,10 +7,7 @@ import (
 )
 
 func TestToStoredLightingLimitsTheValues(t *testing.T) {
-	// The firmware accepts a brightness from zero to one hundred, a speed
-	// from one to nine and a direction that is a switch. The stored
-	// settings must never claim more than the keyboard can do, otherwise
-	// the program shows a brightness that the keyboard does not have.
+
 	config := hardware.RGBConfig{
 		Effect:     hardware.EffectWave,
 		Speed:      99,

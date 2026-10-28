@@ -1,4 +1,3 @@
-// 风扇：读、写、加速。
 package app
 
 import (
@@ -8,24 +7,13 @@ import (
 	"viper/internal/hardware"
 )
 
-// FanStatus is the fan configuration of the machine.
-//
-// The provider reports the behaviour of the group of the processor only,
-// the group of the graphics fan cannot be read back. The mode of the
-// graphics fan is therefore the mode that Viper wrote last, the flag
-// GPUModeReadable tells the caller that this number did not come from the
-// firmware.
-//
-// 固件只报告处理器这一组的行为，显卡这一组读不回来。显卡风扇的模式取自
-// Viper 最后一次写入的值，GPUModeReadable 说明这个值不是从固件读来的。
+// FanStatus 组合风扇当前硬件状态与 GPU 模式可读性标记。
 type FanStatus struct {
 	hardware.FanState
-	// GPUModeReadable 报告显卡风扇的模式是不是从固件读来的。固件不
-	// 报告这一组，所以每一台机器上它都是假。
 	GPUModeReadable bool
 }
 
-// Fans returns the fan configuration.
+// Fans 读取当前 CPU 与 GPU 风扇的转速模式与百分比。
 func (a *App) Fans() (FanStatus, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -37,8 +25,7 @@ func (a *App) Fans() (FanStatus, error) {
 	}
 
 	status := FanStatus{FanState: state}
-	// 固件不报告显卡这一组，模式取自 Viper 最后一次写入的值，并且标记成
-	// 不是从固件读来的。原厂服务读得回这一组，就用它自己的读数。
+
 	if !state.GPUModeReadable {
 		status.GPUMode = fanMode(a.store.Settings().Fans.GPUMode)
 		status.GPUModeReadable = false
@@ -48,7 +35,7 @@ func (a *App) Fans() (FanStatus, error) {
 	return status, nil
 }
 
-// SetFans applies a fan configuration and remembers it.
+// SetFans 应用新的风扇配置并同步持久化到本地配置文件。
 func (a *App) SetFans(fans hardware.FanConfig) error {
 	if !knownFanMode(fans.CPUMode) {
 		return fmt.Errorf("app: 处理器风扇的行为 %q 不认识", fans.CPUMode)
@@ -78,10 +65,6 @@ func (a *App) SetFans(fans hardware.FanConfig) error {
 	return nil
 }
 
-// knownFanMode reports whether a behaviour of a fan group is part of the
-// enumeration of the hardware layer.
-//
-// 行为必须是硬件层枚举里的一个。
 func knownFanMode(mode hardware.FanMode) bool {
 	switch mode {
 	case hardware.FanAuto, hardware.FanMax, hardware.FanCustom:
@@ -91,16 +74,6 @@ func knownFanMode(mode hardware.FanMode) bool {
 	}
 }
 
-// fanMode maps a stored behaviour onto the enumeration of the hardware
-// layer.
-//
-// The settings hold the semantic enumeration of the hardware layer. A
-// value that is not part of it comes from a file that was written by hand
-// or by another tool, such a value is treated as the automatic mode, the
-// curve of the embedded controller.
-//
-// 设置文件里存的是语义枚举。文件里的值不在枚举里，说明它被人手改过或者
-// 是别的工具写的，这种值按自动模式处理。
 func fanMode(value uint64) hardware.FanMode {
 	switch value {
 	case config.FanMax:
@@ -112,14 +85,6 @@ func fanMode(value uint64) hardware.FanMode {
 	}
 }
 
-// storedFanMode maps a behaviour of the hardware layer onto the value
-// that is stored.
-//
-// The settings carry an enumeration of their own, so that the file keeps
-// its meaning even when the hardware layer gets a new behaviour.
-//
-// 设置文件带着自己的枚举，这样硬件层以后多一种行为时，文件里的意思不会
-// 跟着变。
 func storedFanMode(mode hardware.FanMode) uint64 {
 	switch mode {
 	case hardware.FanMax:
@@ -131,14 +96,14 @@ func storedFanMode(mode hardware.FanMode) uint64 {
 	}
 }
 
-// SetCoolBoost switches the boost fan table.
+// SetCoolBoost 开启或关闭 CoolBoost 强冷加速。
 func (a *App) SetCoolBoost(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {
 		return err
 	}
 	if err := backend.CoolBoost(enabled); err != nil {
-		return fmt.Errorf("app: 设置风扇加速失败: %w", err)
+		return fmt.Errorf("app: 设置 CoolBoost 失败: %w", err)
 	}
 	if err := a.store.Update(func(s *config.Settings) {
 		s.Fans.CoolBoost = enabled
@@ -146,4 +111,13 @@ func (a *App) SetCoolBoost(enabled bool) error {
 		return fmt.Errorf("app: 保存风扇加速设置失败: %w", err)
 	}
 	return nil
+}
+
+// CoolBoost 查询 CoolBoost 强冷是否已开启。
+func (a *App) CoolBoost() (bool, error) {
+	backend, err := a.hardware()
+	if err != nil {
+		return false, err
+	}
+	return backend.CoolBoostEnabled()
 }

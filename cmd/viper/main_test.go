@@ -9,11 +9,6 @@ import (
 	"viper/internal/hardware"
 )
 
-// capture runs the command line with the output captured.
-//
-// 命令行这一层的用例不碰真的机器：只挑那些在碰到机器之前就会失败的命令，
-// 以及那些纯解析的函数。用例的输出被换成缓冲区，所以能看见命令到底写了
-// 什么。
 func capture(t *testing.T, args ...string) (string, string, error) {
 	t.Helper()
 
@@ -28,11 +23,6 @@ func capture(t *testing.T, args ...string) (string, string, error) {
 	return outBuf.String(), errBuf.String(), err
 }
 
-// TestUsageIsPrintedForEveryFormOfHelp locks the three ways of asking for the
-// usage.
-//
-// 三种问用法的写法都要能用。以前 "--help" 会掉进全局选项的循环里，被当成
-// 不认识的选项报出来。
 func TestUsageIsPrintedForEveryFormOfHelp(t *testing.T) {
 	for _, args := range [][]string{nil, {"help"}, {"-h"}, {"--help"}} {
 		out, _, err := capture(t, args...)
@@ -45,7 +35,6 @@ func TestUsageIsPrintedForEveryFormOfHelp(t *testing.T) {
 	}
 }
 
-// TestUnknownOptionIsRejected checks that an option nobody knows is reported.
 func TestUnknownOptionIsRejected(t *testing.T) {
 	_, _, err := capture(t, "--nope")
 	if err == nil {
@@ -56,7 +45,6 @@ func TestUnknownOptionIsRejected(t *testing.T) {
 	}
 }
 
-// TestServiceOptionNeedsAnAddress checks the missing value of --service.
 func TestServiceOptionNeedsAnAddress(t *testing.T) {
 	_, _, err := capture(t, "--service")
 	if err == nil {
@@ -67,7 +55,6 @@ func TestServiceOptionNeedsAnAddress(t *testing.T) {
 	}
 }
 
-// TestUnknownCommandIsRejected checks a command nobody knows.
 func TestUnknownCommandIsRejected(t *testing.T) {
 	out, _, err := capture(t, "nosuchcommand")
 	if err == nil {
@@ -81,10 +68,6 @@ func TestUnknownCommandIsRejected(t *testing.T) {
 	}
 }
 
-// TestBadArgumentsAreRejectedBeforeTheMachine checks that a wrong argument is
-// reported instead of being handed to the machine.
-//
-// 这些命令在碰到机器之前就该把参数说清楚，所以用例不需要真的机器。
 func TestBadArgumentsAreRejectedBeforeTheMachine(t *testing.T) {
 	cases := []struct {
 		name string
@@ -127,7 +110,6 @@ func TestBadArgumentsAreRejectedBeforeTheMachine(t *testing.T) {
 	}
 }
 
-// TestParseOnOff locks the words that mean on and off.
 func TestParseOnOff(t *testing.T) {
 	for _, word := range []string{"on", "true", "1", "yes", "enable", "ON"} {
 		value, err := parseOnOff(word)
@@ -152,7 +134,6 @@ func TestParseOnOff(t *testing.T) {
 	}
 }
 
-// TestParseColor locks the hex colour of the command line.
 func TestParseColor(t *testing.T) {
 	colour, err := parseColor("#FF8800")
 	if err != nil {
@@ -177,7 +158,6 @@ func TestParseColor(t *testing.T) {
 	}
 }
 
-// lightingBase returns a lighting configuration to build the tests on.
 func lightingBase() hardware.RGBConfig {
 	return hardware.RGBConfig{
 		Effect:     hardware.EffectWave,
@@ -194,11 +174,6 @@ func lightingBase() hardware.RGBConfig {
 	}
 }
 
-// TestLightingOptionsKeepTheBase locks that the options that are not
-// mentioned keep the value the machine has now.
-//
-// 这条锁的是原厂服务的行为：写回去的时候没带的颜色会被清掉。所以只改亮度
-// 的命令必须带着机器现在的颜色出发，不能从零出发。
 func TestLightingOptionsKeepTheBase(t *testing.T) {
 	base := lightingBase()
 
@@ -220,7 +195,6 @@ func TestLightingOptionsKeepTheBase(t *testing.T) {
 	}
 }
 
-// TestLightingColorSetsEveryZone locks the global colour.
 func TestLightingColorSetsEveryZone(t *testing.T) {
 	base := lightingBase()
 
@@ -241,10 +215,6 @@ func TestLightingColorSetsEveryZone(t *testing.T) {
 	}
 }
 
-// TestLightingZoneKeepsTheOtherZones locks the colour of a single zone.
-//
-// 以前这条命令会把点过的那个分区颜色丢掉：写回去的时候 PerZone 是假，硬件
-// 层就只写全局颜色，点过的分区等于没写。
 func TestLightingZoneKeepsTheOtherZones(t *testing.T) {
 	base := lightingBase()
 
@@ -268,8 +238,6 @@ func TestLightingZoneKeepsTheOtherZones(t *testing.T) {
 	}
 }
 
-// TestLightingOptionsRejectBadInput locks the wrong arguments of the
-// lighting command.
 func TestLightingOptionsRejectBadInput(t *testing.T) {
 	base := lightingBase()
 
@@ -300,7 +268,6 @@ func TestLightingOptionsRejectBadInput(t *testing.T) {
 	}
 }
 
-// TestDescribeFan locks the rendering of a fan behaviour.
 func TestDescribeFan(t *testing.T) {
 	if got := describeFan(hardware.FanAuto, 0); got != "auto" {
 		t.Errorf("自动是 %q", got)
@@ -313,8 +280,6 @@ func TestDescribeFan(t *testing.T) {
 	}
 }
 
-// TestDescribeGPUFan locks the mark that says the value is not from the
-// machine.
 func TestDescribeGPUFan(t *testing.T) {
 	readable := app.FanStatus{GPUMode: hardware.FanAuto, GPUModeReadable: true}
 	if got := describeGPUFan(readable); strings.Contains(got, "not readable") {
@@ -327,7 +292,6 @@ func TestDescribeGPUFan(t *testing.T) {
 	}
 }
 
-// TestMinMaxAndBytes locks the small helpers of the output.
 func TestMinMaxAndBytes(t *testing.T) {
 	values := []int{3, 9, 5}
 	if got := minOf(values); got != 3 {
@@ -348,7 +312,6 @@ func TestMinMaxAndBytes(t *testing.T) {
 	}
 }
 
-// TestOnOff locks the rendering of a boolean.
 func TestOnOff(t *testing.T) {
 	if onOff(true) != "on" {
 		t.Error("真该是 on")

@@ -1,4 +1,3 @@
-// 机器的读数：传感器、电源、显卡遥测、身份。
 package app
 
 import (
@@ -6,23 +5,13 @@ import (
 	"viper/internal/nvidia"
 )
 
-// Telemetry is the state of the machine.
-//
-// 读数以**原厂服务**为主：它的监视数据里有处理器的使用率与频率、每核频率、
-// 显卡的使用率与频率、内存的占用与频率、网络的上下行。
-//
-// 显卡驱动只**补充**它没报的那几样：显卡的名字、显存与显存频率。驱动报的
-// 使用率与频率不用——原厂服务报的那些就是机器自己的数。
+// Telemetry 汇集原厂监控数据与 NVIDIA 显卡专属遥测指标。
 type Telemetry struct {
-	// Monitor is what the original service reports about the machine.
 	Monitor hardware.MonitorData
-	// Cards are what the driver of the graphics cards reports: the name of
-	// the card, the video memory and the memory clock. The service does not
-	// report those.
-	Cards []nvidia.Telemetry
+	Cards   []nvidia.Telemetry
 }
 
-// Instance returns the object path of the gaming functions.
+// Instance 返回当前底层连接的后端驱动实例名称。
 func (a *App) Instance() (string, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -31,7 +20,7 @@ func (a *App) Instance() (string, error) {
 	return backend.Instance(), nil
 }
 
-// Sensors reads the live temperatures and fan speeds.
+// Sensors 读取基础传感器数据（CPU/GPU 温度与风扇转速）。
 func (a *App) Sensors() (hardware.Sensors, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -40,9 +29,7 @@ func (a *App) Sensors() (hardware.Sensors, error) {
 	return backend.Sensors()
 }
 
-// Monitor reads everything the machine reports about itself.
-//
-// 读数来自原厂服务的监视数据。
+// Monitor 获取全套软硬件运行参数与监控指标。
 func (a *App) Monitor() (hardware.MonitorData, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -51,19 +38,12 @@ func (a *App) Monitor() (hardware.MonitorData, error) {
 	return backend.Monitor()
 }
 
-// PowerStatus reads the power supply of the machine.
-//
-// The information comes from the kernel of Windows, so it needs neither the
-// gaming provider nor the services of the original software.
+// PowerStatus 查询当前适配器连接与电池充放电状态。
 func (a *App) PowerStatus() (hardware.PowerStatus, error) {
 	return hardware.SystemPowerStatus()
 }
 
-// Telemetry reads the state of the machine: the readings of the original
-// service first, the driver of the card filling in the rest.
-//
-// A machine without a card that offers them answers with an empty list of
-// cards, the readings of the service are still there.
+// Telemetry 采集包含整机遥测与 NVML 显卡详细指标的完整数据包。
 func (a *App) Telemetry() (Telemetry, error) {
 	monitor, err := a.Monitor()
 	if err != nil {
@@ -72,8 +52,6 @@ func (a *App) Telemetry() (Telemetry, error) {
 
 	cards, err := nvidia.Read()
 	if err != nil {
-		// A machine without the driver of the vendor simply has no
-		// telemetry from the card, that is not an error.
 		if nvidia.Available() {
 			return Telemetry{}, err
 		}
@@ -83,7 +61,7 @@ func (a *App) Telemetry() (Telemetry, error) {
 	return Telemetry{Monitor: monitor, Cards: cards}, nil
 }
 
-// Identity returns the machine information from the machine's own tables.
+// Identity 读取 SMBIOS 固件信息以获取设备型号与厂商身份。
 func (a *App) Identity() (hardware.Identity, error) {
 	return hardware.SystemInfo()
 }

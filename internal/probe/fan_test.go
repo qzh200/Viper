@@ -6,7 +6,6 @@ import (
 	"viper/internal/agentservice"
 )
 
-// TestWriteFan locks the write of the fan configuration.
 func TestWriteFan(t *testing.T) {
 	service := newFakeService()
 
@@ -24,7 +23,6 @@ func TestWriteFan(t *testing.T) {
 	}
 }
 
-// TestWriteFanOfAServiceThatIsNotThere covers the answer that never comes.
 func TestWriteFanOfAServiceThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 	service.fail = errNoService
@@ -43,10 +41,8 @@ func TestWriteFanOfAServiceThatIsNotThere(t *testing.T) {
 	}
 }
 
-// errNoService is the error of a service that is not there.
 var errNoService = errService{}
 
-// errService is the error of a service that is not there.
 type errService struct{}
 
 func (errService) Error() string { return "服务不可达" }

@@ -9,7 +9,6 @@ import (
 	"viper/internal/agentservice"
 )
 
-// fakeService is a stand for the service of the original software.
 type fakeService struct {
 	answers map[string]json.RawMessage
 	written []string
@@ -50,7 +49,6 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 	return agentservice.Answer{Data: s.answers["monitor"], Result: "0"}, nil
 }
 
-// capture runs the tool with the output captured.
 func capture(t *testing.T, fn func()) string {
 	t.Helper()
 
@@ -63,7 +61,6 @@ func capture(t *testing.T, fn func()) string {
 	return buffer.String()
 }
 
-// TestProbeWinKey writes both numbers and reads them back.
 func TestProbeWinKey(t *testing.T) {
 	service := newFakeService()
 	service.answer(agentservice.FunctionWinKey, `{"status":1}`)
@@ -79,14 +76,12 @@ func TestProbeWinKey(t *testing.T) {
 			t.Errorf("输出里没有 %q:\n%s", want, out)
 		}
 	}
-	// 四个读回加上最后那一次读回。
+
 	if len(service.written) != 5 {
 		t.Errorf("写了 %d 次:\n%s", len(service.written), out)
 	}
 }
 
-// TestProbeWinKeyOfAServiceThatIsNotThere covers the service that does not
-// answer.
 func TestProbeWinKeyOfAServiceThatIsNotThere(t *testing.T) {
 	service := newFakeService()
 	service.fail = errNotThere{}
@@ -101,12 +96,10 @@ func TestProbeWinKeyOfAServiceThatIsNotThere(t *testing.T) {
 	}
 }
 
-// errNotThere is the error of a service that is not there.
 type errNotThere struct{}
 
 func (errNotThere) Error() string { return "服务不可达" }
 
-// contains reports whether the text holds the name.
 func contains(text, name string) bool {
 	for i := 0; i+len(name) <= len(text); i++ {
 		if text[i:i+len(name)] == name {

@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// 这个用例连的是本机真正在跑的原厂 Quick Access 服务，只读不写。
-//
-// 它平时是跳过的，只有在环境变量 VIPER_LIVE_QUICKACCESS=1 之后才会跑，
-// 用来核对命令的名字与应答的形状。
-
-// TestLiveProbeOfTheCommands 读一遍本机服务认识的所有命令。
 func TestLiveProbeOfTheCommands(t *testing.T) {
 	if os.Getenv("VIPER_LIVE_QUICKACCESS") == "" {
 		t.Skip("设置 VIPER_LIVE_QUICKACCESS=1 之后才会连本机的原厂服务")
@@ -48,7 +42,6 @@ func TestLiveProbeOfTheCommands(t *testing.T) {
 	}
 }
 
-// TestLiveProbeOfTheMethods 用本机服务核对新加的方法读到的形状。
 func TestLiveProbeOfTheMethods(t *testing.T) {
 	if os.Getenv("VIPER_LIVE_QUICKACCESS") == "" {
 		t.Skip("设置 VIPER_LIVE_QUICKACCESS=1 之后才会连本机的原厂服务")
@@ -102,7 +95,6 @@ func TestLiveProbeOfTheMethods(t *testing.T) {
 	}
 }
 
-// probe 发一个读取请求，把服务回答的整个文档打印出来。
 func (c *Client) probe(command string) (string, error) {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -115,7 +107,6 @@ func (c *Client) probe(command string) (string, error) {
 		return "", err
 	}
 
-	// 服务不认识的命令不会回答，没有期限就会一直等下去。
 	c.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 
 	answer, err := c.readJSON()

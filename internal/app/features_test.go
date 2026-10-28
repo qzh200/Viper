@@ -11,15 +11,8 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// The tests of this file lock the fixes of the use case layer: the
-// connections are opened once, the lighting that is written is the
-// lighting that is stored, the settings of the Quick Access service are
-// reachable and the stored values carry the enumeration of the hardware
-// layer.
-
 func TestTheHardwareIsOpenedOnlyOnce(t *testing.T) {
-	// Two calls that run at the same time must not open two connections,
-	// the second one would be left behind.
+
 	application := newTestAppWithoutMachine(t)
 
 	var mu sync.Mutex
@@ -71,15 +64,12 @@ func TestTheCloseReleasesTheHardwareOnlyOnce(t *testing.T) {
 	if !machine.closed {
 		t.Error("the machine was not released")
 	}
-	// A second close must not fail and must not release anything twice.
+
 	application.Close()
 }
 
 func TestTheStoredProfileIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
-	// The settings carry the semantic enumeration of the hardware layer,
-	// never the codes that the firmware expects. The mapping has to work
-	// in both directions, so that a profile of the hardware layer and the
-	// value that is stored for it always mean the same thing.
+
 	cases := []struct {
 		mode   hardware.PowerMode
 		stored uint64
@@ -102,10 +92,7 @@ func TestTheStoredProfileIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
 }
 
 func TestTheNumbersOfTheSettingsAreTheNumbersOfTheEnumeration(t *testing.T) {
-	// The file carries the numbers of the enumeration of the hardware
-	// layer. When the hardware layer moves a profile to another number,
-	// this test fails and the change is made on purpose instead of
-	// silently changing the meaning of the file.
+
 	cases := map[uint64]hardware.PowerMode{
 		config.PowerQuiet:       hardware.PowerQuiet,
 		config.PowerBalanced:    hardware.PowerBalanced,
@@ -123,8 +110,7 @@ func TestTheNumbersOfTheSettingsAreTheNumbersOfTheEnumeration(t *testing.T) {
 }
 
 func TestTheStoredFanModeIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
-	// The settings carry the semantic enumeration of the hardware layer,
-	// never the codes that the firmware expects.
+
 	cases := []struct {
 		mode   hardware.FanMode
 		stored uint64
@@ -205,8 +191,7 @@ func TestTheStoredFanModeIsTheOneThatIsWritten(t *testing.T) {
 }
 
 func TestTheLightingThatIsWrittenIsTheLightingThatIsStored(t *testing.T) {
-	// The firmware and the settings have to carry the same numbers, a
-	// value that the firmware does not accept must not reach it.
+
 	application, machine := newTestAppWith(t)
 
 	if err := application.SetLighting(hardware.RGBConfig{
@@ -240,8 +225,7 @@ func TestTheLightingThatIsWrittenIsTheLightingThatIsStored(t *testing.T) {
 }
 
 func TestTheLightingFailsWhenTheMachineCannotBeRead(t *testing.T) {
-	// The caller has to be able to tell a firmware that cannot be read
-	// from a brightness of zero.
+
 	application, machine := newTestAppWith(t)
 	machine.brightnessError = errors.New("the firmware does not answer")
 	application.store.Update(func(s *config.Settings) {
@@ -262,8 +246,7 @@ func TestTheLightingFailsWithoutTheGamingProvider(t *testing.T) {
 }
 
 func TestTheModeOfTheGraphicsFanIsNotReadFromTheFirmware(t *testing.T) {
-	// The provider does not report the group of the graphics fan, the
-	// program must not pretend that it read it.
+
 	application, machine := newTestAppWith(t)
 	machine.fans = hardware.FanState{CPUMode: hardware.FanCustom, GPUMode: hardware.FanAuto}
 
@@ -445,10 +428,6 @@ func TestSetTheTimeoutOfTheScreenSaverOfTheService(t *testing.T) {
 	}
 }
 
-// failingQuickAccess is a service that answers every call with an error.
-//
-// The program has to report which setting failed, the caller must be able
-// to tell it from a service that is simply switched off.
 type failingQuickAccess struct {
 	*fakeQuickAccess
 }
@@ -485,8 +464,7 @@ func TestTheFailureOfTheServiceIsReported(t *testing.T) {
 }
 
 func TestTheSessionOfTheTestIsNotClosed(t *testing.T) {
-	// A session that was handed in belongs to the caller, the program
-	// must not close it.
+
 	application, service := newAppWithQuick(t)
 
 	if _, err := application.DarkMode(); err != nil {

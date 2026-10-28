@@ -9,18 +9,8 @@ import (
 	"testing"
 )
 
-// The settings live in a single file below the user profile. A missing or
-// a broken file must not stop the program, the defaults are used instead.
-
 func TestOpenInTheUserProfile(t *testing.T) {
-	// The settings live below the profile of the user. The test points
-	// the profile at a temporary directory, so that it does not touch the
-	// settings of the user.
-	//
-	// The name of the variable that holds the directory of the settings
-	// differs between the systems: Windows reads APPDATA, the others read
-	// XDG_CONFIG_HOME. All of them are set, so that the test stays in its
-	// own directory everywhere.
+
 	home := t.TempDir()
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("LOCALAPPDATA", home)
@@ -31,12 +21,11 @@ func TestOpenInTheUserProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The settings have to be inside the temporary directory, otherwise
-	// the test would read the settings of the user.
+
 	if !strings.HasPrefix(store.Path(), home) {
 		t.Errorf("the settings are at %q, want them inside %q", store.Path(), home)
 	}
-	// A missing file is not an error, the defaults are used.
+
 	if store.Settings().PowerMode != Default().PowerMode {
 		t.Errorf("the power mode is %d, want the default %d",
 			store.Settings().PowerMode, Default().PowerMode)
@@ -66,7 +55,7 @@ func TestOpenAtAMissingFile(t *testing.T) {
 }
 
 func TestOpenAtABrokenFile(t *testing.T) {
-	// A broken file must not stop the program.
+
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
@@ -83,8 +72,7 @@ func TestOpenAtABrokenFile(t *testing.T) {
 }
 
 func TestOpenAtAnOlderFile(t *testing.T) {
-	// An older file has no scenes and no bindings, the maps have to exist
-	// anyway, otherwise the program cannot store anything.
+
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{"powerMode":2}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -132,7 +120,6 @@ func TestSaveAndOpenAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The directory of the file is created on the way.
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("the settings were not written: %v", err)
 	}
@@ -195,8 +182,7 @@ func TestUpdateKeepsTheOtherSettings(t *testing.T) {
 }
 
 func TestSaveWritesReadableText(t *testing.T) {
-	// The file is written by hand, so that a person can look at it and
-	// change a value.
+
 	path := filepath.Join(t.TempDir(), "config.json")
 	store, err := OpenAt(path)
 	if err != nil {
@@ -222,8 +208,7 @@ func TestSaveWritesReadableText(t *testing.T) {
 }
 
 func TestDefaultSettingsAreTheAutomaticMode(t *testing.T) {
-	// The program starts with the fans on the curve of the embedded
-	// controller and with the backlight that switches off on its own.
+
 	settings := Default()
 	if settings.Fans.CPUMode != FanAuto || settings.Fans.GPUMode != FanAuto {
 		t.Errorf("the fans start in the mode %d and %d, want the automatic mode",
@@ -246,12 +231,8 @@ func TestDefaultSettingsAreTheAutomaticMode(t *testing.T) {
 	}
 }
 
-// The store is shared between the connections of the service of Viper, so
-// it has to survive calls that run at the same time.
-
 func TestTheSettingsAreACopy(t *testing.T) {
-	// The caller must not be able to change the stored settings by
-	// accident, the maps of the settings are not shared with the store.
+
 	store, err := OpenAt(filepath.Join(t.TempDir(), "config.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -285,9 +266,7 @@ func TestTheSettingsAreACopy(t *testing.T) {
 }
 
 func TestTheChangesThatRunAtTheSameTime(t *testing.T) {
-	// The service of Viper shares one store between its connections, a
-	// change that runs at the same time as another one must not lose a
-	// scene and must not write a broken file.
+
 	path := filepath.Join(t.TempDir(), "config.json")
 	store, err := OpenAt(path)
 	if err != nil {
@@ -332,9 +311,7 @@ func TestTheChangesThatRunAtTheSameTime(t *testing.T) {
 }
 
 func TestSaveWritesTheSettingsOnItsOwn(t *testing.T) {
-	// The save is a public call of its own, not only a part of the
-	// update. The settings that were changed by hand have to reach the
-	// file.
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
 	store, err := OpenAt(path)
@@ -360,9 +337,7 @@ func TestSaveWritesTheSettingsOnItsOwn(t *testing.T) {
 }
 
 func TestSaveOfAMachineThatRefuses(t *testing.T) {
-	// The directory of the settings cannot be created, so the save has to
-	// fail instead of losing the settings silently.
-	// A file where the directory should be makes the creation fail.
+
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
@@ -378,9 +353,7 @@ func TestSaveOfAMachineThatRefuses(t *testing.T) {
 }
 
 func TestTheFileIsWrittenWithoutALeftover(t *testing.T) {
-	// The settings are written beside the file and moved over it, so that
-	// a reader never sees a half written file. The temporary file must
-	// not stay behind.
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
 	store, err := OpenAt(path)
