@@ -1,5 +1,5 @@
-// Package hardware 定义硬件控制与状态采集的核心接口与数据结构。
-package hardware
+// Package domain 定义游戏笔记本硬件控制与状态采集的核心领域接口与数据模型。
+package domain
 
 // PowerModeReader 定义电源模式读取接口。
 type PowerModeReader interface {

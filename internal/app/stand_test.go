@@ -1,9 +1,9 @@
-package app
+﻿package app
 
 import (
 	"testing"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestTheStandReadsBackWhatWasWritten(t *testing.T) {
@@ -20,8 +20,8 @@ func TestTheStandReadsBackWhatWasWritten(t *testing.T) {
 		t.Error("the backlight timeout was written but it reads back as off")
 	}
 
-	if err := application.SetFans(hardware.FanConfig{
-		CPUMode:    hardware.FanCustom,
+	if err := application.SetFans(domain.FanConfig{
+		CPUMode:    domain.FanCustom,
 		CPUPercent: 60,
 	}); err != nil {
 		t.Fatal(err)
@@ -30,15 +30,15 @@ func TestTheStandReadsBackWhatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fans.CPUMode != hardware.FanCustom {
-		t.Errorf("the fan was written in the mode %s but reads back as %s", hardware.FanCustom, fans.CPUMode)
+	if fans.CPUMode != domain.FanCustom {
+		t.Errorf("the fan was written in the mode %s but reads back as %s", domain.FanCustom, fans.CPUMode)
 	}
 	if fans.CPUPercent != 60 {
 		t.Errorf("the fan was written at 60 percent but reads back at %d", fans.CPUPercent)
 	}
 
-	lighting := hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	lighting := domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      5,
 		Direction:  1,
 		Brightness: 80,
@@ -51,18 +51,18 @@ func TestTheStandReadsBackWhatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if read.Effect != hardware.EffectWave {
-		t.Errorf("the effect was written as %d but reads back as %d", hardware.EffectWave, read.Effect)
+	if read.Effect != domain.EffectWave {
+		t.Errorf("the effect was written as %d but reads back as %d", domain.EffectWave, read.Effect)
 	}
 
-	if err := application.SetPowerMode(hardware.PowerTurbo); err != nil {
+	if err := application.SetPowerMode(domain.PowerTurbo); err != nil {
 		t.Fatal(err)
 	}
 	mode, err := application.PowerMode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode != hardware.PowerTurbo {
-		t.Errorf("the profile was written as %s but reads back as %s", hardware.PowerTurbo, mode)
+	if mode != domain.PowerTurbo {
+		t.Errorf("the profile was written as %s but reads back as %s", domain.PowerTurbo, mode)
 	}
 }

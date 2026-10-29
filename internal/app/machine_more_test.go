@@ -1,4 +1,4 @@
-package app
+﻿package app
 
 import (
 	"path/filepath"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
@@ -17,14 +17,14 @@ func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
 		t.Fatal("the machine offers no profile")
 	}
 
-	found := map[hardware.PowerMode]bool{}
+	found := map[domain.PowerMode]bool{}
 	for _, mode := range modes {
 		found[mode] = true
 	}
-	if !found[hardware.PowerQuiet] {
+	if !found[domain.PowerQuiet] {
 		t.Errorf("the profiles are %v, want the quiet one", modes)
 	}
-	if !found[hardware.PowerBalanced] {
+	if !found[domain.PowerBalanced] {
 		t.Errorf("the profiles are %v, want the balanced one", modes)
 	}
 }
@@ -68,10 +68,10 @@ func TestTheSettingsOfTheMachineWithoutTheGamingProvider(t *testing.T) {
 func TestTheSettingsThatAreWrittenWithoutTheGamingProvider(t *testing.T) {
 	application := newTestAppWithoutMachine(t)
 
-	if err := application.SetPowerMode(hardware.PowerTurbo); err == nil {
+	if err := application.SetPowerMode(domain.PowerTurbo); err == nil {
 		t.Error("the profile was written although the gaming provider is not there")
 	}
-	if err := application.SetGPUMode(hardware.GPUModeDiscrete); err == nil {
+	if err := application.SetGPUMode(domain.GPUModeDiscrete); err == nil {
 		t.Error("the graphics mode was written although the gaming provider is not there")
 	}
 	if err := application.SetWinKeyLocked(true); err == nil {
@@ -86,10 +86,10 @@ func TestTheSettingsThatAreWrittenWithoutTheGamingProvider(t *testing.T) {
 	if err := application.SetCoolBoost(true); err == nil {
 		t.Error("the boost was written although the gaming provider is not there")
 	}
-	if err := application.SetLighting(hardware.RGBConfig{}); err == nil {
+	if err := application.SetLighting(domain.RGBConfig{}); err == nil {
 		t.Error("the lighting was written although the gaming provider is not there")
 	}
-	if err := application.SetFans(hardware.FanConfig{}); err == nil {
+	if err := application.SetFans(domain.FanConfig{}); err == nil {
 		t.Error("the fans were written although the gaming provider is not there")
 	}
 	if err := application.ResetLighting(); err == nil {

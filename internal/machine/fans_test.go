@@ -1,11 +1,11 @@
-package machine
+﻿package machine
 
 import (
 	"errors"
 	"testing"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestCoolBoostIsTheMaximumOfTheFans(t *testing.T) {
@@ -107,4 +107,4 @@ func TestCoolBoostHandsTheFansBack(t *testing.T) {
 	}
 }
 
-var _ = hardware.FanMax
+var _ = domain.FanMax

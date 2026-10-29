@@ -1,9 +1,9 @@
-package main
+﻿package main
 
 import (
 	"testing"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/quickaccess"
 )
 
@@ -102,5 +102,5 @@ func containsText(text, name string) bool {
 	return false
 }
 
-var _ = hardware.GPUModeDiscrete
+var _ = domain.GPUModeDiscrete
 var _ = quickaccess.DisplayModeDiscrete

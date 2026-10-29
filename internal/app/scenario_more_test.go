@@ -1,11 +1,11 @@
-package app
+﻿package app
 
 import (
 	"path/filepath"
 	"testing"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestSaveScenarioKeepsTheScenes(t *testing.T) {
@@ -136,7 +136,7 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 	application, machine := newTestAppWith(t)
 	machine.brightness = 65
 	application.store.Update(func(s *config.Settings) {
-		s.Lighting.Effect = uint64(hardware.EffectWave)
+		s.Lighting.Effect = uint64(domain.EffectWave)
 		s.Lighting.Speed = 6
 		s.Lighting.Direction = 1
 		s.Lighting.Brightness = 65
@@ -145,13 +145,13 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 	})
 
 	lighting := application.StoredLighting()
-	if lighting.Effect != hardware.EffectWave {
-		t.Errorf("the effect is %d, want %d", lighting.Effect, hardware.EffectWave)
+	if lighting.Effect != domain.EffectWave {
+		t.Errorf("the effect is %d, want %d", lighting.Effect, domain.EffectWave)
 	}
 	if lighting.Speed != 6 || lighting.Direction != 1 {
 		t.Errorf("the lighting is %+v, want the speed 6 and the direction 1", lighting)
 	}
-	if lighting.Zones[0] != (hardware.RGBColor{R: 199, G: 0, B: 135}) {
+	if lighting.Zones[0] != (domain.RGBColor{R: 199, G: 0, B: 135}) {
 		t.Errorf("the first zone is %+v, want the magenta", lighting.Zones[0])
 	}
 	if !lighting.PerZone {
@@ -169,7 +169,7 @@ func TestTheLightingOfTheStoredSettings(t *testing.T) {
 func TestToStoredLightingKeepsTheDirection(t *testing.T) {
 
 	for _, direction := range []uint64{0, 1} {
-		stored := toStoredLighting(hardware.RGBConfig{Direction: direction})
+		stored := toStoredLighting(domain.RGBConfig{Direction: direction})
 		if stored.Direction != direction {
 			t.Errorf("the stored direction is %d, want %d", stored.Direction, direction)
 		}
@@ -178,14 +178,14 @@ func TestToStoredLightingKeepsTheDirection(t *testing.T) {
 
 func TestToStoredLightingLimitsTheSpeed(t *testing.T) {
 
-	stored := toStoredLighting(hardware.RGBConfig{Speed: 0})
+	stored := toStoredLighting(domain.RGBConfig{Speed: 0})
 	if stored.Speed != 1 {
 		t.Errorf("the stored speed is %d, want 1", stored.Speed)
 	}
 }
 
 func TestToStoredLightingLimitsTheBrightness(t *testing.T) {
-	stored := toStoredLighting(hardware.RGBConfig{Brightness: 0})
+	stored := toStoredLighting(domain.RGBConfig{Brightness: 0})
 	if stored.Brightness != 0 {
 		t.Errorf("the stored brightness is %d, want 0", stored.Brightness)
 	}

@@ -1,10 +1,10 @@
-package app
+﻿package app
 
 import (
 	"fmt"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // Scenarios 返回所有已保存的命名场景配置字典。
@@ -80,21 +80,21 @@ func (a *App) ApplyScenario(name string) error {
 }
 
 func (a *App) applyScenario(scenario config.Scenario) error {
-	lighting := hardware.RGBConfig{
-		Effect:     hardware.LightingEffect(scenario.Lighting.Effect),
+	lighting := domain.RGBConfig{
+		Effect:     domain.LightingEffect(scenario.Lighting.Effect),
 		Speed:      scenario.Lighting.Speed,
 		Direction:  scenario.Lighting.Direction,
 		Brightness: scenario.Lighting.Brightness,
 		PerZone:    scenario.Lighting.PerZone,
 	}
 	for i, colour := range scenario.Lighting.Zones {
-		lighting.Zones[i] = hardware.RGBColor{R: colour.R, G: colour.G, B: colour.B}
+		lighting.Zones[i] = domain.RGBColor{R: colour.R, G: colour.G, B: colour.B}
 	}
 	if err := a.SetLighting(lighting); err != nil {
 		return err
 	}
 
-	return a.SetFans(hardware.FanConfig{
+	return a.SetFans(domain.FanConfig{
 		CPUMode:    fanMode(scenario.Fans.CPUMode),
 		GPUMode:    fanMode(scenario.Fans.GPUMode),
 		CPUPercent: scenario.Fans.CPUPercent,

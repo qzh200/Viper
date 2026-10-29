@@ -1,11 +1,11 @@
-package app
+﻿package app
 
 import (
 	"path/filepath"
 	"testing"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func newTestAppWith(t *testing.T) (*App, *fakeGaming) {
@@ -21,14 +21,14 @@ func newTestAppWith(t *testing.T) (*App, *fakeGaming) {
 func TestSetLightingRemembersTheLighting(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	lighting := hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	lighting := domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      5,
 		Direction:  1,
 		Brightness: 80,
 		PerZone:    true,
 	}
-	lighting.Zones[0] = hardware.RGBColor{R: 199, G: 0, B: 135}
+	lighting.Zones[0] = domain.RGBColor{R: 199, G: 0, B: 135}
 
 	if err := application.SetLighting(lighting); err != nil {
 		t.Fatal(err)
@@ -37,13 +37,13 @@ func TestSetLightingRemembersTheLighting(t *testing.T) {
 	if len(machine.written) != 1 {
 		t.Fatalf("the lighting was written %d times, want once", len(machine.written))
 	}
-	if machine.written[0].Effect != hardware.EffectWave {
-		t.Errorf("the written effect is %d, want %d", machine.written[0].Effect, hardware.EffectWave)
+	if machine.written[0].Effect != domain.EffectWave {
+		t.Errorf("the written effect is %d, want %d", machine.written[0].Effect, domain.EffectWave)
 	}
 
 	stored := application.store.Settings().Lighting
-	if stored.Effect != uint64(hardware.EffectWave) {
-		t.Errorf("the stored effect is %d, want %d", stored.Effect, hardware.EffectWave)
+	if stored.Effect != uint64(domain.EffectWave) {
+		t.Errorf("the stored effect is %d, want %d", stored.Effect, domain.EffectWave)
 	}
 	if stored.Brightness != 80 {
 		t.Errorf("the stored brightness is %d, want 80", stored.Brightness)
@@ -57,7 +57,7 @@ func TestSetLightingLimitsTheStoredValues(t *testing.T) {
 
 	application, _ := newTestAppWith(t)
 
-	if err := application.SetLighting(hardware.RGBConfig{
+	if err := application.SetLighting(domain.RGBConfig{
 		Speed:      99,
 		Direction:  5,
 		Brightness: 199,
@@ -88,7 +88,7 @@ func TestResetLightingWritesWhiteAndRemembersIt(t *testing.T) {
 		t.Fatalf("the lighting was written %d times, want once", len(machine.written))
 	}
 	written := machine.written[0]
-	if written.Effect != hardware.EffectStatic {
+	if written.Effect != domain.EffectStatic {
 		t.Errorf("the written effect is %d, want the static one", written.Effect)
 	}
 	if written.Brightness != 100 {
@@ -98,7 +98,7 @@ func TestResetLightingWritesWhiteAndRemembersIt(t *testing.T) {
 		t.Error("the written lighting does not carry the zones on their own")
 	}
 	for i, colour := range written.Zones {
-		if colour != (hardware.RGBColor{R: 255, G: 255, B: 255}) {
+		if colour != (domain.RGBColor{R: 255, G: 255, B: 255}) {
 			t.Errorf("the written zone %d is %+v, want white", i, colour)
 		}
 	}
@@ -115,9 +115,9 @@ func TestResetLightingWritesWhiteAndRemembersIt(t *testing.T) {
 func TestSetFansRemembersTheFans(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetFans(hardware.FanConfig{
-		CPUMode:    hardware.FanCustom,
-		GPUMode:    hardware.FanMax,
+	if err := application.SetFans(domain.FanConfig{
+		CPUMode:    domain.FanCustom,
+		GPUMode:    domain.FanMax,
 		CPUPercent: 60,
 		GPUPercent: 30,
 		CoolBoost:  true,
@@ -130,8 +130,8 @@ func TestSetFansRemembersTheFans(t *testing.T) {
 	}
 
 	stored := application.store.Settings().Fans
-	if stored.CPUMode != uint64(hardware.FanCustom) {
-		t.Errorf("the stored mode of the CPU fan is %d, want %d", stored.CPUMode, hardware.FanCustom)
+	if stored.CPUMode != uint64(domain.FanCustom) {
+		t.Errorf("the stored mode of the CPU fan is %d, want %d", stored.CPUMode, domain.FanCustom)
 	}
 	if stored.CPUPercent != 60 || stored.GPUPercent != 30 {
 		t.Errorf("the stored fans are %+v, want 60 and 30 percent", stored)
@@ -158,15 +158,15 @@ func TestSetCoolBoostRemembersIt(t *testing.T) {
 func TestSetPowerModeRemembersTheProfile(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetPowerMode(hardware.PowerTurbo); err != nil {
+	if err := application.SetPowerMode(domain.PowerTurbo); err != nil {
 		t.Fatal(err)
 	}
-	if len(machine.writtenPower) != 1 || machine.writtenPower[0] != hardware.PowerTurbo {
+	if len(machine.writtenPower) != 1 || machine.writtenPower[0] != domain.PowerTurbo {
 		t.Errorf("the profile was written %v, want the turbo one", machine.writtenPower)
 	}
-	if application.store.Settings().PowerMode != uint64(hardware.PowerTurbo) {
+	if application.store.Settings().PowerMode != uint64(domain.PowerTurbo) {
 		t.Errorf("the stored profile is %d, want %d",
-			application.store.Settings().PowerMode, hardware.PowerTurbo)
+			application.store.Settings().PowerMode, domain.PowerTurbo)
 	}
 }
 
@@ -181,7 +181,7 @@ func TestSetPowerModeAppliesTheBoundScene(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := application.SetPowerMode(hardware.PowerTurbo); err != nil {
+	if err := application.SetPowerMode(domain.PowerTurbo); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +196,7 @@ func TestSetPowerModeAppliesTheBoundScene(t *testing.T) {
 func TestSetPowerModeWithoutABoundScene(t *testing.T) {
 	application, _ := newTestAppWith(t)
 
-	if err := application.SetPowerMode(hardware.PowerPerformance); err != nil {
+	if err := application.SetPowerMode(domain.PowerPerformance); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -208,7 +208,7 @@ func TestSetPowerModeOfAProfileThatIsNotBound(t *testing.T) {
 		s.Bindings["turbo"] = "missing"
 	})
 
-	if err := application.SetPowerMode(hardware.PowerTurbo); err != nil {
+	if err := application.SetPowerMode(domain.PowerTurbo); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -234,9 +234,9 @@ func TestApplyScenarioWritesTheLightingAndTheFans(t *testing.T) {
 func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
 
 	application, machine := newTestAppWith(t)
-	machine.fans = hardware.FanState{
-		CPUMode:    hardware.FanCustom,
-		GPUMode:    hardware.FanMax,
+	machine.fans = domain.FanState{
+		CPUMode:    domain.FanCustom,
+		GPUMode:    domain.FanMax,
 		CPUPercent: 70,
 		GPUPercent: 40,
 		CoolBoost:  true,
@@ -248,8 +248,8 @@ func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
 	}
 
 	scenario := application.Scenarios()["game"]
-	if scenario.Fans.CPUMode != uint64(hardware.FanCustom) {
-		t.Errorf("the scene holds the mode %d, want %d", scenario.Fans.CPUMode, hardware.FanCustom)
+	if scenario.Fans.CPUMode != uint64(domain.FanCustom) {
+		t.Errorf("the scene holds the mode %d, want %d", scenario.Fans.CPUMode, domain.FanCustom)
 	}
 	if scenario.Fans.CPUPercent != 70 {
 		t.Errorf("the scene holds the duty cycle %d, want 70", scenario.Fans.CPUPercent)
@@ -313,8 +313,8 @@ func TestTheSettingsOfTheMachine(t *testing.T) {
 	machine.overclockGPU = false
 	machine.overclockCPU = true
 
-	machine.fans = hardware.FanState{CPUMode: hardware.FanMax, GPUMode: hardware.FanMax}
-	machine.backlight = hardware.BacklightState{Timeout: true}
+	machine.fans = domain.FanState{CPUMode: domain.FanMax, GPUMode: domain.FanMax}
+	machine.backlight = domain.BacklightState{Timeout: true}
 
 	if value, err := application.BootSound(); err != nil || !value {
 		t.Errorf("the sound at the start of the machine is %v (%v), want it on", value, err)
@@ -361,7 +361,7 @@ func TestTheSettingsThatAreWritten(t *testing.T) {
 	if err := application.SetLCDOverdrive(true); err != nil {
 		t.Fatal(err)
 	}
-	if err := application.SetGPUMode(hardware.GPUModeDiscrete); err != nil {
+	if err := application.SetGPUMode(domain.GPUModeDiscrete); err != nil {
 		t.Fatal(err)
 	}
 
@@ -374,7 +374,7 @@ func TestTheSettingsThatAreWritten(t *testing.T) {
 	if len(machine.writtenOverdrive) != 1 || !machine.writtenOverdrive[0] {
 		t.Errorf("the overdrive was written %v, want it switched on", machine.writtenOverdrive)
 	}
-	if len(machine.writtenGPUMode) != 1 || machine.writtenGPUMode[0] != hardware.GPUModeDiscrete {
+	if len(machine.writtenGPUMode) != 1 || machine.writtenGPUMode[0] != domain.GPUModeDiscrete {
 		t.Errorf("the graphics switch was written %v, want the discrete one", machine.writtenGPUMode)
 	}
 }
@@ -410,12 +410,12 @@ func TestTheLightingComesFromTheMachine(t *testing.T) {
 
 	application, machine := newTestAppWith(t)
 	machine.brightness = 80
-	machine.lighting = hardware.RGBConfig{
-		Effect: hardware.EffectBreathing,
+	machine.lighting = domain.RGBConfig{
+		Effect: domain.EffectBreathing,
 		Speed:  4,
 	}
 	application.store.Update(func(s *config.Settings) {
-		s.Lighting.Effect = uint64(hardware.EffectWave)
+		s.Lighting.Effect = uint64(domain.EffectWave)
 		s.Lighting.Brightness = 20
 	})
 
@@ -426,8 +426,8 @@ func TestTheLightingComesFromTheMachine(t *testing.T) {
 	if lighting.Brightness != 80 {
 		t.Errorf("the brightness is %d, want the 80 of the machine", lighting.Brightness)
 	}
-	if lighting.Effect != hardware.EffectBreathing {
-		t.Errorf("the effect is %d, want %d", lighting.Effect, hardware.EffectBreathing)
+	if lighting.Effect != domain.EffectBreathing {
+		t.Errorf("the effect is %d, want %d", lighting.Effect, domain.EffectBreathing)
 	}
 }
 

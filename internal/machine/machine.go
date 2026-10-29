@@ -1,4 +1,4 @@
-// Package machine 基于 AcerAgentService 实现 hardware.Gaming 接口。
+﻿// Package machine 基于 AcerAgentService 实现 domain.Gaming 接口。
 package machine
 
 import (
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // ErrNoProvider 表示目标功能缺少底层固件或服务驱动支持。
@@ -51,7 +51,7 @@ func NewWithService(service Service) *Backend {
 	return &Backend{service: service}
 }
 
-var _ hardware.Gaming = (*Backend)(nil)
+var _ domain.Gaming = (*Backend)(nil)
 
 // Instance 返回当前后端的标识名称。
 func (b *Backend) Instance() string { return "AcerAgentService" }
@@ -86,13 +86,13 @@ func (b *Backend) set(function string, parameter any) error {
 }
 
 // Monitor 获取全套硬件运行状态与指标监控数据。
-func (b *Backend) Monitor() (hardware.MonitorData, error) {
+func (b *Backend) Monitor() (domain.MonitorData, error) {
 	answer, err := b.service.MonitorData()
 	if err != nil {
-		return hardware.MonitorData{}, fmt.Errorf("machine: 读取监视数据失败: %w", err)
+		return domain.MonitorData{}, fmt.Errorf("machine: 读取监视数据失败: %w", err)
 	}
 	if err, failed := answer.Err(); failed {
-		return hardware.MonitorData{}, err
+		return domain.MonitorData{}, err
 	}
 
 	var data struct {
@@ -118,10 +118,10 @@ func (b *Backend) Monitor() (hardware.MonitorData, error) {
 		EtherUpload      float64   `json:"ETHERNET_UPLOAD"`
 	}
 	if err := answer.Decode(&data); err != nil {
-		return hardware.MonitorData{}, err
+		return domain.MonitorData{}, err
 	}
 
-	result := hardware.MonitorData{
+	result := domain.MonitorData{
 		CPUTemperatureC:      int(data.CPUTemperature),
 		CPUFanRPM:            int(data.CPUFanSpeed),
 		CPUUsagePercent:      data.CPUUsage,
@@ -149,13 +149,13 @@ func (b *Backend) Monitor() (hardware.MonitorData, error) {
 }
 
 // Sensors 读取基本的 CPU/GPU 温度及风扇转速。
-func (b *Backend) Sensors() (hardware.Sensors, error) {
+func (b *Backend) Sensors() (domain.Sensors, error) {
 	data, err := b.Monitor()
 	if err != nil {
-		return hardware.Sensors{}, err
+		return domain.Sensors{}, err
 	}
 
-	return hardware.Sensors{
+	return domain.Sensors{
 		CPUTempC:    data.CPUTemperatureC,
 		CPUFanRPM:   data.CPUFanRPM,
 		GPUTempC:    data.GPUTemperatureC,
@@ -165,24 +165,24 @@ func (b *Backend) Sensors() (hardware.Sensors, error) {
 }
 
 // PowerMode 查询当前电源性能模式。
-func (b *Backend) PowerMode() (hardware.PowerMode, error) {
+func (b *Backend) PowerMode() (domain.PowerMode, error) {
 	answer, err := b.get(agentservice.FunctionOperatingMode)
 	if err != nil {
-		return hardware.PowerUnknown, err
+		return domain.PowerUnknown, err
 	}
 
 	var data struct {
 		Mode int `json:"mode"`
 	}
 	if err := answer.Decode(&data); err != nil {
-		return hardware.PowerUnknown, err
+		return domain.PowerUnknown, err
 	}
-	return hardware.DecodePowerMode(uint64(data.Mode)), nil
+	return domain.DecodePowerMode(uint64(data.Mode)), nil
 }
 
 // SetPowerMode 设置并校验目标电源性能模式。
-func (b *Backend) SetPowerMode(mode hardware.PowerMode) error {
-	code := hardware.PowerModeCode(mode)
+func (b *Backend) SetPowerMode(mode domain.PowerMode) error {
+	code := domain.PowerModeCode(mode)
 	if err := b.set(agentservice.FunctionOperatingMode, map[string]any{
 		"mode": int(code),
 	}); err != nil {
@@ -221,23 +221,23 @@ func (b *Backend) verifyPowerMode(expected int) error {
 }
 
 // GPUMode 查询显卡直连/混合切换模式。
-func (b *Backend) GPUMode() (hardware.GPUMode, error) {
+func (b *Backend) GPUMode() (domain.GPUMode, error) {
 	answer, err := b.get(agentservice.FunctionGPUMode)
 	if err != nil {
-		return hardware.GPUModeHybrid, err
+		return domain.GPUModeHybrid, err
 	}
 
 	var data struct {
 		Mode int `json:"mode"`
 	}
 	if err := answer.Decode(&data); err != nil {
-		return hardware.GPUModeHybrid, err
+		return domain.GPUModeHybrid, err
 	}
 	return serviceGPUMode(data.Mode), nil
 }
 
 // SetGPUMode 设置显卡工作模式。
-func (b *Backend) SetGPUMode(mode hardware.GPUMode) error {
+func (b *Backend) SetGPUMode(mode domain.GPUMode) error {
 	code := int(mode)
 	if code < 1 {
 		code = 1
@@ -247,16 +247,16 @@ func (b *Backend) SetGPUMode(mode hardware.GPUMode) error {
 	})
 }
 
-func serviceGPUMode(value int) hardware.GPUMode {
+func serviceGPUMode(value int) domain.GPUMode {
 	switch value {
 	case 0:
-		return hardware.GPUModeHybrid
+		return domain.GPUModeHybrid
 	case 1:
-		return hardware.GPUModeDiscrete
+		return domain.GPUModeDiscrete
 	case 2:
-		return hardware.GPUModeAuto
+		return domain.GPUModeAuto
 	default:
-		return hardware.GPUModeHybrid
+		return domain.GPUModeHybrid
 	}
 }
 
@@ -266,7 +266,7 @@ func (b *Backend) DiscreteGPU() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return mode == hardware.GPUModeDiscrete, nil
+	return mode == domain.GPUModeDiscrete, nil
 }
 
 // OverclockCapability 探测 GPU 与 CPU 的超频支持能力。

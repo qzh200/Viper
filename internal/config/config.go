@@ -1,4 +1,4 @@
-// Package config 提供用户配置、灯效预设、风扇策略与场景绑定的持久化存储。
+﻿// Package config 提供用户配置、灯效预设、风扇策略与场景绑定的持久化存储。
 package config
 
 import (
@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// 电源模式数值常量（对应 hardware.PowerMode 编码）。
+// 电源模式数值常量（对应 domain.PowerMode 编码）。
 const (
 	PowerQuiet uint64 = iota
 	PowerBalanced

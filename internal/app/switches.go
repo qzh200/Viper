@@ -1,9 +1,9 @@
-package app
+﻿package app
 
 import (
 	"fmt"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // LCDOverdrive 查询屏幕响应时间超速加速功能是否开启。
@@ -67,16 +67,16 @@ func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 }
 
 // GPUMode 查询当前的显卡工作模式。
-func (a *App) GPUMode() (hardware.GPUMode, error) {
+func (a *App) GPUMode() (domain.GPUMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
-		return hardware.GPUModeHybrid, err
+		return domain.GPUModeHybrid, err
 	}
 	return backend.GPUMode()
 }
 
 // SetGPUMode 切换显卡模式（混合/独显直连/自动）。
-func (a *App) SetGPUMode(mode hardware.GPUMode) error {
+func (a *App) SetGPUMode(mode domain.GPUMode) error {
 	backend, err := a.hardware()
 	if err != nil {
 		return err

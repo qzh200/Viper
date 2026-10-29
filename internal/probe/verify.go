@@ -1,11 +1,11 @@
-package probe
+﻿package probe
 
 import (
 	"encoding/json"
 	"errors"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/machine"
 )
 
@@ -13,21 +13,21 @@ import (
 type Machine interface {
 	Instance() string
 
-	Sensors() (hardware.Sensors, error)
-	Lighting() (hardware.RGBConfig, error)
-	SetLighting(config hardware.RGBConfig) error
-	Backlight() (hardware.BacklightState, error)
+	Sensors() (domain.Sensors, error)
+	Lighting() (domain.RGBConfig, error)
+	SetLighting(config domain.RGBConfig) error
+	Backlight() (domain.BacklightState, error)
 	SetBacklight(brightness int, timeout bool) error
-	PowerMode() (hardware.PowerMode, error)
-	SetPowerMode(mode hardware.PowerMode) error
+	PowerMode() (domain.PowerMode, error)
+	SetPowerMode(mode domain.PowerMode) error
 	LCDOverdrive() (bool, error)
 	SetLCDOverdrive(enabled bool) error
 	BootSound() (bool, error)
 	SetBootSound(enabled bool) error
 	WinKeyLocked() (bool, error)
 	SetWinKeyLocked(locked bool) error
-	Fans() (hardware.FanState, error)
-	SetFans(config hardware.FanConfig) error
+	Fans() (domain.FanState, error)
+	SetFans(config domain.FanConfig) error
 }
 
 // StepResult 记录单项功能测试与状态复原的执行结果。
@@ -45,13 +45,13 @@ func (r StepResult) OK() bool {
 
 // Original 保存各项硬件控制功能在测试前的原始状态快照。
 type Original struct {
-	Lighting  hardware.RGBConfig
-	Backlight hardware.BacklightState
-	Power     hardware.PowerMode
+	Lighting  domain.RGBConfig
+	Backlight domain.BacklightState
+	Power     domain.PowerMode
 	Overdrive bool
 	BootSound bool
 	WinKey    bool
-	Fans      hardware.FanState
+	Fans      domain.FanState
 }
 
 // Verify 执行全套硬件功能的读写校验流程：先备份现有状态，依次触发改动并校验，最后还原初始设定。
@@ -105,19 +105,19 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 
 	zone := lighting
 	zone.PerZone = true
-	zone.Effect = hardware.EffectStatic
+	zone.Effect = domain.EffectStatic
 	zone.Speed = 3
 	zone.Direction = 0
 	zone.Brightness = 50
 	for i := range zone.Zones {
-		zone.Zones[i] = hardware.RGBColor{B: 255}
+		zone.Zones[i] = domain.RGBColor{B: 255}
 	}
 
 	global := lighting
 	global.PerZone = false
-	global.Effect = hardware.EffectStatic
+	global.Effect = domain.EffectStatic
 	global.Brightness = 50
-	global.Zones[0] = hardware.RGBColor{G: 255}
+	global.Zones[0] = domain.RGBColor{G: 255}
 
 	steps := []struct {
 		name    string
@@ -156,7 +156,7 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 		},
 		{
 			name:    "性能档位",
-			apply:   func() error { return device.SetPowerMode(hardware.PowerPerformance) },
+			apply:   func() error { return device.SetPowerMode(domain.PowerPerformance) },
 			restore: func() error { return device.SetPowerMode(power) },
 		},
 		{
@@ -167,9 +167,9 @@ func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 		{
 			name: "风扇全速",
 			apply: func() error {
-				return device.SetFans(hardware.FanConfig{
-					CPUMode: hardware.FanMax,
-					GPUMode: hardware.FanMax,
+				return device.SetFans(domain.FanConfig{
+					CPUMode: domain.FanMax,
+					GPUMode: domain.FanMax,
 				})
 			},
 			restore: func() error {

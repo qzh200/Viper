@@ -1,4 +1,4 @@
-package machine
+﻿package machine
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 type fakeWrite struct {
@@ -154,7 +154,7 @@ func TestPowerModeIsReadFromTheService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取性能档位失败: %v", err)
 	}
-	if mode != hardware.PowerPerformance {
+	if mode != domain.PowerPerformance {
 		t.Fatalf("性能档位是 %v，不是性能档", mode)
 	}
 }
@@ -163,7 +163,7 @@ func TestPowerModeIsWrittenWithTheNumberOfTheMachine(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	if err := backend.SetPowerMode(hardware.PowerTurbo); err != nil {
+	if err := backend.SetPowerMode(domain.PowerTurbo); err != nil {
 		t.Fatalf("写入性能档位失败: %v", err)
 	}
 	if len(service.writes) != 1 {
@@ -173,7 +173,7 @@ func TestPowerModeIsWrittenWithTheNumberOfTheMachine(t *testing.T) {
 		t.Fatalf("写入的档位是 %v，不是 5", mode)
 	}
 
-	if err := backend.SetPowerMode(hardware.PowerEco); err != nil {
+	if err := backend.SetPowerMode(domain.PowerEco); err != nil {
 		t.Fatalf("写入性能档位失败: %v", err)
 	}
 	if mode := service.writes[1].Parameter["mode"]; mode != 6 {
@@ -192,7 +192,7 @@ func TestGPUModeCountsFromZeroInTheService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取显卡模式失败: %v", err)
 	}
-	if mode != hardware.GPUModeDiscrete {
+	if mode != domain.GPUModeDiscrete {
 		t.Fatalf("显卡模式是 %v，不是独显", mode)
 	}
 
@@ -209,14 +209,14 @@ func TestGPUModeIsWrittenWithTheNumberOfTheService(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	if err := backend.SetGPUMode(hardware.GPUModeHybrid); err != nil {
+	if err := backend.SetGPUMode(domain.GPUModeHybrid); err != nil {
 		t.Fatalf("写入显卡模式失败: %v", err)
 	}
 	if mode := service.writes[0].Parameter["mode"]; mode != 0 {
 		t.Fatalf("写入的显卡模式是 %v，不是 0", mode)
 	}
 
-	if err := backend.SetGPUMode(hardware.GPUModeAuto); err != nil {
+	if err := backend.SetGPUMode(domain.GPUModeAuto); err != nil {
 		t.Fatalf("写入显卡模式失败: %v", err)
 	}
 	if mode := service.writes[1].Parameter["mode"]; mode != 2 {
@@ -287,7 +287,7 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取灯效失败: %v", err)
 	}
-	if lighting.Effect != hardware.EffectWave {
+	if lighting.Effect != domain.EffectWave {
 		t.Errorf("灯效是 %v，不是波形", lighting.Effect)
 	}
 	if lighting.Speed != 5 {
@@ -305,10 +305,10 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 	if !lighting.ColourReadable || !lighting.EffectReadable {
 		t.Error("原厂服务读得回颜色与灯效")
 	}
-	if lighting.Zones[0] != (hardware.RGBColor{R: 255}) {
+	if lighting.Zones[0] != (domain.RGBColor{R: 255}) {
 		t.Errorf("第一个分区的颜色是 %#v，不是纯红", lighting.Zones[0])
 	}
-	if lighting.Zones[3] != (hardware.RGBColor{R: 255, G: 255}) {
+	if lighting.Zones[3] != (domain.RGBColor{R: 255, G: 255}) {
 		t.Errorf("第四个分区的颜色是 %#v，不是黄色", lighting.Zones[3])
 	}
 }
@@ -317,15 +317,15 @@ func TestLightingIsWrittenWithTheZonesOfTheKeyboard(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectMeteor,
+	config := domain.RGBConfig{
+		Effect:     domain.EffectMeteor,
 		Speed:      7,
 		Direction:  1,
 		Brightness: 80,
 		PerZone:    true,
 	}
-	config.Zones[0] = hardware.RGBColor{R: 255}
-	config.Zones[1] = hardware.RGBColor{G: 255}
+	config.Zones[0] = domain.RGBColor{R: 255}
+	config.Zones[1] = domain.RGBColor{G: 255}
 
 	if err := backend.SetLighting(config); err != nil {
 		t.Fatalf("写入灯效失败: %v", err)
@@ -346,8 +346,8 @@ func TestLightingIsWrittenWithTheZonesOfTheKeyboard(t *testing.T) {
 	if !ok {
 		t.Fatalf("写入的分区不是一组数值: %#v", parameter["LEDs"])
 	}
-	if len(leds) != hardware.LightingZones {
-		t.Fatalf("写入了 %d 个分区，不是 %d 个", len(leds), hardware.LightingZones)
+	if len(leds) != domain.LightingZones {
+		t.Fatalf("写入了 %d 个分区，不是 %d 个", len(leds), domain.LightingZones)
 	}
 
 	first, ok := leds[0].(map[string]any)
@@ -363,8 +363,8 @@ func TestLightingIsLimitedToTheRangeOfTheMachine(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectStatic,
+	config := domain.RGBConfig{
+		Effect:     domain.EffectStatic,
 		Speed:      20,
 		Direction:  5,
 		Brightness: 200,
@@ -462,13 +462,13 @@ func TestFansAreReadFromTheService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取风扇失败: %v", err)
 	}
-	if state.CPUMode != hardware.FanCustom {
+	if state.CPUMode != domain.FanCustom {
 		t.Errorf("处理器风扇的行为是 %v，不是固定占空比", state.CPUMode)
 	}
 	if state.CPUPercent != 50 {
 		t.Errorf("处理器风扇的占空比是 %d，不是 50", state.CPUPercent)
 	}
-	if state.GPUMode != hardware.FanAuto {
+	if state.GPUMode != domain.FanAuto {
 		t.Errorf("显卡风扇的行为是 %v，不是自动", state.GPUMode)
 	}
 	if !state.GPUModeReadable {
@@ -492,7 +492,7 @@ func TestFansInMaximumMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取风扇失败: %v", err)
 	}
-	if state.CPUMode != hardware.FanMax || state.GPUMode != hardware.FanMax {
+	if state.CPUMode != domain.FanMax || state.GPUMode != domain.FanMax {
 		t.Fatalf("模式 1 是全速，风扇的行为是 %v 和 %v", state.CPUMode, state.GPUMode)
 	}
 }
@@ -513,9 +513,9 @@ func TestFansAreWrittenWithTheModeOfTheService(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	config := hardware.FanConfig{
-		CPUMode:    hardware.FanMax,
-		GPUMode:    hardware.FanMax,
+	config := domain.FanConfig{
+		CPUMode:    domain.FanMax,
+		GPUMode:    domain.FanMax,
 		CPUPercent: 0,
 		GPUPercent: 0,
 	}
@@ -531,9 +531,9 @@ func TestFansAreWrittenWithTheDutyCycles(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	config := hardware.FanConfig{
-		CPUMode:    hardware.FanCustom,
-		GPUMode:    hardware.FanAuto,
+	config := domain.FanConfig{
+		CPUMode:    domain.FanCustom,
+		GPUMode:    domain.FanAuto,
 		CPUPercent: 60,
 	}
 	if err := backend.SetFans(config); err != nil {
@@ -571,9 +571,9 @@ func TestFansAreCheckedAfterTheWrite(t *testing.T) {
 
 	backend := newBackend(t, service)
 
-	err := backend.SetFans(hardware.FanConfig{
-		CPUMode: hardware.FanCustom,
-		GPUMode: hardware.FanCustom,
+	err := backend.SetFans(domain.FanConfig{
+		CPUMode: domain.FanCustom,
+		GPUMode: domain.FanCustom,
 	})
 	if err == nil {
 		t.Fatal("机器没有接受这个设置时该报错")

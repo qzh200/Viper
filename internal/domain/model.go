@@ -1,4 +1,4 @@
-package hardware
+package domain
 
 // FanMode 表示风扇运转模式。
 type FanMode int

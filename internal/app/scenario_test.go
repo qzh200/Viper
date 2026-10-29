@@ -1,19 +1,19 @@
-package app
+﻿package app
 
 import (
 	"testing"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestSaveScenario(t *testing.T) {
 	application := newTestApp(t)
 
 	application.store.Update(func(s *config.Settings) {
-		s.Lighting.Effect = uint64(hardware.EffectWave)
+		s.Lighting.Effect = uint64(domain.EffectWave)
 		s.Lighting.Brightness = 80
-		s.Fans.CPUMode = uint64(hardware.FanCustom)
+		s.Fans.CPUMode = uint64(domain.FanCustom)
 	})
 
 	if err := application.SaveScenario("game"); err != nil {
@@ -25,8 +25,8 @@ func TestSaveScenario(t *testing.T) {
 	if !ok {
 		t.Fatalf("the scene was not saved, the scenes are %v", scenarios)
 	}
-	if scenario.Lighting.Effect != uint64(hardware.EffectWave) {
-		t.Errorf("the scene holds the effect %d, want %d", scenario.Lighting.Effect, hardware.EffectWave)
+	if scenario.Lighting.Effect != uint64(domain.EffectWave) {
+		t.Errorf("the scene holds the effect %d, want %d", scenario.Lighting.Effect, domain.EffectWave)
 	}
 	if scenario.Lighting.Brightness != 80 {
 		t.Errorf("the scene holds the brightness %d, want 80", scenario.Lighting.Brightness)

@@ -26,10 +26,10 @@ Viper/
 │   └── winkey/                 # Windows 徽标键锁定行为探测工具
 ├── internal/                   # 内部核心领域实现（禁止外部模块直接引用）
 │   ├── app/                    # 统一业务门面与场景引擎（协调硬件、配置与扩展服务）
-│   ├── machine/                # hardware.Gaming 接口的原厂服务驱动实现（含写后轮询校验）
+│   ├── machine/                # domain.Gaming 接口的原厂服务驱动实现（含写后轮询校验）
 │   ├── agentservice/           # AcerAgentService 底层 TCP 帧协议封包与流式解析
 │   ├── quickaccess/            # Acer QuickAccess 客户端（TLS + WebSocket + AES 鉴权）
-│   ├── hardware/               # 领域接口与数据模型定义（Gaming、PowerMode、FanMode 等）
+│   ├── domain/                 # 领域接口与数据模型定义（Gaming、PowerMode、FanMode 等）
 │   ├── config/                 # 本地配置文件（%APPDATA%/Viper/config.json）原子读写存储
 │   └── probe/                  # 诊断工具套件复用的协议探针与自动化回环测试组件
 ├── build.ps1                   # 批量编译脚本
@@ -122,8 +122,8 @@ Viper/
   2. 使用 AES-128-ECB 对固定握手提问字符串（`question`）及密钥 `keyA` 进行加密，并作为 `PacketType: 1`（`AuthKey`）发送完成身份鉴权。
 - **功能覆盖**：显卡显示切换（混合/独显直连）、关机 USB 供电阈值、系统深色模式、任务栏自动隐藏、屏幕保护程序等。
 
-### C. 硬件抽象与领域模型 (`internal/hardware`)
-- 定义统一的硬件调控顶级接口 `hardware.Gaming` 及各细粒度子接口。
+### C. 硬件抽象与领域模型 (`internal/domain`)
+- 定义统一的硬件调控顶级接口 `domain.Gaming` 及各细粒度子接口。
 - 定义风扇模式（`FanMode`）、电源模式（`PowerMode`）、显卡工作模式（`GPUMode`）、键盘灯效（`RGBConfig`）与实时监视指标（`MonitorData`）等核心领域模型。
 
 ---

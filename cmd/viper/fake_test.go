@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"path/filepath"
@@ -6,32 +6,32 @@ import (
 
 	"viper/internal/app"
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/quickaccess"
 )
 
 type fakeMachine struct {
-	power     hardware.PowerMode
-	gpu       hardware.GPUMode
-	lighting  hardware.RGBConfig
-	backlight hardware.BacklightState
-	fans      hardware.FanState
+	power     domain.PowerMode
+	gpu       domain.GPUMode
+	lighting  domain.RGBConfig
+	backlight domain.BacklightState
+	fans      domain.FanState
 	winKey    bool
 	overdrive bool
 	bootSound bool
-	monitor   hardware.MonitorData
+	monitor   domain.MonitorData
 
 	lightingErr error
 }
 
 func newFakeMachine() *fakeMachine {
 	return &fakeMachine{
-		power:     hardware.PowerBalanced,
-		gpu:       hardware.GPUModeDiscrete,
-		lighting:  hardware.RGBConfig{Effect: hardware.EffectWave, Speed: 3, Direction: 1, Brightness: 5, PerZone: true},
-		backlight: hardware.BacklightState{Brightness: 5, Timeout: true},
-		fans:      hardware.FanState{CPUMode: hardware.FanAuto, GPUMode: hardware.FanAuto, GPUModeReadable: true},
-		monitor: hardware.MonitorData{
+		power:     domain.PowerBalanced,
+		gpu:       domain.GPUModeDiscrete,
+		lighting:  domain.RGBConfig{Effect: domain.EffectWave, Speed: 3, Direction: 1, Brightness: 5, PerZone: true},
+		backlight: domain.BacklightState{Brightness: 5, Timeout: true},
+		fans:      domain.FanState{CPUMode: domain.FanAuto, GPUMode: domain.FanAuto, GPUModeReadable: true},
+		monitor: domain.MonitorData{
 			CPUTemperatureC:     87,
 			CPUFanRPM:           2681,
 			CPUUsagePercent:     7,
@@ -56,8 +56,8 @@ func (m *fakeMachine) Instance() string { return "假机器" }
 
 func (m *fakeMachine) Close() {}
 
-func (m *fakeMachine) Sensors() (hardware.Sensors, error) {
-	return hardware.Sensors{
+func (m *fakeMachine) Sensors() (domain.Sensors, error) {
+	return domain.Sensors{
 		CPUTempC:    m.monitor.CPUTemperatureC,
 		CPUFanRPM:   m.monitor.CPUFanRPM,
 		GPUTempC:    m.monitor.GPUTemperatureC,
@@ -66,24 +66,24 @@ func (m *fakeMachine) Sensors() (hardware.Sensors, error) {
 	}, nil
 }
 
-func (m *fakeMachine) Monitor() (hardware.MonitorData, error) { return m.monitor, nil }
+func (m *fakeMachine) Monitor() (domain.MonitorData, error) { return m.monitor, nil }
 
-func (m *fakeMachine) PowerMode() (hardware.PowerMode, error) { return m.power, nil }
+func (m *fakeMachine) PowerMode() (domain.PowerMode, error) { return m.power, nil }
 
-func (m *fakeMachine) SetPowerMode(mode hardware.PowerMode) error {
+func (m *fakeMachine) SetPowerMode(mode domain.PowerMode) error {
 	m.power = mode
 	return nil
 }
 
-func (m *fakeMachine) GPUMode() (hardware.GPUMode, error) { return m.gpu, nil }
+func (m *fakeMachine) GPUMode() (domain.GPUMode, error) { return m.gpu, nil }
 
-func (m *fakeMachine) SetGPUMode(mode hardware.GPUMode) error {
+func (m *fakeMachine) SetGPUMode(mode domain.GPUMode) error {
 	m.gpu = mode
 	return nil
 }
 
 func (m *fakeMachine) DiscreteGPU() (bool, error) {
-	return m.gpu == hardware.GPUModeDiscrete, nil
+	return m.gpu == domain.GPUModeDiscrete, nil
 }
 
 func (m *fakeMachine) OverclockCapability() (bool, bool, error) { return false, false, nil }
@@ -92,34 +92,34 @@ func (m *fakeMachine) LightingBrightness() (uint64, error) {
 	return m.lighting.Brightness, nil
 }
 
-func (m *fakeMachine) Backlight() (hardware.BacklightState, error) { return m.backlight, nil }
+func (m *fakeMachine) Backlight() (domain.BacklightState, error) { return m.backlight, nil }
 
-func (m *fakeMachine) Lighting() (hardware.RGBConfig, error) {
+func (m *fakeMachine) Lighting() (domain.RGBConfig, error) {
 	if m.lightingErr != nil {
-		return hardware.RGBConfig{}, m.lightingErr
+		return domain.RGBConfig{}, m.lightingErr
 	}
 	return m.lighting, nil
 }
 
-func (m *fakeMachine) SetLighting(config hardware.RGBConfig) error {
+func (m *fakeMachine) SetLighting(config domain.RGBConfig) error {
 	m.lighting = config
 	return nil
 }
 
 func (m *fakeMachine) SetBacklight(brightness int, timeout bool) error {
-	m.backlight = hardware.BacklightState{Brightness: brightness, Timeout: timeout}
+	m.backlight = domain.BacklightState{Brightness: brightness, Timeout: timeout}
 	return nil
 }
 
 func (m *fakeMachine) ResetLighting() error {
-	m.lighting = hardware.RGBConfig{Effect: hardware.EffectStatic, Speed: 3, Brightness: 100, PerZone: true}
+	m.lighting = domain.RGBConfig{Effect: domain.EffectStatic, Speed: 3, Brightness: 100, PerZone: true}
 	return nil
 }
 
-func (m *fakeMachine) Fans() (hardware.FanState, error) { return m.fans, nil }
+func (m *fakeMachine) Fans() (domain.FanState, error) { return m.fans, nil }
 
-func (m *fakeMachine) SetFans(config hardware.FanConfig) error {
-	m.fans = hardware.FanState{
+func (m *fakeMachine) SetFans(config domain.FanConfig) error {
+	m.fans = domain.FanState{
 		CPUMode:         config.CPUMode,
 		GPUMode:         config.GPUMode,
 		GPUModeReadable: true,
@@ -250,7 +250,7 @@ func installFakes(t *testing.T) (*fakeMachine, *fakeQuick) {
 	old := newApp
 	newApp = func() (*app.App, error) {
 		application := app.NewWithQuickAccess(store, quick)
-		application.SetBackendOpener(func() (hardware.Gaming, string, error) {
+		application.SetBackendOpener(func() (domain.Gaming, string, error) {
 			return machine, "测试路线", nil
 		})
 		return application, nil

@@ -1,4 +1,4 @@
-package app
+﻿package app
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/quickaccess"
 )
 
@@ -71,15 +71,15 @@ func TestTheCloseReleasesTheHardwareOnlyOnce(t *testing.T) {
 func TestTheStoredProfileIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
 
 	cases := []struct {
-		mode   hardware.PowerMode
+		mode   domain.PowerMode
 		stored uint64
 	}{
-		{hardware.PowerQuiet, config.PowerQuiet},
-		{hardware.PowerBalanced, config.PowerBalanced},
-		{hardware.PowerPerformance, config.PowerPerformance},
-		{hardware.PowerTurbo, config.PowerTurbo},
-		{hardware.PowerUnknown, config.PowerUnknown},
-		{hardware.PowerEco, config.PowerEco},
+		{domain.PowerQuiet, config.PowerQuiet},
+		{domain.PowerBalanced, config.PowerBalanced},
+		{domain.PowerPerformance, config.PowerPerformance},
+		{domain.PowerTurbo, config.PowerTurbo},
+		{domain.PowerUnknown, config.PowerUnknown},
+		{domain.PowerEco, config.PowerEco},
 	}
 	for _, c := range cases {
 		if got := storedPowerMode(c.mode); got != c.stored {
@@ -93,13 +93,13 @@ func TestTheStoredProfileIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
 
 func TestTheNumbersOfTheSettingsAreTheNumbersOfTheEnumeration(t *testing.T) {
 
-	cases := map[uint64]hardware.PowerMode{
-		config.PowerQuiet:       hardware.PowerQuiet,
-		config.PowerBalanced:    hardware.PowerBalanced,
-		config.PowerPerformance: hardware.PowerPerformance,
-		config.PowerTurbo:       hardware.PowerTurbo,
-		config.PowerUnknown:     hardware.PowerUnknown,
-		config.PowerEco:         hardware.PowerEco,
+	cases := map[uint64]domain.PowerMode{
+		config.PowerQuiet:       domain.PowerQuiet,
+		config.PowerBalanced:    domain.PowerBalanced,
+		config.PowerPerformance: domain.PowerPerformance,
+		config.PowerTurbo:       domain.PowerTurbo,
+		config.PowerUnknown:     domain.PowerUnknown,
+		config.PowerEco:         domain.PowerEco,
 	}
 	for stored, mode := range cases {
 		if stored != uint64(mode) {
@@ -112,12 +112,12 @@ func TestTheNumbersOfTheSettingsAreTheNumbersOfTheEnumeration(t *testing.T) {
 func TestTheStoredFanModeIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
 
 	cases := []struct {
-		mode   hardware.FanMode
+		mode   domain.FanMode
 		stored uint64
 	}{
-		{hardware.FanAuto, config.FanAuto},
-		{hardware.FanMax, config.FanMax},
-		{hardware.FanCustom, config.FanCustom},
+		{domain.FanAuto, config.FanAuto},
+		{domain.FanMax, config.FanMax},
+		{domain.FanCustom, config.FanCustom},
 	}
 	for _, c := range cases {
 		if got := storedFanMode(c.mode); got != c.stored {
@@ -132,7 +132,7 @@ func TestTheStoredFanModeIsTheEnumerationOfTheHardwareLayer(t *testing.T) {
 func TestTheProfileThatIsStoredIsTheOneThatIsWritten(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetPowerMode(hardware.PowerPerformance); err != nil {
+	if err := application.SetPowerMode(domain.PowerPerformance); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func TestTheProfileThatIsStoredIsTheOneThatIsWritten(t *testing.T) {
 	if stored != config.PowerPerformance {
 		t.Errorf("the stored profile is %d, want %d", stored, config.PowerPerformance)
 	}
-	if len(machine.writtenPower) != 1 || machine.writtenPower[0] != hardware.PowerPerformance {
+	if len(machine.writtenPower) != 1 || machine.writtenPower[0] != domain.PowerPerformance {
 		t.Errorf("the profile was written %v, want the performance one", machine.writtenPower)
 	}
 }
@@ -148,7 +148,7 @@ func TestTheProfileThatIsStoredIsTheOneThatIsWritten(t *testing.T) {
 func TestAProfileThatIsNotKnownIsRefused(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetPowerMode(hardware.PowerUnknown); err == nil {
+	if err := application.SetPowerMode(domain.PowerUnknown); err == nil {
 		t.Error("a profile that is not known was applied")
 	}
 	if len(machine.writtenPower) != 0 {
@@ -159,9 +159,9 @@ func TestAProfileThatIsNotKnownIsRefused(t *testing.T) {
 func TestAFanModeThatIsNotKnownIsRefused(t *testing.T) {
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetFans(hardware.FanConfig{
-		CPUMode: hardware.FanMode(9),
-		GPUMode: hardware.FanAuto,
+	if err := application.SetFans(domain.FanConfig{
+		CPUMode: domain.FanMode(9),
+		GPUMode: domain.FanAuto,
 	}); err == nil {
 		t.Error("a mode that is not known was applied")
 	}
@@ -173,9 +173,9 @@ func TestAFanModeThatIsNotKnownIsRefused(t *testing.T) {
 func TestTheStoredFanModeIsTheOneThatIsWritten(t *testing.T) {
 	application, _ := newTestAppWith(t)
 
-	if err := application.SetFans(hardware.FanConfig{
-		CPUMode:    hardware.FanCustom,
-		GPUMode:    hardware.FanMax,
+	if err := application.SetFans(domain.FanConfig{
+		CPUMode:    domain.FanCustom,
+		GPUMode:    domain.FanMax,
 		CPUPercent: 60,
 	}); err != nil {
 		t.Fatal(err)
@@ -194,8 +194,8 @@ func TestTheLightingThatIsWrittenIsTheLightingThatIsStored(t *testing.T) {
 
 	application, machine := newTestAppWith(t)
 
-	if err := application.SetLighting(hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	if err := application.SetLighting(domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      99,
 		Direction:  5,
 		Brightness: 199,
@@ -248,7 +248,7 @@ func TestTheLightingFailsWithoutTheGamingProvider(t *testing.T) {
 func TestTheModeOfTheGraphicsFanIsNotReadFromTheFirmware(t *testing.T) {
 
 	application, machine := newTestAppWith(t)
-	machine.fans = hardware.FanState{CPUMode: hardware.FanCustom, GPUMode: hardware.FanAuto}
+	machine.fans = domain.FanState{CPUMode: domain.FanCustom, GPUMode: domain.FanAuto}
 
 	status, err := application.Fans()
 	if err != nil {
@@ -257,7 +257,7 @@ func TestTheModeOfTheGraphicsFanIsNotReadFromTheFirmware(t *testing.T) {
 	if status.GPUModeReadable {
 		t.Error("the mode of the graphics fan was read from the firmware")
 	}
-	if status.CPUMode != hardware.FanCustom {
+	if status.CPUMode != domain.FanCustom {
 		t.Errorf("the mode of the CPU fan is %d, want the custom one", status.CPUMode)
 	}
 }
@@ -265,9 +265,9 @@ func TestTheModeOfTheGraphicsFanIsNotReadFromTheFirmware(t *testing.T) {
 func TestTheModeOfTheGraphicsFanIsTheOneThatWasWritten(t *testing.T) {
 	application, _ := newTestAppWith(t)
 
-	if err := application.SetFans(hardware.FanConfig{
-		CPUMode: hardware.FanAuto,
-		GPUMode: hardware.FanMax,
+	if err := application.SetFans(domain.FanConfig{
+		CPUMode: domain.FanAuto,
+		GPUMode: domain.FanMax,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestTheModeOfTheGraphicsFanIsTheOneThatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.GPUMode != hardware.FanMax {
+	if status.GPUMode != domain.FanMax {
 		t.Errorf("the mode of the graphics fan is %d, want the maximum one", status.GPUMode)
 	}
 	if status.GPUModeReadable {

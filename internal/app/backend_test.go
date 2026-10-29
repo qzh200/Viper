@@ -1,18 +1,18 @@
-package app
+﻿package app
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func newTestAppWithoutMachine(t *testing.T) *App {
 	t.Helper()
 
 	application := NewWithStore(mustStore(t))
-	application.SetBackendOpener(func() (hardware.Gaming, string, error) {
+	application.SetBackendOpener(func() (domain.Gaming, string, error) {
 		return nil, "", errors.New("the machine is not there")
 	})
 	return application

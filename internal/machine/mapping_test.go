@@ -1,4 +1,4 @@
-package machine
+﻿package machine
 
 import (
 	"encoding/json"
@@ -7,20 +7,20 @@ import (
 	"time"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestTheNamesOfThePatterns(t *testing.T) {
 
-	names := map[string]hardware.LightingEffect{
-		"STATIC":    hardware.EffectStatic,
-		"BREATHING": hardware.EffectBreathing,
-		"NEON":      hardware.EffectNeon,
-		"WAVE":      hardware.EffectWave,
-		"SHIFTING":  hardware.EffectSwitch,
-		"ZOOM":      hardware.EffectScale,
-		"METEOR":    hardware.EffectMeteor,
-		"TWINKLING": hardware.EffectFlash,
+	names := map[string]domain.LightingEffect{
+		"STATIC":    domain.EffectStatic,
+		"BREATHING": domain.EffectBreathing,
+		"NEON":      domain.EffectNeon,
+		"WAVE":      domain.EffectWave,
+		"SHIFTING":  domain.EffectSwitch,
+		"ZOOM":      domain.EffectScale,
+		"METEOR":    domain.EffectMeteor,
+		"TWINKLING": domain.EffectFlash,
 	}
 
 	for name, effect := range names {
@@ -32,29 +32,29 @@ func TestTheNamesOfThePatterns(t *testing.T) {
 		}
 	}
 
-	if got := serviceEffect("DIRECT"); got != hardware.EffectStatic {
+	if got := serviceEffect("DIRECT"); got != domain.EffectStatic {
 		t.Errorf("DIRECT 对应的是 %v，不是静态", got)
 	}
-	if got := serviceEffect(""); got != hardware.EffectStatic {
+	if got := serviceEffect(""); got != domain.EffectStatic {
 		t.Errorf("空名字对应的是 %v，不是静态", got)
 	}
-	if got := effectName(hardware.LightingEffect(99)); got != "STATIC" {
-		t.Errorf("不认识的灯效 %v 的名字是 %q，不是 STATIC", hardware.LightingEffect(99), got)
+	if got := effectName(domain.LightingEffect(99)); got != "STATIC" {
+		t.Errorf("不认识的灯效 %v 的名字是 %q，不是 STATIC", domain.LightingEffect(99), got)
 	}
 }
 
 func TestTheNumberOfTheGraphicsModes(t *testing.T) {
 
-	if got := serviceGPUMode(0); got != hardware.GPUModeHybrid {
+	if got := serviceGPUMode(0); got != domain.GPUModeHybrid {
 		t.Errorf("编号 0 是 %v，不是混合", got)
 	}
-	if got := serviceGPUMode(1); got != hardware.GPUModeDiscrete {
+	if got := serviceGPUMode(1); got != domain.GPUModeDiscrete {
 		t.Errorf("编号 1 是 %v，不是独显", got)
 	}
-	if got := serviceGPUMode(2); got != hardware.GPUModeAuto {
+	if got := serviceGPUMode(2); got != domain.GPUModeAuto {
 		t.Errorf("编号 2 是 %v，不是自动", got)
 	}
-	if got := serviceGPUMode(7); got != hardware.GPUModeHybrid {
+	if got := serviceGPUMode(7); got != domain.GPUModeHybrid {
 		t.Errorf("不认识的编号 7 是 %v，不是混合", got)
 	}
 }
@@ -64,7 +64,7 @@ func TestColoursThatAreNotColours(t *testing.T) {
 	if !ok {
 		t.Fatal("六位颜色不该被丢掉")
 	}
-	if colour != (hardware.RGBColor{G: 255}) {
+	if colour != (domain.RGBColor{G: 255}) {
 		t.Errorf("颜色是 %#v，不是纯绿", colour)
 	}
 
@@ -155,7 +155,7 @@ func TestAWriteThatDoesNotHappen(t *testing.T) {
 	service.setErr = errors.New("服务不可达")
 	backend := newBackend(t, service)
 
-	if err := backend.SetPowerMode(hardware.PowerPerformance); err == nil {
+	if err := backend.SetPowerMode(domain.PowerPerformance); err == nil {
 		t.Fatal("写不进去时该报错")
 	}
 }
@@ -205,10 +205,10 @@ func TestTheFanOfTheOtherGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取风扇失败: %v", err)
 	}
-	if state.GPUMode != hardware.FanCustom || state.GPUPercent != 30 {
+	if state.GPUMode != domain.FanCustom || state.GPUPercent != 30 {
 		t.Errorf("显卡风扇是 %v 占空比 %d，不是固定占空比 30", state.GPUMode, state.GPUPercent)
 	}
-	if state.CPUMode != hardware.FanAuto {
+	if state.CPUMode != domain.FanAuto {
 		t.Errorf("处理器风扇是 %v，不是自动", state.CPUMode)
 	}
 }

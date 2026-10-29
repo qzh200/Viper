@@ -1,45 +1,45 @@
-package app
+﻿package app
 
 import (
 	"fmt"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // Lighting 从硬件读取当前生效的 RGB 灯效配置。
-func (a *App) Lighting() (hardware.RGBConfig, error) {
+func (a *App) Lighting() (domain.RGBConfig, error) {
 	backend, err := a.hardware()
 	if err != nil {
-		return hardware.RGBConfig{}, err
+		return domain.RGBConfig{}, err
 	}
 
 	result, err := backend.Lighting()
 	if err != nil {
-		return hardware.RGBConfig{}, fmt.Errorf("app: 读取键盘灯效失败: %w", err)
+		return domain.RGBConfig{}, fmt.Errorf("app: 读取键盘灯效失败: %w", err)
 	}
 	return result, nil
 }
 
 // StoredLighting 返回本地配置文件中保存的灯效数据。
-func (a *App) StoredLighting() hardware.RGBConfig {
+func (a *App) StoredLighting() domain.RGBConfig {
 	stored := a.store.Settings().Lighting
 
-	result := hardware.RGBConfig{
-		Effect:     hardware.LightingEffect(stored.Effect),
+	result := domain.RGBConfig{
+		Effect:     domain.LightingEffect(stored.Effect),
 		Speed:      stored.Speed,
 		Direction:  stored.Direction,
 		Brightness: stored.Brightness,
 		PerZone:    stored.PerZone,
 	}
 	for i, colour := range stored.Zones {
-		result.Zones[i] = hardware.RGBColor{R: colour.R, G: colour.G, B: colour.B}
+		result.Zones[i] = domain.RGBColor{R: colour.R, G: colour.G, B: colour.B}
 	}
 	return result
 }
 
 // SetLighting 向硬件应用新的灯效设置并持久化至本地配置。
-func (a *App) SetLighting(value hardware.RGBConfig) error {
+func (a *App) SetLighting(value domain.RGBConfig) error {
 	value = clampLighting(value)
 
 	backend, err := a.hardware()
@@ -59,14 +59,14 @@ func (a *App) SetLighting(value hardware.RGBConfig) error {
 	return nil
 }
 
-func clampLighting(value hardware.RGBConfig) hardware.RGBConfig {
+func clampLighting(value domain.RGBConfig) domain.RGBConfig {
 	value.Speed = clamp(value.Speed, 1, 9)
 	value.Direction = clamp(value.Direction, 0, 1)
 	value.Brightness = clamp(value.Brightness, 0, 100)
 	return value
 }
 
-func toStoredLighting(value hardware.RGBConfig) config.Lighting {
+func toStoredLighting(value domain.RGBConfig) config.Lighting {
 	value = clampLighting(value)
 	stored := config.Lighting{
 		Effect:     uint64(value.Effect),
@@ -102,7 +102,7 @@ func (a *App) ResetLighting() error {
 	}
 	if err := a.store.Update(func(s *config.Settings) {
 		s.Lighting = config.Lighting{
-			Effect:     uint64(hardware.EffectStatic),
+			Effect:     uint64(domain.EffectStatic),
 			Speed:      3,
 			Direction:  0,
 			Brightness: 100,

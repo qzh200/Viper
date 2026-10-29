@@ -1,11 +1,11 @@
-package machine
+﻿package machine
 
 import (
 	"fmt"
 	"strings"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 const (
@@ -30,27 +30,27 @@ type fanData struct {
 }
 
 // Fans 读取当前 CPU 与 GPU 风扇的运转模式与转速百分比。
-func (b *Backend) Fans() (hardware.FanState, error) {
+func (b *Backend) Fans() (domain.FanState, error) {
 	data, err := b.fans()
 	if err != nil {
-		return hardware.FanState{}, err
+		return domain.FanState{}, err
 	}
 
-	state := hardware.FanState{
+	state := domain.FanState{
 		GPUModeReadable: true,
 	}
 
 	switch data.Mode {
 	case fanModeMax:
-		state.CPUMode = hardware.FanMax
-		state.GPUMode = hardware.FanMax
+		state.CPUMode = domain.FanMax
+		state.GPUMode = domain.FanMax
 	case fanModeCustom, fanModeAuto:
-		state.CPUMode = hardware.FanAuto
-		state.GPUMode = hardware.FanAuto
+		state.CPUMode = domain.FanAuto
+		state.GPUMode = domain.FanAuto
 		for _, fan := range data.CustomFanData {
-			mode := hardware.FanAuto
+			mode := domain.FanAuto
 			if fan.Auto == 0 {
-				mode = hardware.FanCustom
+				mode = domain.FanCustom
 			}
 			switch strings.ToUpper(fan.Name) {
 			case fanNameCPU:
@@ -62,28 +62,28 @@ func (b *Backend) Fans() (hardware.FanState, error) {
 			}
 		}
 	default:
-		return hardware.FanState{}, fmt.Errorf("machine: 原厂服务报了不认识的风扇模式 %d", data.Mode)
+		return domain.FanState{}, fmt.Errorf("machine: 原厂服务报了不认识的风扇模式 %d", data.Mode)
 	}
 
-	state.CoolBoost = state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax
+	state.CoolBoost = state.CPUMode == domain.FanMax && state.GPUMode == domain.FanMax
 
 	return state, nil
 }
 
 // SetFans 配置并下发风扇的目标运转模式及转速参数。
-func (b *Backend) SetFans(config hardware.FanConfig) error {
+func (b *Backend) SetFans(config domain.FanConfig) error {
 	if config.CoolBoost {
-		config.CPUMode = hardware.FanMax
-		config.GPUMode = hardware.FanMax
+		config.CPUMode = domain.FanMax
+		config.GPUMode = domain.FanMax
 	}
 
 	mode := fanModeCustom
 	cpuAuto, cpuSpeed := fanRequest(config.CPUMode, config.CPUPercent)
 	gpuAuto, gpuSpeed := fanRequest(config.GPUMode, config.GPUPercent)
 	switch {
-	case config.CPUMode == hardware.FanAuto && config.GPUMode == hardware.FanAuto:
+	case config.CPUMode == domain.FanAuto && config.GPUMode == domain.FanAuto:
 		mode = fanModeAuto
-	case config.CPUMode == hardware.FanMax && config.GPUMode == hardware.FanMax:
+	case config.CPUMode == domain.FanMax && config.GPUMode == domain.FanMax:
 		mode = fanModeMax
 	}
 
@@ -147,11 +147,11 @@ func (b *Backend) verifyFans(mode int, cpuAuto int, cpuSpeed int, gpuAuto int, g
 	return nil
 }
 
-func fanRequest(mode hardware.FanMode, percent int) (auto int, speed int) {
+func fanRequest(mode domain.FanMode, percent int) (auto int, speed int) {
 	switch mode {
-	case hardware.FanMax:
+	case domain.FanMax:
 		return 0, 100
-	case hardware.FanCustom:
+	case domain.FanCustom:
 		return 0, int(clamp(uint64(percent), 0, 100))
 	default:
 		return 1, 0
@@ -164,20 +164,20 @@ func (b *Backend) CoolBoostEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax, nil
+	return state.CPUMode == domain.FanMax && state.GPUMode == domain.FanMax, nil
 }
 
 // CoolBoost 启用或禁用 CoolBoost 强冷功能。
 func (b *Backend) CoolBoost(enabled bool) error {
 	if enabled {
-		return b.SetFans(hardware.FanConfig{
-			CPUMode: hardware.FanMax,
-			GPUMode: hardware.FanMax,
+		return b.SetFans(domain.FanConfig{
+			CPUMode: domain.FanMax,
+			GPUMode: domain.FanMax,
 		})
 	}
-	return b.SetFans(hardware.FanConfig{
-		CPUMode: hardware.FanAuto,
-		GPUMode: hardware.FanAuto,
+	return b.SetFans(domain.FanConfig{
+		CPUMode: domain.FanAuto,
+		GPUMode: domain.FanAuto,
 	})
 }
 

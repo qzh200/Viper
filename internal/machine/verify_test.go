@@ -1,4 +1,4 @@
-package machine
+﻿package machine
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func fastVerify(t *testing.T) {
@@ -27,14 +27,14 @@ func TestThatTheLightingIsCheckedAfterTheWrite(t *testing.T) {
 	service := newFakeService()
 	backend := newBackend(t, service)
 
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	config := domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      5,
 		Direction:  1,
 		Brightness: 60,
 		PerZone:    true,
 	}
-	config.Zones[0] = hardware.RGBColor{R: 255}
+	config.Zones[0] = domain.RGBColor{R: 255}
 
 	if err := backend.SetLighting(config); err != nil {
 		t.Fatalf("写入灯效失败: %v", err)
@@ -88,7 +88,7 @@ func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	err := backend.SetLighting(hardware.RGBConfig{Brightness: 90})
+	err := backend.SetLighting(domain.RGBConfig{Brightness: 90})
 	if err == nil {
 		t.Fatal("机器没有接受这个亮度时该报错")
 	}
@@ -114,8 +114,8 @@ func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	config := hardware.RGBConfig{Brightness: 50, Speed: 3, PerZone: true}
-	config.Zones[0] = hardware.RGBColor{R: 255}
+	config := domain.RGBConfig{Brightness: 50, Speed: 3, PerZone: true}
+	config.Zones[0] = domain.RGBColor{R: 255}
 
 	err := backend.SetLighting(config)
 	if err == nil {
@@ -140,8 +140,8 @@ func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	err := backend.SetLighting(hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	err := backend.SetLighting(domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Brightness: 50,
 		Speed:      3,
 	})
@@ -179,7 +179,7 @@ func TestThatTheProfileThatWasNotAcceptedIsReported(t *testing.T) {
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	err := backend.SetPowerMode(hardware.PowerPerformance)
+	err := backend.SetPowerMode(domain.PowerPerformance)
 	if err == nil {
 		t.Fatal("机器没有换档时该报错")
 	}
@@ -224,7 +224,7 @@ func TestThatTheGraphicsModeIsNotCheckedAfterTheWrite(t *testing.T) {
 
 	backend := newBackend(t, service)
 
-	if err := backend.SetGPUMode(hardware.GPUModeHybrid); err != nil {
+	if err := backend.SetGPUMode(domain.GPUModeHybrid); err != nil {
 		t.Fatalf("显卡模式不该读回核对: %v", err)
 	}
 	if len(service.writes) != 1 {

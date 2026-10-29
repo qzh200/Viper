@@ -1,15 +1,15 @@
-package app
+﻿package app
 
 import (
 	"fmt"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // FanStatus 组合风扇当前硬件状态与 GPU 模式可读性标记。
 type FanStatus struct {
-	hardware.FanState
+	domain.FanState
 	GPUModeReadable bool
 }
 
@@ -36,7 +36,7 @@ func (a *App) Fans() (FanStatus, error) {
 }
 
 // SetFans 应用新的风扇配置并同步持久化到本地配置文件。
-func (a *App) SetFans(fans hardware.FanConfig) error {
+func (a *App) SetFans(fans domain.FanConfig) error {
 	if !knownFanMode(fans.CPUMode) {
 		return fmt.Errorf("app: 处理器风扇的行为 %q 不认识", fans.CPUMode)
 	}
@@ -65,31 +65,31 @@ func (a *App) SetFans(fans hardware.FanConfig) error {
 	return nil
 }
 
-func knownFanMode(mode hardware.FanMode) bool {
+func knownFanMode(mode domain.FanMode) bool {
 	switch mode {
-	case hardware.FanAuto, hardware.FanMax, hardware.FanCustom:
+	case domain.FanAuto, domain.FanMax, domain.FanCustom:
 		return true
 	default:
 		return false
 	}
 }
 
-func fanMode(value uint64) hardware.FanMode {
+func fanMode(value uint64) domain.FanMode {
 	switch value {
 	case config.FanMax:
-		return hardware.FanMax
+		return domain.FanMax
 	case config.FanCustom:
-		return hardware.FanCustom
+		return domain.FanCustom
 	default:
-		return hardware.FanAuto
+		return domain.FanAuto
 	}
 }
 
-func storedFanMode(mode hardware.FanMode) uint64 {
+func storedFanMode(mode domain.FanMode) uint64 {
 	switch mode {
-	case hardware.FanMax:
+	case domain.FanMax:
 		return config.FanMax
-	case hardware.FanCustom:
+	case domain.FanCustom:
 		return config.FanCustom
 	default:
 		return config.FanAuto

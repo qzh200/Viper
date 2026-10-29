@@ -1,4 +1,4 @@
-package machine
+﻿package machine
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 type lightingLED struct {
@@ -34,31 +34,31 @@ func (b *Backend) LightingBrightness() (uint64, error) {
 }
 
 // Backlight 读取背光亮度以及 30 秒自动休眠关闭状态。
-func (b *Backend) Backlight() (hardware.BacklightState, error) {
+func (b *Backend) Backlight() (domain.BacklightState, error) {
 	data, err := b.lighting()
 	if err != nil {
-		return hardware.BacklightState{}, err
+		return domain.BacklightState{}, err
 	}
 
 	timeout, err := b.switchStatus(agentservice.FunctionBacklightTimeout)
 	if err != nil {
-		return hardware.BacklightState{}, err
+		return domain.BacklightState{}, err
 	}
 
-	return hardware.BacklightState{
+	return domain.BacklightState{
 		Brightness: data.Brightness,
 		Timeout:    timeout == 1,
 	}, nil
 }
 
 // Lighting 读取完整的键盘 RGB 灯效配置（分区颜色、效果模式、速度、方向与亮度）。
-func (b *Backend) Lighting() (hardware.RGBConfig, error) {
+func (b *Backend) Lighting() (domain.RGBConfig, error) {
 	data, err := b.lighting()
 	if err != nil {
-		return hardware.RGBConfig{}, err
+		return domain.RGBConfig{}, err
 	}
 
-	result := hardware.RGBConfig{
+	result := domain.RGBConfig{
 		Effect:         serviceEffect(data.Effect),
 		Speed:          uint64(data.Speed),
 		Direction:      uint64(data.Direction),
@@ -70,7 +70,7 @@ func (b *Backend) Lighting() (hardware.RGBConfig, error) {
 
 	found := false
 	for _, led := range data.LEDs {
-		if led.LEDID < 0 || led.LEDID >= hardware.LightingZones {
+		if led.LEDID < 0 || led.LEDID >= domain.LightingZones {
 			continue
 		}
 		colour, ok := parseColour(led.Color)
@@ -91,7 +91,7 @@ func (b *Backend) Lighting() (hardware.RGBConfig, error) {
 }
 
 // SetLighting 向硬件下发新的 RGB 灯效设置并验证生效。
-func (b *Backend) SetLighting(config hardware.RGBConfig) error {
+func (b *Backend) SetLighting(config domain.RGBConfig) error {
 	speed := clamp(config.Speed, 1, 9)
 	direction := clamp(config.Direction, 0, 1)
 	brightness := clamp(config.Brightness, 0, 100)
@@ -116,8 +116,8 @@ func (b *Backend) SetLighting(config hardware.RGBConfig) error {
 		written.Color = text
 		payload["color"] = text
 	} else {
-		leds := make([]any, 0, hardware.LightingZones)
-		for i := 0; i < hardware.LightingZones; i++ {
+		leds := make([]any, 0, domain.LightingZones)
+		for i := 0; i < domain.LightingZones; i++ {
 			colour := config.Zones[i]
 			text := fmt.Sprintf("#%02x%02x%02x", colour.R, colour.G, colour.B)
 			written.LEDs = append(written.LEDs, lightingLED{LEDID: i, Color: text, Status: 1})
@@ -266,9 +266,9 @@ func (b *Backend) SetBacklight(brightness int, timeout bool) error {
 
 // ResetLighting 将键盘背光恢复为默认白色常亮状态。
 func (b *Backend) ResetLighting() error {
-	white := hardware.RGBColor{R: 255, G: 255, B: 255}
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectStatic,
+	white := domain.RGBColor{R: 255, G: 255, B: 255}
+	config := domain.RGBConfig{
+		Effect:     domain.EffectStatic,
 		Speed:      3,
 		Direction:  0,
 		Brightness: 100,
@@ -293,59 +293,59 @@ func (b *Backend) lighting() (lightingData, error) {
 	return data, nil
 }
 
-func serviceEffect(name string) hardware.LightingEffect {
+func serviceEffect(name string) domain.LightingEffect {
 	switch strings.ToUpper(name) {
 	case "BREATHING":
-		return hardware.EffectBreathing
+		return domain.EffectBreathing
 	case "NEON":
-		return hardware.EffectNeon
+		return domain.EffectNeon
 	case "WAVE":
-		return hardware.EffectWave
+		return domain.EffectWave
 	case "SHIFTING":
-		return hardware.EffectSwitch
+		return domain.EffectSwitch
 	case "ZOOM":
-		return hardware.EffectScale
+		return domain.EffectScale
 	case "METEOR":
-		return hardware.EffectMeteor
+		return domain.EffectMeteor
 	case "TWINKLING":
-		return hardware.EffectFlash
+		return domain.EffectFlash
 	default:
-		return hardware.EffectStatic
+		return domain.EffectStatic
 	}
 }
 
-func effectName(effect hardware.LightingEffect) string {
+func effectName(effect domain.LightingEffect) string {
 	switch effect {
-	case hardware.EffectBreathing:
+	case domain.EffectBreathing:
 		return "BREATHING"
-	case hardware.EffectNeon:
+	case domain.EffectNeon:
 		return "NEON"
-	case hardware.EffectWave:
+	case domain.EffectWave:
 		return "WAVE"
-	case hardware.EffectSwitch:
+	case domain.EffectSwitch:
 		return "SHIFTING"
-	case hardware.EffectScale:
+	case domain.EffectScale:
 		return "ZOOM"
-	case hardware.EffectMeteor:
+	case domain.EffectMeteor:
 		return "METEOR"
-	case hardware.EffectFlash:
+	case domain.EffectFlash:
 		return "TWINKLING"
 	default:
 		return "STATIC"
 	}
 }
 
-func parseColour(text string) (hardware.RGBColor, bool) {
+func parseColour(text string) (domain.RGBColor, bool) {
 	text = strings.TrimPrefix(strings.TrimSpace(text), "#")
 	if len(text) != 6 {
-		return hardware.RGBColor{}, false
+		return domain.RGBColor{}, false
 	}
 
 	value, err := strconv.ParseUint(text, 16, 32)
 	if err != nil {
-		return hardware.RGBColor{}, false
+		return domain.RGBColor{}, false
 	}
-	return hardware.RGBColor{
+	return domain.RGBColor{
 		R: uint8(value >> 16),
 		G: uint8(value >> 8),
 		B: uint8(value),

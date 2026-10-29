@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 type fakeService struct {
@@ -52,44 +52,44 @@ func (s *fakeService) MonitorData() (agentservice.Answer, error) {
 }
 
 type fakeMachine struct {
-	lighting  hardware.RGBConfig
-	backlight hardware.BacklightState
-	power     hardware.PowerMode
-	gpu       hardware.GPUMode
+	lighting  domain.RGBConfig
+	backlight domain.BacklightState
+	power     domain.PowerMode
+	gpu       domain.GPUMode
 	overdrive bool
 	bootSound bool
 	winKey    bool
-	fans      hardware.FanState
+	fans      domain.FanState
 
 	failWith error
 }
 
 func newFakeMachine() *fakeMachine {
 	return &fakeMachine{
-		lighting:  hardware.RGBConfig{Effect: hardware.EffectWave, Speed: 3, Brightness: 5, PerZone: true},
-		backlight: hardware.BacklightState{Brightness: 5, Timeout: true},
-		power:     hardware.PowerBalanced,
-		gpu:       hardware.GPUModeDiscrete,
+		lighting:  domain.RGBConfig{Effect: domain.EffectWave, Speed: 3, Brightness: 5, PerZone: true},
+		backlight: domain.BacklightState{Brightness: 5, Timeout: true},
+		power:     domain.PowerBalanced,
+		gpu:       domain.GPUModeDiscrete,
 	}
 }
 
 func (m *fakeMachine) Instance() string { return "假机器" }
 
-func (m *fakeMachine) Sensors() (hardware.Sensors, error) {
+func (m *fakeMachine) Sensors() (domain.Sensors, error) {
 	if m.failWith != nil {
-		return hardware.Sensors{}, m.failWith
+		return domain.Sensors{}, m.failWith
 	}
-	return hardware.Sensors{CPUTempC: 87, CPUFanRPM: 2681, SystemTempC: 61, GPUTempC: 56, GPUFanRPM: 2681}, nil
+	return domain.Sensors{CPUTempC: 87, CPUFanRPM: 2681, SystemTempC: 61, GPUTempC: 56, GPUFanRPM: 2681}, nil
 }
 
-func (m *fakeMachine) Lighting() (hardware.RGBConfig, error) {
+func (m *fakeMachine) Lighting() (domain.RGBConfig, error) {
 	if m.failWith != nil {
-		return hardware.RGBConfig{}, m.failWith
+		return domain.RGBConfig{}, m.failWith
 	}
 	return m.lighting, nil
 }
 
-func (m *fakeMachine) SetLighting(config hardware.RGBConfig) error {
+func (m *fakeMachine) SetLighting(config domain.RGBConfig) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
@@ -97,9 +97,9 @@ func (m *fakeMachine) SetLighting(config hardware.RGBConfig) error {
 	return nil
 }
 
-func (m *fakeMachine) Backlight() (hardware.BacklightState, error) {
+func (m *fakeMachine) Backlight() (domain.BacklightState, error) {
 	if m.failWith != nil {
-		return hardware.BacklightState{}, m.failWith
+		return domain.BacklightState{}, m.failWith
 	}
 	return m.backlight, nil
 }
@@ -108,18 +108,18 @@ func (m *fakeMachine) SetBacklight(brightness int, timeout bool) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
-	m.backlight = hardware.BacklightState{Brightness: brightness, Timeout: timeout}
+	m.backlight = domain.BacklightState{Brightness: brightness, Timeout: timeout}
 	return nil
 }
 
-func (m *fakeMachine) PowerMode() (hardware.PowerMode, error) {
+func (m *fakeMachine) PowerMode() (domain.PowerMode, error) {
 	if m.failWith != nil {
 		return 0, m.failWith
 	}
 	return m.power, nil
 }
 
-func (m *fakeMachine) SetPowerMode(mode hardware.PowerMode) error {
+func (m *fakeMachine) SetPowerMode(mode domain.PowerMode) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
@@ -127,7 +127,7 @@ func (m *fakeMachine) SetPowerMode(mode hardware.PowerMode) error {
 	return nil
 }
 
-func (m *fakeMachine) GPUMode() (hardware.GPUMode, error) {
+func (m *fakeMachine) GPUMode() (domain.GPUMode, error) {
 	if m.failWith != nil {
 		return 0, m.failWith
 	}
@@ -179,18 +179,18 @@ func (m *fakeMachine) SetWinKeyLocked(locked bool) error {
 	return nil
 }
 
-func (m *fakeMachine) Fans() (hardware.FanState, error) {
+func (m *fakeMachine) Fans() (domain.FanState, error) {
 	if m.failWith != nil {
-		return hardware.FanState{}, m.failWith
+		return domain.FanState{}, m.failWith
 	}
 	return m.fans, nil
 }
 
-func (m *fakeMachine) SetFans(config hardware.FanConfig) error {
+func (m *fakeMachine) SetFans(config domain.FanConfig) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
-	m.fans = hardware.FanState{CPUMode: config.CPUMode, GPUMode: config.GPUMode}
+	m.fans = domain.FanState{CPUMode: config.CPUMode, GPUMode: config.GPUMode}
 	return nil
 }
 

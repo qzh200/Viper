@@ -28,7 +28,7 @@ package main
 import (
 	"fmt"
 	"viper/internal/app"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func main() {
@@ -46,12 +46,12 @@ func main() {
 	}
 
 	// 2. 切换到静音模式
-	if err := application.SetPowerMode(hardware.PowerQuiet); err != nil {
+	if err := application.SetPowerMode(domain.PowerQuiet); err != nil {
 		fmt.Println("切换失败:", err)
 	}
 
 	// 3. 保存当前状态为自定义场景并绑定到静音模式
 	_ = application.SaveScenario("夜间模式")
-	_ = application.BindScenario(hardware.PowerQuiet.String(), "夜间模式")
+	_ = application.BindScenario(domain.PowerQuiet.String(), "夜间模式")
 }
 ```

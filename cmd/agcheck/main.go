@@ -1,4 +1,4 @@
-// agcheck 是一款针对 AcerAgentService 通信协议与硬件读写能力的真机诊断与验证工具。
+﻿// agcheck 是一款针对 AcerAgentService 通信协议与硬件读写能力的真机诊断与验证工具。
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/machine"
 	"viper/internal/probe"
 )
@@ -54,7 +54,7 @@ func main() {
 
 type machineView interface {
 	probe.Machine
-	GPUMode() (hardware.GPUMode, error)
+	GPUMode() (domain.GPUMode, error)
 	Close()
 }
 

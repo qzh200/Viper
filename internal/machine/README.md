@@ -1,10 +1,10 @@
 # machine
 
-`machine` 基于 `agentservice` 客户端，实现了统一的 `hardware.Gaming` 硬件抽象接口，负责将宏碁笔记本的原厂硬件协议转化为结构化的领域模型。
+`machine` 基于 `agentservice` 客户端，实现了统一的 `domain.Gaming` 硬件抽象接口，负责将宏碁笔记本的原厂硬件协议转化为结构化的领域模型。
 
 ## 核心职责
 
-1. **硬件抽象实现**：实现 `hardware.Gaming` 接口，提供电源模式、显卡直连、风扇转速、键盘灯效与外设开关的完整控制。
+1. **硬件抽象实现**：实现 `domain.Gaming` 接口，提供电源模式、显卡直连、风扇转速、键盘灯效与外设开关的完整控制。
 2. **写后校验机制 (Write-Verification)**：向硬件服务写入控制参数后，自动采用轮询重试机制（默认超时 3 秒，间隔 100 毫秒）读回硬件状态，确认配置真实生效后再返回成功。
 3. **数据模型映射与容错**：负责处理各硬件功能在原厂协议中的数值编码与标准模型之间的双向映射转换。
 
@@ -64,7 +64,7 @@ package main
 
 import (
 	"fmt"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/machine"
 )
 
@@ -76,7 +76,7 @@ func main() {
 	defer backend.Close()
 
 	// 切换电源模式为高性能并校验
-	if err := backend.SetPowerMode(hardware.PowerPerformance); err != nil {
+	if err := backend.SetPowerMode(domain.PowerPerformance); err != nil {
 		fmt.Println("切换失败:", err)
 		return
 	}

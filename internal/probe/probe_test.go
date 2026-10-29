@@ -1,4 +1,4 @@
-package probe
+﻿package probe
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"viper/internal/agentservice"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/machine"
 )
 
@@ -310,13 +310,13 @@ func contains(text, name string) bool {
 }
 
 type fakeMachine struct {
-	lighting  hardware.RGBConfig
-	backlight hardware.BacklightState
-	power     hardware.PowerMode
+	lighting  domain.RGBConfig
+	backlight domain.BacklightState
+	power     domain.PowerMode
 	overdrive bool
 	bootSound bool
 	winKey    bool
-	fans      hardware.FanState
+	fans      domain.FanState
 
 	failWith error
 
@@ -325,21 +325,21 @@ type fakeMachine struct {
 
 func newFakeMachine() *fakeMachine {
 	return &fakeMachine{
-		lighting:  hardware.RGBConfig{Effect: hardware.EffectWave, Speed: 3, Brightness: 5, PerZone: true},
-		backlight: hardware.BacklightState{Brightness: 5, Timeout: true},
-		power:     hardware.PowerBalanced,
+		lighting:  domain.RGBConfig{Effect: domain.EffectWave, Speed: 3, Brightness: 5, PerZone: true},
+		backlight: domain.BacklightState{Brightness: 5, Timeout: true},
+		power:     domain.PowerBalanced,
 	}
 }
 
 func (m *fakeMachine) Instance() string { return "假机器" }
 
-func (m *fakeMachine) Sensors() (hardware.Sensors, error) {
-	return hardware.Sensors{CPUTempC: 87, CPUFanRPM: 2681}, nil
+func (m *fakeMachine) Sensors() (domain.Sensors, error) {
+	return domain.Sensors{CPUTempC: 87, CPUFanRPM: 2681}, nil
 }
 
-func (m *fakeMachine) Lighting() (hardware.RGBConfig, error) { return m.lighting, nil }
+func (m *fakeMachine) Lighting() (domain.RGBConfig, error) { return m.lighting, nil }
 
-func (m *fakeMachine) SetLighting(config hardware.RGBConfig) error {
+func (m *fakeMachine) SetLighting(config domain.RGBConfig) error {
 	m.applied = append(m.applied, "lighting")
 	if m.failWith != nil {
 		return m.failWith
@@ -348,20 +348,20 @@ func (m *fakeMachine) SetLighting(config hardware.RGBConfig) error {
 	return nil
 }
 
-func (m *fakeMachine) Backlight() (hardware.BacklightState, error) { return m.backlight, nil }
+func (m *fakeMachine) Backlight() (domain.BacklightState, error) { return m.backlight, nil }
 
 func (m *fakeMachine) SetBacklight(brightness int, timeout bool) error {
 	m.applied = append(m.applied, "backlight")
 	if m.failWith != nil {
 		return m.failWith
 	}
-	m.backlight = hardware.BacklightState{Brightness: brightness, Timeout: timeout}
+	m.backlight = domain.BacklightState{Brightness: brightness, Timeout: timeout}
 	return nil
 }
 
-func (m *fakeMachine) PowerMode() (hardware.PowerMode, error) { return m.power, nil }
+func (m *fakeMachine) PowerMode() (domain.PowerMode, error) { return m.power, nil }
 
-func (m *fakeMachine) SetPowerMode(mode hardware.PowerMode) error {
+func (m *fakeMachine) SetPowerMode(mode domain.PowerMode) error {
 	m.applied = append(m.applied, "power")
 	if m.failWith != nil {
 		return m.failWith
@@ -403,14 +403,14 @@ func (m *fakeMachine) SetWinKeyLocked(locked bool) error {
 	return nil
 }
 
-func (m *fakeMachine) Fans() (hardware.FanState, error) { return m.fans, nil }
+func (m *fakeMachine) Fans() (domain.FanState, error) { return m.fans, nil }
 
-func (m *fakeMachine) SetFans(config hardware.FanConfig) error {
+func (m *fakeMachine) SetFans(config domain.FanConfig) error {
 	m.applied = append(m.applied, "fans")
 	if m.failWith != nil {
 		return m.failWith
 	}
-	m.fans = hardware.FanState{CPUMode: config.CPUMode, GPUMode: config.GPUMode}
+	m.fans = domain.FanState{CPUMode: config.CPUMode, GPUMode: config.GPUMode}
 	return nil
 }
 

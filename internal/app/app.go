@@ -1,4 +1,4 @@
-// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
+﻿// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
 package app
 
 import (
@@ -6,25 +6,25 @@ import (
 	"sync"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 	"viper/internal/machine"
 	"viper/internal/quickaccess"
 )
 
 type abilities interface {
-	hardware.ReadingsReader
-	hardware.PowerModeReader
-	hardware.GraphicsModeReader
-	hardware.LightingReader
-	hardware.LightingConfig
-	hardware.LightingWriter
-	hardware.LightingReset
-	hardware.FansReader
-	hardware.FansWriter
-	hardware.CoolBoostReader
-	hardware.SwitchesReader
+	domain.ReadingsReader
+	domain.PowerModeReader
+	domain.GraphicsModeReader
+	domain.LightingReader
+	domain.LightingConfig
+	domain.LightingWriter
+	domain.LightingReset
+	domain.FansReader
+	domain.FansWriter
+	domain.CoolBoostReader
+	domain.SwitchesReader
 
-	Monitor() (hardware.MonitorData, error)
+	Monitor() (domain.MonitorData, error)
 }
 
 const (
@@ -37,7 +37,7 @@ type App struct {
 
 	backend abilities
 
-	openBackend func() (hardware.Gaming, string, error)
+	openBackend func() (domain.Gaming, string, error)
 
 	serviceAddress string
 
@@ -103,7 +103,7 @@ func (a *App) hardware() (abilities, error) {
 	return a.connect(func() (abilities, error) {
 		open := a.openBackend
 		if open == nil {
-			open = func() (hardware.Gaming, string, error) {
+			open = func() (domain.Gaming, string, error) {
 				return openMachine(a.serviceAddress)
 			}
 		}
@@ -117,7 +117,7 @@ func (a *App) hardware() (abilities, error) {
 	})
 }
 
-func openMachine(address string) (hardware.Gaming, string, error) {
+func openMachine(address string) (domain.Gaming, string, error) {
 	backend, err := machine.New(machine.Options{
 		Address: address,
 	})
@@ -130,7 +130,7 @@ func openMachine(address string) (hardware.Gaming, string, error) {
 }
 
 // SetBackendOpener 自定义硬件后端连接工厂函数，主要用于单元测试与模拟注入。
-func (a *App) SetBackendOpener(open func() (hardware.Gaming, string, error)) {
+func (a *App) SetBackendOpener(open func() (domain.Gaming, string, error)) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 

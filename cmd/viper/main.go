@@ -1,4 +1,4 @@
-// viper 是 Acer 游戏笔记本（掠夺者 Predator / 暗影骑士 Nitro）的跨平台硬件控制中心命令行客户端。
+﻿// viper 是 Acer 游戏笔记本（掠夺者 Predator / 暗影骑士 Nitro）的跨平台硬件控制中心命令行客户端。
 package main
 
 import (
@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"viper/internal/app"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 var (
@@ -271,7 +271,7 @@ func runScenario(args []string) error {
 		if len(args) < 3 {
 			return fmt.Errorf("usage: viper scenario bind <profile> <name>")
 		}
-		mode, ok := hardware.ParsePowerMode(strings.ToLower(args[1]))
+		mode, ok := domain.ParsePowerMode(strings.ToLower(args[1]))
 		if !ok {
 			return fmt.Errorf("unknown performance profile %q", args[1])
 		}
@@ -284,7 +284,7 @@ func runScenario(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("usage: viper scenario unbind <profile>")
 		}
-		mode, ok := hardware.ParsePowerMode(strings.ToLower(args[1]))
+		mode, ok := domain.ParsePowerMode(strings.ToLower(args[1]))
 		if !ok {
 			return fmt.Errorf("unknown performance profile %q", args[1])
 		}
@@ -305,9 +305,9 @@ func listScenarios(application *app.App) error {
 	} else {
 		for name, scenario := range scenarios {
 			fmt.Fprintf(stdout, "  %-16s lighting %s at %d%%, fans %s\n", name,
-				hardware.LightingEffect(scenario.Lighting.Effect),
+				domain.LightingEffect(scenario.Lighting.Effect),
 				scenario.Lighting.Brightness,
-				hardware.FanMode(scenario.Fans.CPUMode))
+				domain.FanMode(scenario.Fans.CPUMode))
 		}
 	}
 
@@ -371,11 +371,11 @@ func runFan(args []string) error {
 		fmt.Fprintln(stdout, "CoolBoost:", onOff(enabled))
 		return nil
 	case "auto", "max":
-		mode := hardware.FanAuto
+		mode := domain.FanAuto
 		if args[0] == "max" {
-			mode = hardware.FanMax
+			mode = domain.FanMax
 		}
-		return applyFan(application, hardware.FanConfig{CPUMode: mode, GPUMode: mode})
+		return applyFan(application, domain.FanConfig{CPUMode: mode, GPUMode: mode})
 	case "custom":
 		if len(args) < 3 {
 			return fmt.Errorf("usage: viper fan custom <cpu%%> <gpu%%>")
@@ -388,9 +388,9 @@ func runFan(args []string) error {
 		if err != nil {
 			return err
 		}
-		return applyFan(application, hardware.FanConfig{
-			CPUMode:    hardware.FanCustom,
-			GPUMode:    hardware.FanCustom,
+		return applyFan(application, domain.FanConfig{
+			CPUMode:    domain.FanCustom,
+			GPUMode:    domain.FanCustom,
 			CPUPercent: cpu,
 			GPUPercent: gpu,
 		})
@@ -399,7 +399,7 @@ func runFan(args []string) error {
 	}
 }
 
-func applyFan(application *app.App, config hardware.FanConfig) error {
+func applyFan(application *app.App, config domain.FanConfig) error {
 	if err := application.SetFans(config); err != nil {
 		return err
 	}
@@ -412,8 +412,8 @@ func applyFan(application *app.App, config hardware.FanConfig) error {
 	return nil
 }
 
-func describeFan(mode hardware.FanMode, percent int) string {
-	if mode == hardware.FanCustom {
+func describeFan(mode domain.FanMode, percent int) string {
+	if mode == domain.FanCustom {
 		return fmt.Sprintf("%s (%d%%)", mode, percent)
 	}
 	return mode.String()
@@ -443,7 +443,7 @@ func runPower(args []string) error {
 		return nil
 	}
 
-	mode, ok := hardware.ParsePowerMode(strings.ToLower(args[0]))
+	mode, ok := domain.ParsePowerMode(strings.ToLower(args[0]))
 	if !ok {
 		return fmt.Errorf("unknown performance profile %q", args[0])
 	}
@@ -531,9 +531,9 @@ func showLighting(application *app.App) error {
 	return nil
 }
 
-func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGBConfig, error) {
+func parseLightingOptions(base domain.RGBConfig, args []string) (*domain.RGBConfig, error) {
 	config := base
-	zoneColours := map[int]hardware.RGBColor{}
+	zoneColours := map[int]domain.RGBColor{}
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -541,7 +541,7 @@ func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGB
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("effect needs a value")
 			}
-			effect, ok := hardware.ParseLightingEffect(strings.ToLower(args[i+1]))
+			effect, ok := domain.ParseLightingEffect(strings.ToLower(args[i+1]))
 			if !ok {
 				return nil, fmt.Errorf("unknown lighting effect %q", args[i+1])
 			}
@@ -598,7 +598,7 @@ func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGB
 			if err != nil {
 				return nil, err
 			}
-			if zone < 1 || zone > hardware.LightingZones {
+			if zone < 1 || zone > domain.LightingZones {
 				return nil, fmt.Errorf("zone %d is out of range", zone)
 			}
 			colour, err := parseColor(args[i+2])
@@ -627,16 +627,16 @@ func parseLightingOptions(base hardware.RGBConfig, args []string) (*hardware.RGB
 	return &config, nil
 }
 
-func parseColor(text string) (hardware.RGBColor, error) {
+func parseColor(text string) (domain.RGBColor, error) {
 	hex := strings.TrimPrefix(strings.TrimSpace(text), "#")
 	if len(hex) != 6 {
-		return hardware.RGBColor{}, fmt.Errorf("colour %q must be six hex digits", text)
+		return domain.RGBColor{}, fmt.Errorf("colour %q must be six hex digits", text)
 	}
 	value, err := strconv.ParseUint(hex, 16, 32)
 	if err != nil {
-		return hardware.RGBColor{}, fmt.Errorf("colour %q: %w", text, err)
+		return domain.RGBColor{}, fmt.Errorf("colour %q: %w", text, err)
 	}
-	return hardware.RGBColor{
+	return domain.RGBColor{
 		R: uint8(value >> 16),
 		G: uint8(value >> 8),
 		B: uint8(value),
@@ -714,7 +714,7 @@ func runGPU(args []string) error {
 		return nil
 	}
 
-	mode, ok := hardware.ParseGPUMode(strings.ToLower(args[0]))
+	mode, ok := domain.ParseGPUMode(strings.ToLower(args[0]))
 	if !ok {
 		return fmt.Errorf("unknown graphics mode %q", args[0])
 	}

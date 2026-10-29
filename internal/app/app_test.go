@@ -1,15 +1,15 @@
-package app
+﻿package app
 
 import (
 	"testing"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestToStoredLightingLimitsTheValues(t *testing.T) {
 
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+	config := domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      99,
 		Direction:  5,
 		Brightness: 199,
@@ -28,8 +28,8 @@ func TestToStoredLightingLimitsTheValues(t *testing.T) {
 }
 
 func TestToStoredLightingKeepsValidValues(t *testing.T) {
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectBreathing,
+	config := domain.RGBConfig{
+		Effect:     domain.EffectBreathing,
 		Speed:      5,
 		Direction:  0,
 		Brightness: 60,
@@ -45,17 +45,17 @@ func TestToStoredLightingKeepsValidValues(t *testing.T) {
 	if stored.Direction != 0 {
 		t.Errorf("the stored direction is %d, want 0", stored.Direction)
 	}
-	if stored.Effect != uint64(hardware.EffectBreathing) {
-		t.Errorf("the stored effect is %d, want %d", stored.Effect, hardware.EffectBreathing)
+	if stored.Effect != uint64(domain.EffectBreathing) {
+		t.Errorf("the stored effect is %d, want %d", stored.Effect, domain.EffectBreathing)
 	}
 }
 
 func TestToStoredLightingKeepsTheColours(t *testing.T) {
-	config := hardware.RGBConfig{
+	config := domain.RGBConfig{
 		PerZone: true,
 	}
-	config.Zones[0] = hardware.RGBColor{R: 199, G: 0, B: 135}
-	config.Zones[1] = hardware.RGBColor{R: 0, G: 174, B: 199}
+	config.Zones[0] = domain.RGBColor{R: 199, G: 0, B: 135}
+	config.Zones[1] = domain.RGBColor{R: 0, G: 174, B: 199}
 
 	stored := toStoredLighting(config)
 	if stored.Zones[0].R != 199 || stored.Zones[0].G != 0 || stored.Zones[0].B != 135 {

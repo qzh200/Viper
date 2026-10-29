@@ -1,26 +1,26 @@
-package app
+﻿package app
 
 import (
 	"fmt"
 
 	"viper/internal/config"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 // PowerMode 查询当前生效的电源性能模式。
-func (a *App) PowerMode() (hardware.PowerMode, error) {
+func (a *App) PowerMode() (domain.PowerMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
-		return hardware.PowerBalanced, err
+		return domain.PowerBalanced, err
 	}
 	return backend.PowerMode()
 }
 
 // SetPowerMode 设置电源性能模式，更新本地配置，并自动应用绑定到该模式的场景预设（如果有）。
-func (a *App) SetPowerMode(mode hardware.PowerMode) error {
-	if mode != hardware.PowerQuiet && mode != hardware.PowerBalanced &&
-		mode != hardware.PowerPerformance && mode != hardware.PowerTurbo &&
-		mode != hardware.PowerEco {
+func (a *App) SetPowerMode(mode domain.PowerMode) error {
+	if mode != domain.PowerQuiet && mode != domain.PowerBalanced &&
+		mode != domain.PowerPerformance && mode != domain.PowerTurbo &&
+		mode != domain.PowerEco {
 		return fmt.Errorf("app: 性能档位 %q 不认识", mode)
 	}
 
@@ -53,34 +53,34 @@ func (a *App) SetPowerMode(mode hardware.PowerMode) error {
 	return a.applyScenario(scenario)
 }
 
-func powerMode(value uint64) hardware.PowerMode {
+func powerMode(value uint64) domain.PowerMode {
 	switch value {
 	case config.PowerQuiet:
-		return hardware.PowerQuiet
+		return domain.PowerQuiet
 	case config.PowerPerformance:
-		return hardware.PowerPerformance
+		return domain.PowerPerformance
 	case config.PowerTurbo:
-		return hardware.PowerTurbo
+		return domain.PowerTurbo
 	case config.PowerUnknown:
-		return hardware.PowerUnknown
+		return domain.PowerUnknown
 	case config.PowerEco:
-		return hardware.PowerEco
+		return domain.PowerEco
 	default:
-		return hardware.PowerBalanced
+		return domain.PowerBalanced
 	}
 }
 
-func storedPowerMode(mode hardware.PowerMode) uint64 {
+func storedPowerMode(mode domain.PowerMode) uint64 {
 	switch mode {
-	case hardware.PowerQuiet:
+	case domain.PowerQuiet:
 		return config.PowerQuiet
-	case hardware.PowerPerformance:
+	case domain.PowerPerformance:
 		return config.PowerPerformance
-	case hardware.PowerTurbo:
+	case domain.PowerTurbo:
 		return config.PowerTurbo
-	case hardware.PowerUnknown:
+	case domain.PowerUnknown:
 		return config.PowerUnknown
-	case hardware.PowerEco:
+	case domain.PowerEco:
 		return config.PowerEco
 	default:
 		return config.PowerBalanced
@@ -88,6 +88,6 @@ func storedPowerMode(mode hardware.PowerMode) uint64 {
 }
 
 // AvailablePowerModes 返回当前机型支持的电源模式列表。
-func (a *App) AvailablePowerModes() []hardware.PowerMode {
-	return hardware.AvailablePowerModes()
+func (a *App) AvailablePowerModes() []domain.PowerMode {
+	return domain.AvailablePowerModes()
 }

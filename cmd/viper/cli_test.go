@@ -1,10 +1,10 @@
-package main
+﻿package main
 
 import (
 	"strings"
 	"testing"
 
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func TestStatusShowsTheReadings(t *testing.T) {
@@ -55,14 +55,14 @@ func TestFanCommands(t *testing.T) {
 	if _, _, err := capture(t, "fan", "max"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.fans.CPUMode != hardware.FanMax || machine.fans.GPUMode != hardware.FanMax {
+	if machine.fans.CPUMode != domain.FanMax || machine.fans.GPUMode != domain.FanMax {
 		t.Errorf("全速没写进去: %#v", machine.fans)
 	}
 
 	if _, _, err := capture(t, "fan", "custom", "50", "40"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.fans.CPUMode != hardware.FanCustom || machine.fans.CPUPercent != 50 {
+	if machine.fans.CPUMode != domain.FanCustom || machine.fans.CPUPercent != 50 {
 		t.Errorf("固定占空比没写进去: %#v", machine.fans)
 	}
 	if machine.fans.GPUPercent != 40 {
@@ -72,7 +72,7 @@ func TestFanCommands(t *testing.T) {
 	if _, _, err := capture(t, "fan", "auto"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.fans.CPUMode != hardware.FanAuto {
+	if machine.fans.CPUMode != domain.FanAuto {
 		t.Errorf("自动没写进去: %#v", machine.fans)
 	}
 
@@ -98,7 +98,7 @@ func TestPowerCommand(t *testing.T) {
 	if _, _, err := capture(t, "power", "performance"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.power != hardware.PowerPerformance {
+	if machine.power != domain.PowerPerformance {
 		t.Errorf("档位没写进去: %v", machine.power)
 	}
 }
@@ -124,7 +124,7 @@ func TestLightingCommand(t *testing.T) {
 	if machine.lighting.Zones != before {
 		t.Errorf("颜色被改了: %#v", machine.lighting.Zones)
 	}
-	if machine.lighting.Effect != hardware.EffectWave {
+	if machine.lighting.Effect != domain.EffectWave {
 		t.Errorf("效果被改了: %v", machine.lighting.Effect)
 	}
 
@@ -134,7 +134,7 @@ func TestLightingCommand(t *testing.T) {
 	if !machine.lighting.PerZone {
 		t.Errorf("点过分区就该是分区设置: %#v", machine.lighting)
 	}
-	if machine.lighting.Zones[1] != (hardware.RGBColor{G: 0xFF}) {
+	if machine.lighting.Zones[1] != (domain.RGBColor{G: 0xFF}) {
 		t.Errorf("第二个分区的颜色不对: %#v", machine.lighting.Zones[1])
 	}
 	if machine.lighting.Zones[0] != before[0] {
@@ -148,7 +148,7 @@ func TestLightingReset(t *testing.T) {
 	if _, _, err := capture(t, "lighting", "reset"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.lighting.Effect != hardware.EffectStatic {
+	if machine.lighting.Effect != domain.EffectStatic {
 		t.Errorf("复位之后效果不对: %v", machine.lighting.Effect)
 	}
 	if machine.lighting.Brightness != 100 {
@@ -189,7 +189,7 @@ func TestGPUCommand(t *testing.T) {
 	if _, _, err := capture(t, "gpu", "hybrid"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.gpu != hardware.GPUModeHybrid {
+	if machine.gpu != domain.GPUModeHybrid {
 		t.Errorf("显卡模式没写进去: %v", machine.gpu)
 	}
 }

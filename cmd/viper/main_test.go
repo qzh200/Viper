@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"viper/internal/app"
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 func capture(t *testing.T, args ...string) (string, string, error) {
@@ -158,14 +158,14 @@ func TestParseColor(t *testing.T) {
 	}
 }
 
-func lightingBase() hardware.RGBConfig {
-	return hardware.RGBConfig{
-		Effect:     hardware.EffectWave,
+func lightingBase() domain.RGBConfig {
+	return domain.RGBConfig{
+		Effect:     domain.EffectWave,
 		Speed:      4,
 		Direction:  1,
 		Brightness: 60,
 		PerZone:    true,
-		Zones: [4]hardware.RGBColor{
+		Zones: [4]domain.RGBColor{
 			{R: 255, G: 0, B: 0},
 			{G: 128},
 			{B: 64},
@@ -206,7 +206,7 @@ func TestLightingColorSetsEveryZone(t *testing.T) {
 		t.Error("全局颜色不该是分区设置")
 	}
 	for i, zone := range config.Zones {
-		if zone != (hardware.RGBColor{R: 0x12, G: 0x34, B: 0x56}) {
+		if zone != (domain.RGBColor{R: 0x12, G: 0x34, B: 0x56}) {
 			t.Errorf("分区 %d 的颜色不对: %#v", i+1, zone)
 		}
 	}
@@ -229,7 +229,7 @@ func TestLightingZoneKeepsTheOtherZones(t *testing.T) {
 		if !config.PerZone {
 			t.Errorf("%v: 点过分区就该是分区设置", args)
 		}
-		if config.Zones[1] != (hardware.RGBColor{G: 0xFF}) {
+		if config.Zones[1] != (domain.RGBColor{G: 0xFF}) {
 			t.Errorf("%v: 第二个分区的颜色不对: %#v", args, config.Zones[1])
 		}
 		if config.Zones[0] != base.Zones[0] || config.Zones[3] != base.Zones[3] {
@@ -269,24 +269,24 @@ func TestLightingOptionsRejectBadInput(t *testing.T) {
 }
 
 func TestDescribeFan(t *testing.T) {
-	if got := describeFan(hardware.FanAuto, 0); got != "auto" {
+	if got := describeFan(domain.FanAuto, 0); got != "auto" {
 		t.Errorf("自动是 %q", got)
 	}
-	if got := describeFan(hardware.FanMax, 0); got != "max" {
+	if got := describeFan(domain.FanMax, 0); got != "max" {
 		t.Errorf("全速是 %q", got)
 	}
-	if got := describeFan(hardware.FanCustom, 50); !strings.Contains(got, "50") {
+	if got := describeFan(domain.FanCustom, 50); !strings.Contains(got, "50") {
 		t.Errorf("固定占空比是 %q", got)
 	}
 }
 
 func TestDescribeGPUFan(t *testing.T) {
-	readable := app.FanStatus{GPUMode: hardware.FanAuto, GPUModeReadable: true}
+	readable := app.FanStatus{GPUMode: domain.FanAuto, GPUModeReadable: true}
 	if got := describeGPUFan(readable); strings.Contains(got, "not readable") {
 		t.Errorf("读得到的值不该带那个标记: %q", got)
 	}
 
-	stored := app.FanStatus{GPUMode: hardware.FanAuto, GPUModeReadable: false}
+	stored := app.FanStatus{GPUMode: domain.FanAuto, GPUModeReadable: false}
 	if got := describeGPUFan(stored); !strings.Contains(got, "not readable") {
 		t.Errorf("读不到的值该带那个标记: %q", got)
 	}

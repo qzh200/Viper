@@ -1,21 +1,21 @@
-package app
+﻿package app
 
 import (
-	"viper/internal/hardware"
+	"viper/internal/domain"
 )
 
 type fakeGaming struct {
-	powerMode hardware.PowerMode
+	powerMode domain.PowerMode
 
-	gpuMode hardware.GPUMode
+	gpuMode domain.GPUMode
 
 	brightness uint64
 
-	sensors hardware.Sensors
+	sensors domain.Sensors
 
-	fans hardware.FanState
+	fans domain.FanState
 
-	backlight hardware.BacklightState
+	backlight domain.BacklightState
 
 	bootSound bool
 
@@ -33,7 +33,7 @@ type fakeGaming struct {
 
 	overclockCPU bool
 
-	lighting hardware.RGBConfig
+	lighting domain.RGBConfig
 
 	brightnessError error
 
@@ -41,11 +41,11 @@ type fakeGaming struct {
 
 	closed bool
 
-	written []hardware.RGBConfig
+	written []domain.RGBConfig
 
-	writtenFans []hardware.FanConfig
+	writtenFans []domain.FanConfig
 
-	writtenPower []hardware.PowerMode
+	writtenPower []domain.PowerMode
 
 	writtenBacklight []int
 
@@ -59,32 +59,32 @@ type fakeGaming struct {
 
 	writtenCoolBoost []bool
 
-	writtenGPUMode []hardware.GPUMode
+	writtenGPUMode []domain.GPUMode
 }
 
 func newFakeGaming() *fakeGaming {
 	return &fakeGaming{
-		powerMode:  hardware.PowerBalanced,
-		gpuMode:    hardware.GPUModeHybrid,
+		powerMode:  domain.PowerBalanced,
+		gpuMode:    domain.GPUModeHybrid,
 		brightness: 50,
 	}
 }
 
 func (g *fakeGaming) Instance() string { return "gaming\\instance" }
 
-func (g *fakeGaming) Sensors() (hardware.Sensors, error) { return g.sensors, nil }
+func (g *fakeGaming) Sensors() (domain.Sensors, error) { return g.sensors, nil }
 
-func (g *fakeGaming) PowerMode() (hardware.PowerMode, error) { return g.powerMode, nil }
+func (g *fakeGaming) PowerMode() (domain.PowerMode, error) { return g.powerMode, nil }
 
-func (g *fakeGaming) SetPowerMode(mode hardware.PowerMode) error {
+func (g *fakeGaming) SetPowerMode(mode domain.PowerMode) error {
 	g.writtenPower = append(g.writtenPower, mode)
 	g.powerMode = mode
 	return nil
 }
 
-func (g *fakeGaming) GPUMode() (hardware.GPUMode, error) { return g.gpuMode, nil }
+func (g *fakeGaming) GPUMode() (domain.GPUMode, error) { return g.gpuMode, nil }
 
-func (g *fakeGaming) SetGPUMode(mode hardware.GPUMode) error {
+func (g *fakeGaming) SetGPUMode(mode domain.GPUMode) error {
 	g.writtenGPUMode = append(g.writtenGPUMode, mode)
 	g.gpuMode = mode
 	return nil
@@ -97,9 +97,9 @@ func (g *fakeGaming) LightingBrightness() (uint64, error) {
 	return g.brightness, nil
 }
 
-func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) {
+func (g *fakeGaming) Lighting() (domain.RGBConfig, error) {
 	if g.brightnessError != nil {
-		return hardware.RGBConfig{}, g.brightnessError
+		return domain.RGBConfig{}, g.brightnessError
 	}
 	result := g.lighting
 	result.Brightness = g.brightness
@@ -108,7 +108,7 @@ func (g *fakeGaming) Lighting() (hardware.RGBConfig, error) {
 	return result, nil
 }
 
-func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
+func (g *fakeGaming) SetLighting(config domain.RGBConfig) error {
 	g.written = append(g.written, config)
 
 	g.lighting = config
@@ -117,9 +117,9 @@ func (g *fakeGaming) SetLighting(config hardware.RGBConfig) error {
 
 func (g *fakeGaming) ResetLighting() error {
 
-	white := hardware.RGBColor{R: 255, G: 255, B: 255}
-	config := hardware.RGBConfig{
-		Effect:     hardware.EffectStatic,
+	white := domain.RGBColor{R: 255, G: 255, B: 255}
+	config := domain.RGBConfig{
+		Effect:     domain.EffectStatic,
 		Speed:      3,
 		Direction:  0,
 		Brightness: 100,
@@ -132,7 +132,7 @@ func (g *fakeGaming) ResetLighting() error {
 	return nil
 }
 
-func (g *fakeGaming) Backlight() (hardware.BacklightState, error) { return g.backlight, nil }
+func (g *fakeGaming) Backlight() (domain.BacklightState, error) { return g.backlight, nil }
 
 func (g *fakeGaming) BacklightBuffer() ([]byte, error) {
 
@@ -149,18 +149,18 @@ func (g *fakeGaming) SetBacklight(brightness int, timeout bool) error {
 	g.writtenTimeout = append(g.writtenTimeout, timeout)
 
 	g.brightness = uint64(brightness)
-	g.backlight = hardware.BacklightState{
+	g.backlight = domain.BacklightState{
 		Brightness: brightness,
 		Timeout:    timeout,
 	}
 	return nil
 }
 
-func (g *fakeGaming) Monitor() (hardware.MonitorData, error) {
+func (g *fakeGaming) Monitor() (domain.MonitorData, error) {
 	if g.monitorError != nil {
-		return hardware.MonitorData{}, g.monitorError
+		return domain.MonitorData{}, g.monitorError
 	}
-	return hardware.MonitorData{
+	return domain.MonitorData{
 		CPUTemperatureC:    90,
 		CPUFanRPM:          2700,
 		CPUUsagePercent:    12.5,
@@ -178,16 +178,16 @@ func (g *fakeGaming) Monitor() (hardware.MonitorData, error) {
 	}, nil
 }
 
-func (g *fakeGaming) Fans() (hardware.FanState, error) {
+func (g *fakeGaming) Fans() (domain.FanState, error) {
 	state := g.fans
-	state.CoolBoost = state.CPUMode == hardware.FanMax && state.GPUMode == hardware.FanMax
+	state.CoolBoost = state.CPUMode == domain.FanMax && state.GPUMode == domain.FanMax
 	return state, nil
 }
 
-func (g *fakeGaming) SetFans(config hardware.FanConfig) error {
+func (g *fakeGaming) SetFans(config domain.FanConfig) error {
 	g.writtenFans = append(g.writtenFans, config)
 
-	g.fans = hardware.FanState{
+	g.fans = domain.FanState{
 		CPUMode:    config.CPUMode,
 		GPUMode:    config.GPUMode,
 		CPUPercent: config.CPUPercent,

@@ -55,7 +55,7 @@ Viper/
 │   ├── machine/        # 基于原厂服务的硬件控制驱动实现
 │   ├── agentservice/   # AcerAgentService TCP 封包与解包协议库
 │   ├── quickaccess/    # Acer QuickAccess TLS/WebSocket/AES 加密通信库
-│   ├── hardware/       # 硬件接口与领域数据模型定义
+│   ├── domain/         # 硬件接口与领域数据模型定义
 │   ├── config/         # 本地 JSON 配置文件管理库 (%APPDATA%/Viper)
 │   └── probe/          # 诊断工具复用的协议探针与回环验证套件
 ├── build.ps1           # 自动化构建脚本

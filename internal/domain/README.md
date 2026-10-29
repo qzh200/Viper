@@ -1,6 +1,6 @@
-# hardware
+# domain
 
-`hardware` 定义了 Viper 项目中与硬件交互相关的核心接口与领域数据结构。
+`domain` 定义了 Viper 项目中核心领域接口与数据模型。
 
 ## 模块构成
 

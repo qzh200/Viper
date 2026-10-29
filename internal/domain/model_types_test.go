@@ -1,4 +1,4 @@
-package hardware
+package domain
 
 import (
 	"testing"

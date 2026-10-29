@@ -1,4 +1,4 @@
-package hardware
+package domain
 
 // MonitorData 汇集整机实时硬件监控遥测指标。
 type MonitorData struct {
