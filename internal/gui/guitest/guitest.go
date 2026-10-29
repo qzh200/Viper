@@ -19,6 +19,8 @@ type Hardware struct {
 	MonitorData domain.MonitorData
 	// Power 是机器当前的性能档位。
 	Power domain.PowerMode
+	// FansState 是机器当前的风扇配置与状态。
+	FansState domain.FanState
 	// InstanceName 是后端驱动实例的名字。
 	InstanceName string
 	// RouteName 是连接通道的名字。
@@ -30,6 +32,10 @@ type Hardware struct {
 
 	// Writes 记下每次写入了什么档位。
 	Writes []domain.PowerMode
+	// FanWrites 记下每次写入了什么风扇配置。
+	FanWrites []domain.FanConfig
+	// CoolBoostWrites 记下每次写入了什么强冷设置。
+	CoolBoostWrites []bool
 }
 
 // Interface 返回这个替身，让它可以被塞进控制器。
@@ -63,6 +69,38 @@ func (h *Hardware) SetPowerMode(mode domain.PowerMode) error {
 
 // Route 返回连接通道的名字。
 func (h *Hardware) Route() string { return h.RouteName }
+
+// FanState 读取当前风扇状态。
+func (h *Hardware) FanState() (domain.FanState, error) {
+	if h.Err != nil {
+		return domain.FanState{}, h.Err
+	}
+	return h.FansState, nil
+}
+
+// SetFans 应用风扇设置并记下来。
+func (h *Hardware) SetFans(config domain.FanConfig) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.FanWrites = append(h.FanWrites, config)
+	h.FansState.CPUMode = config.CPUMode
+	h.FansState.GPUMode = config.GPUMode
+	h.FansState.CPUPercent = config.CPUPercent
+	h.FansState.GPUPercent = config.GPUPercent
+	h.FansState.CoolBoost = config.CoolBoost
+	return nil
+}
+
+// SetCoolBoost 设置强冷开关并记下来。
+func (h *Hardware) SetCoolBoost(enabled bool) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.CoolBoostWrites = append(h.CoolBoostWrites, enabled)
+	h.FansState.CoolBoost = enabled
+	return nil
+}
 
 // Instance 返回后端驱动实例的名字。
 func (h *Hardware) Instance() (string, error) {

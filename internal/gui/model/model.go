@@ -78,6 +78,8 @@ type Overview struct {
 	PowerMode domain.PowerMode
 	// PowerModes 是可选的性能档位。
 	PowerModes []domain.PowerMode
+	// FanState 是当前风扇工作模式与强冷配置。
+	FanState domain.FanState
 	// Metrics 是首页展示的指标。
 	Metrics []Metric
 	// Monitor 是这次读到的整机遥测，界面要用那些没变成指标的数字。
@@ -204,8 +206,13 @@ func FormatCelsius(celsius int) string {
 	return strconv.Itoa(celsius) + " °C"
 }
 
-// FormatPercent 把百分比写成「43.2%」。
+// FormatPercent 把百分比写成「43.2%」，自动钳制在 0% 到 100% 之间。
 func FormatPercent(percent float64) string {
+	if percent < 0 {
+		percent = 0
+	} else if percent > 100 {
+		percent = 100
+	}
 	return strconv.FormatFloat(percent, 'f', 1, 64) + "%"
 }
 
@@ -304,6 +311,35 @@ func StatusLine(overview Overview) string {
 		return "未连接 · " + overview.Error
 	}
 	return "未连接"
+}
+
+// FanModeLabels 返回风扇模式的中文选项标签。
+func FanModeLabels() []string {
+	return []string{"自动", "全速", "自定义"}
+}
+
+// FanModeIndex 返回给定模式在 FanModeLabels 里的下标。
+func FanModeIndex(mode domain.FanMode) int {
+	switch mode {
+	case domain.FanMax:
+		return 1
+	case domain.FanCustom:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// FanModeFromIndex 将下标还原为 FanMode。
+func FanModeFromIndex(index int) domain.FanMode {
+	switch index {
+	case 1:
+		return domain.FanMax
+	case 2:
+		return domain.FanCustom
+	default:
+		return domain.FanAuto
+	}
 }
 
 // clamp01 把比例限制在 0 到 1 之间。

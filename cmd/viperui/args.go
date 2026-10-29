@@ -13,6 +13,8 @@ type options struct {
 	screenshot string
 	// theme 是这一次运行要用的外观模式；空串表示用存下来的那个。
 	theme string
+	// page 是这一次运行打开的初始页面；空串表示默认总览页。
+	page string
 	// help 表示只打印用法。
 	help bool
 }
@@ -37,6 +39,12 @@ func parseArgs(args []string) (options, error) {
 				return result, fmt.Errorf("unknown appearance %q, want auto, light or dark", args[1])
 			}
 			result.theme = string(mode)
+			args = args[2:]
+		case "--page":
+			if len(args) < 2 {
+				return result, fmt.Errorf("--page needs a page id, for example --page fans")
+			}
+			result.page = args[1]
 			args = args[2:]
 		case "--help", "-h":
 			result.help = true

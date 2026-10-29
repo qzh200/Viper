@@ -152,11 +152,29 @@ func TestAnotherPageShowsThatItIsNotThereYet(t *testing.T) {
 		window.View(c)
 	}, 1120, 720)
 
-	if err := tt.Click("风扇"); err != nil {
+	if err := tt.Click("灯效"); err != nil {
 		t.Fatal(err)
 	}
 	if !tt.HasText("这一页还在路上") {
 		t.Errorf("the window has no %q in %q", "这一页还在路上", tt.Texts())
+	}
+}
+
+func TestNavigatingToFansPage(t *testing.T) {
+	ctrl := controller.New(&guitest.Hardware{}, &guitest.Store{})
+	defer ctrl.Stop()
+
+	window := shell.New(ctrl, shell.WithApply(func(theme.Mode) {}))
+
+	tt := ui.NewTester(func(c *ui.Context) {
+		window.View(c)
+	}, 1120, 720)
+
+	if err := tt.Click("风扇"); err != nil {
+		t.Fatal(err)
+	}
+	if !tt.HasText("风扇与散热控制") {
+		t.Errorf("the window has no fans page title in %q", tt.Texts())
 	}
 }
 

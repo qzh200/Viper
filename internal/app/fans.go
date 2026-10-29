@@ -35,6 +35,12 @@ func (a *App) Fans() (FanStatus, error) {
 	return status, nil
 }
 
+// FanState 返回当前风扇状态，满足 controller.Hardware 接口。
+func (a *App) FanState() (domain.FanState, error) {
+	st, err := a.Fans()
+	return st.FanState, err
+}
+
 // SetFans 应用新的风扇配置并同步持久化到本地配置文件。
 func (a *App) SetFans(fans domain.FanConfig) error {
 	if !knownFanMode(fans.CPUMode) {

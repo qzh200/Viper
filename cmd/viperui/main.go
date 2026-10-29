@@ -83,11 +83,16 @@ func build(store *config.Store, options options) *parts {
 		appearance = theme.Mode(options.theme)
 	}
 
+	opts := []shell.Option{shell.WithAppearance(appearance)}
+	if options.page != "" {
+		opts = append(opts, shell.WithPage(options.page))
+	}
+
 	return &parts{
 		store:       store,
 		application: application,
 		ctrl:        ctrl,
-		window:      shell.New(ctrl, shell.WithAppearance(appearance)),
+		window:      shell.New(ctrl, opts...),
 		appearance:  appearance,
 	}
 }

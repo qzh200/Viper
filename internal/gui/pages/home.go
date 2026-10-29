@@ -14,11 +14,26 @@ import (
 type State struct {
 	// PowerIndex 是用户刚点中的性能档位下标；-1 表示没有待确认的选择。
 	PowerIndex int
+	// FanModeIndex 是用户刚点中的风扇模式下标；-1 表示没有待确认的选择。
+	FanModeIndex int
+	// CPUDuty 是自定义模式下 CPU 风扇的目标占空比（0~100）。
+	CPUDuty float64
+	// GPUDuty 是自定义模式下 GPU 风扇的目标占空比（0~100）。
+	GPUDuty float64
+	// CPUDutyInited 标记 CPUDuty 是否已初始化。
+	CPUDutyInited bool
+	// GPUDutyInited 标记 GPUDuty 是否已初始化。
+	GPUDutyInited bool
 }
 
 // NewState 返回一份干净的页面状态。
 func NewState() *State {
-	return &State{PowerIndex: -1}
+	return &State{
+		PowerIndex:   -1,
+		FanModeIndex: -1,
+		CPUDuty:      50,
+		GPUDuty:      50,
+	}
 }
 
 // Home 画首页：连接状态、性能档位、实时指标与曲线。

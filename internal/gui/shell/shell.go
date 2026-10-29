@@ -71,6 +71,15 @@ func WithAppearance(mode theme.Mode) Option {
 	}
 }
 
+// WithPage 指定这一次窗口初始打开哪一页。
+func WithPage(page string) Option {
+	return func(s *Shell) {
+		if page != "" {
+			s.page = page
+		}
+	}
+}
+
 // New 创建一扇窗口的骨架。
 func New(ctrl *controller.Controller, opts ...Option) *Shell {
 	window := &Shell{
@@ -215,6 +224,8 @@ func (s *Shell) content(c *ui.Context) {
 	switch s.page {
 	case "home":
 		pages.Home(c, s.ctrl, s.state)
+	case "fans":
+		pages.Fans(c, s.ctrl, s.state)
 	default:
 		widgets.Note(c, "这一页还在路上。")
 	}

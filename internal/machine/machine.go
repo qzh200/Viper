@@ -121,26 +121,39 @@ func (b *Backend) Monitor() (domain.MonitorData, error) {
 		return domain.MonitorData{}, err
 	}
 
+	gpuUsage := int(data.GPUUsage)
+	if gpuUsage < 0 {
+		gpuUsage = 0
+	}
+	cpuUsage := data.CPUUsage
+	if cpuUsage < 0 {
+		cpuUsage = 0
+	}
+	ramUsage := data.RAMUsage
+	if ramUsage < 0 {
+		ramUsage = 0
+	}
+
 	result := domain.MonitorData{
-		CPUTemperatureC:      int(data.CPUTemperature),
-		CPUFanRPM:            int(data.CPUFanSpeed),
-		CPUUsagePercent:      data.CPUUsage,
-		CPUFrequencyMHz:      int(data.CPUFrequency),
-		CPUMaxFrequencyMHz:   int(data.CPUMaxFrequency),
-		SystemTempC:          int(data.SystemTemp),
-		GPUTemperatureC:      int(data.GPUTemperature),
-		GPUFanRPM:            int(data.GPUFanSpeed),
-		GPUUsagePercent:      int(data.GPUUsage),
-		GPUFrequencyMHz:      int(data.GPUFrequency),
-		GPUMaxFrequencyMHz:   int(data.GPUMaxFrequency),
+		CPUTemperatureC:      maxInt(0, int(data.CPUTemperature)),
+		CPUFanRPM:            maxInt(0, int(data.CPUFanSpeed)),
+		CPUUsagePercent:      cpuUsage,
+		CPUFrequencyMHz:      maxInt(0, int(data.CPUFrequency)),
+		CPUMaxFrequencyMHz:   maxInt(0, int(data.CPUMaxFrequency)),
+		SystemTempC:          maxInt(0, int(data.SystemTemp)),
+		GPUTemperatureC:      maxInt(0, int(data.GPUTemperature)),
+		GPUFanRPM:            maxInt(0, int(data.GPUFanSpeed)),
+		GPUUsagePercent:      gpuUsage,
+		GPUFrequencyMHz:      maxInt(0, int(data.GPUFrequency)),
+		GPUMaxFrequencyMHz:   maxInt(0, int(data.GPUMaxFrequency)),
 		GPUIdle:              data.GPUIdle != 0,
-		RAMTotalMB:           data.RAMTotal,
-		RAMUsagePercent:      data.RAMUsage,
-		RAMFrequencyMHz:      int(data.RAMFrequency),
-		WIFIDownloadKbps:     data.WIFIDownload,
-		WIFIUploadKbps:       data.WIFIUpload,
-		EthernetDownloadKbps: data.EtherDownload,
-		EthernetUploadKbps:   data.EtherUpload,
+		RAMTotalMB:           maxFloat(0, data.RAMTotal),
+		RAMUsagePercent:      ramUsage,
+		RAMFrequencyMHz:      maxInt(0, int(data.RAMFrequency)),
+		WIFIDownloadKbps:     maxFloat(0, data.WIFIDownload),
+		WIFIUploadKbps:       maxFloat(0, data.WIFIUpload),
+		EthernetDownloadKbps: maxFloat(0, data.EtherDownload),
+		EthernetUploadKbps:   maxFloat(0, data.EtherUpload),
 	}
 	for _, clock := range data.CPUCoreFrequency {
 		result.CPUCoreFrequencyMHz = append(result.CPUCoreFrequencyMHz, int(clock))
@@ -410,4 +423,18 @@ func boolStatus(enabled bool) int {
 		return 1
 	}
 	return 0
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
 }

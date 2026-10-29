@@ -2,6 +2,8 @@ package widgets
 
 import (
 	"math"
+	"sync"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -13,9 +15,45 @@ const (
 	// fanMaxRPM 是画到最快时的转速：真正的风扇能到六七千转，
 	// 但画太快就成了一团糊，因此按这个上限折算成看得清的速度。
 	fanMaxRPM = 6000
-	// fanMaxTurns 是折算出来的最高转速，每秒几圈。
-	fanMaxTurns = 3.0
+	// fanMaxTurns 是折算出来的最高转速，每秒几圈。调慢到 0.75，沉稳优雅。
+	fanMaxTurns = 0.75
 )
+
+// fanTracker 维护风扇旋转角度的连续积分，杜绝因绝对时间取模导致的跳变脱节。
+type fanTracker struct {
+	mu        sync.Mutex
+	lastTimes map[ui.Color]time.Time
+	angles    map[ui.Color]float64
+}
+
+var globalFanTracker = &fanTracker{
+	lastTimes: make(map[ui.Color]time.Time),
+	angles:    make(map[ui.Color]float64),
+}
+
+func (ft *fanTracker) nextAngle(tint ui.Color, rpm int, now time.Time) float64 {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+
+	last := ft.lastTimes[tint]
+	ft.lastTimes[tint] = now
+	if last.IsZero() {
+		return 0
+	}
+
+	dt := now.Sub(last).Seconds()
+	// 异常帧间隔保护（如休眠唤醒或长时间暂停，防止一瞬间转几十圈）
+	if dt <= 0 || dt > 0.1 {
+		dt = 0.016
+	}
+
+	turns := fanTurns(rpm)
+	cur := ft.angles[tint]
+	cur += turns * 2 * math.Pi * dt
+	cur = math.Mod(cur, 2*math.Pi)
+	ft.angles[tint] = cur
+	return cur
+}
 
 // gaugeSweep 是仪表弧线的角度：底下留一道口子。
 const gaugeSweep = 270
@@ -116,16 +154,14 @@ func Fan(c *ui.Context, rpm int, size float32, tint ui.Color) ui.Element {
 		p.AnimationFrame()
 
 		// 转多快由转速说了算：转速越高转得越快。
-		// 角度要先在 float64 里绕回一圈再交给 float32：直接用时钟的毫秒数去算，
-		// 单精度存不下那么大的数，七片叶子会挤到同一个角度上去。
+		// 通过全局追踪器根据真实帧时间差 dt 累加角度，杜绝任何相位断层。
 		turns := fanTurns(rpm)
-		spin := math.Mod(float64(p.Now().UnixMilli())/1000*turns*2*math.Pi, 2*math.Pi)
+		spin := globalFanTracker.nextAngle(tint, rpm, p.Now())
 
-		// 转得快的时候淡一点，再补一圈残影，看着才像在使劲转。
+		// 转得快的时候稍淡一点。
 		alpha := float32(0.85)
-		if turns > fanMaxTurns*0.6 {
-			alpha = 0.55
-			p.StrokePath(circle(cx, cy, radius*0.60), 3, tint.Alpha(0.18))
+		if turns > fanMaxTurns*0.75 {
+			alpha = 0.65
 		}
 
 		// 七片叶子分七次填：mygo 的路径只填第一段，分成一条路径会少六片。

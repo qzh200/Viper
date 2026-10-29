@@ -302,3 +302,35 @@ func TestTheModelOfTheSnapshotIsTheSharedOne(t *testing.T) {
 			len(overview.PowerModes), len(domain.AvailablePowerModes()))
 	}
 }
+
+func TestSmoothingInterpolatesWhenEnabled(t *testing.T) {
+	machine := &guitest.Hardware{MonitorData: domain.MonitorData{CPUTemperatureC: 40}}
+	ctrl := controller.New(machine, &guitest.Store{})
+
+	ctrl.SetSmoothing(true)
+	machine.MonitorData.CPUTemperatureC = 80
+	ctrl.Refresh()
+
+	// 开启平滑后，Refresh 设置目标为 80，但尚未推进平滑步进，初始仍为 40
+	if got := ctrl.Snapshot().Monitor.CPUTemperatureC; got != 40 {
+		t.Errorf("before step, got CPU temp %d, want 40", got)
+	}
+
+	// 步进一步平滑
+	if !ctrl.StepSmooth(0.2) {
+		t.Fatal("expected StepSmooth to report changes")
+	}
+
+	// 40 + (80-40)*0.2 = 48
+	if got := ctrl.Snapshot().Monitor.CPUTemperatureC; got != 48 {
+		t.Errorf("after 1 step, got CPU temp %d, want 48", got)
+	}
+
+	// 持续推进直到收敛
+	for ctrl.StepSmooth(0.2) {
+	}
+
+	if got := ctrl.Snapshot().Monitor.CPUTemperatureC; got != 80 {
+		t.Errorf("after converging, got CPU temp %d, want 80", got)
+	}
+}
