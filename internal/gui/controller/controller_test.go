@@ -334,3 +334,57 @@ func TestSmoothingInterpolatesWhenEnabled(t *testing.T) {
 		t.Errorf("after converging, got CPU temp %d, want 80", got)
 	}
 }
+
+func TestLightingControlAndDebounce(t *testing.T) {
+	machine := &guitest.Hardware{
+		LightingConfig: domain.RGBConfig{
+			Effect:     domain.EffectStatic,
+			Brightness: 50,
+		},
+		BacklightTimeoutState: false,
+	}
+	ctrl := controller.New(machine, &guitest.Store{})
+	defer ctrl.Stop()
+
+	// 1. 测试 SetLighting
+	targetCfg := domain.RGBConfig{
+		Effect:     domain.EffectWave,
+		Brightness: 90,
+	}
+	if !ctrl.SetLighting(targetCfg, nil) {
+		t.Fatal("SetLighting enqueue failed")
+	}
+	ctrl.Work()
+	if len(machine.LightWrites) != 1 || machine.LightWrites[0].Effect != domain.EffectWave {
+		t.Fatalf("expected 1 light write with EffectWave, got %+v", machine.LightWrites)
+	}
+
+	// 2. 测试 SetLightingDebounced
+	ctrl.SetLightingDebounced(domain.RGBConfig{Brightness: 30}, 20*time.Millisecond, nil)
+	// 在防抖时间内再次触发，覆盖之前的
+	ctrl.SetLightingDebounced(domain.RGBConfig{Brightness: 85}, 20*time.Millisecond, nil)
+	time.Sleep(50 * time.Millisecond)
+	ctrl.Work()
+	last := machine.LightWrites[len(machine.LightWrites)-1]
+	if last.Brightness != 85 {
+		t.Errorf("expected debounced brightness 85, got %d", last.Brightness)
+	}
+
+	// 3. 测试 ResetLighting
+	if !ctrl.ResetLighting(nil) {
+		t.Fatal("ResetLighting enqueue failed")
+	}
+	ctrl.Work()
+	if machine.ResetLightCalls != 1 {
+		t.Errorf("expected ResetLightCalls 1, got %d", machine.ResetLightCalls)
+	}
+
+	// 4. 测试 SetBacklightTimeout
+	if !ctrl.SetBacklightTimeout(true, nil) {
+		t.Fatal("SetBacklightTimeout enqueue failed")
+	}
+	ctrl.Work()
+	if len(machine.TimeoutWrites) != 1 || !machine.TimeoutWrites[0] {
+		t.Errorf("expected timeout true write, got %v", machine.TimeoutWrites)
+	}
+}

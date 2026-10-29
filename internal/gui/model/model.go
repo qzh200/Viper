@@ -80,6 +80,10 @@ type Overview struct {
 	PowerModes []domain.PowerMode
 	// FanState 是当前风扇工作模式与强冷配置。
 	FanState domain.FanState
+	// Lighting 是当前键盘 RGB 灯效配置。
+	Lighting domain.RGBConfig
+	// BacklightTimeout 表示背光是否在 30 秒空闲时自动熄灭。
+	BacklightTimeout bool
 	// Metrics 是首页展示的指标。
 	Metrics []Metric
 	// Monitor 是这次读到的整机遥测，界面要用那些没变成指标的数字。
@@ -351,5 +355,90 @@ func clamp01(value float64) float64 {
 		return 1
 	default:
 		return value
+	}
+}
+
+// LightingEffectItem 描述一个灯效模式的名称和说明。
+type LightingEffectItem struct {
+	Effect domain.LightingEffect
+	Name   string
+	Desc   string
+}
+
+// LightingEffects 返回支持的键盘动态灯效列表。
+func LightingEffects() []LightingEffectItem {
+	return []LightingEffectItem{
+		{Effect: domain.EffectStatic, Name: "静态常亮", Desc: "经典全域单色常亮，专注不刺眼"},
+		{Effect: domain.EffectBreathing, Name: "呼吸渐变", Desc: "明暗起伏如呼吸节奏，静谧电竞氛围"},
+		{Effect: domain.EffectNeon, Name: "霓虹变色", Desc: "全光谱平滑循环变色，流光溢彩"},
+		{Effect: domain.EffectWave, Name: "波浪滚动", Desc: "彩虹光波横向穿梭流动，动感十足"},
+		{Effect: domain.EffectScale, Name: "缩放脉冲", Desc: "中心向两端缩放扩张与收缩光波"},
+		{Effect: domain.EffectMeteor, Name: "流星划过", Desc: "高速流星拖尾自一侧划过键盘"},
+		{Effect: domain.EffectFlash, Name: "动感闪烁", Desc: "节奏跃动爆闪，激情电竞战意"},
+	}
+}
+
+// LightingEffectLabels 返回所有灯效的简短名称。
+func LightingEffectLabels() []string {
+	effects := LightingEffects()
+	labels := make([]string, len(effects))
+	for i, e := range effects {
+		labels[i] = e.Name
+	}
+	return labels
+}
+
+// LightingEffectIndex 返回指定灯效在 LightingEffects 列表中的下标。
+func LightingEffectIndex(effect domain.LightingEffect) int {
+	for i, item := range LightingEffects() {
+		if item.Effect == effect {
+			return i
+		}
+	}
+	return 0
+}
+
+// LightingEffectFromIndex 根据下标返回对应的灯效模式。
+func LightingEffectFromIndex(index int) domain.LightingEffect {
+	effects := LightingEffects()
+	if index >= 0 && index < len(effects) {
+		return effects[index].Effect
+	}
+	return domain.EffectStatic
+}
+
+// ZoneName 返回 4 分区键盘中每个分区的中文名字。
+func ZoneName(zoneIndex int) string {
+	switch zoneIndex {
+	case 0:
+		return "分区 1 (WASD/左侧)"
+	case 1:
+		return "分区 2 (主键区中左)"
+	case 2:
+		return "分区 3 (主键区右侧/方向)"
+	case 3:
+		return "分区 4 (数字小键盘区)"
+	default:
+		return fmt.Sprintf("分区 %d", zoneIndex+1)
+	}
+}
+
+// PresetColor 预设颜色定义。
+type PresetColor struct {
+	Name  string
+	Color domain.RGBColor
+}
+
+// LightingPresetColors 返回快捷精选色盘。
+func LightingPresetColors() []PresetColor {
+	return []PresetColor{
+		{Name: "掠夺蓝", Color: domain.RGBColor{R: 0, G: 136, B: 255}},
+		{Name: "极光青", Color: domain.RGBColor{R: 0, G: 230, B: 118}},
+		{Name: "烈焰红", Color: domain.RGBColor{R: 255, G: 23, B: 68}},
+		{Name: "赛博紫", Color: domain.RGBColor{R: 213, G: 0, B: 249}},
+		{Name: "暖光橙", Color: domain.RGBColor{R: 255, G: 145, B: 0}},
+		{Name: "柠檬黄", Color: domain.RGBColor{R: 255, G: 234, B: 0}},
+		{Name: "冰纯白", Color: domain.RGBColor{R: 255, G: 255, B: 255}},
+		{Name: "关闭", Color: domain.RGBColor{R: 0, G: 0, B: 0}},
 	}
 }

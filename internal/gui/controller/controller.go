@@ -38,6 +38,16 @@ type Hardware interface {
 	SetFans(config domain.FanConfig) error
 	// SetCoolBoost 开启或关闭酷冷强冷加速。
 	SetCoolBoost(enabled bool) error
+	// Lighting 读取当前键盘 RGB 灯效配置。
+	Lighting() (domain.RGBConfig, error)
+	// SetLighting 设置键盘 RGB 灯效配置。
+	SetLighting(config domain.RGBConfig) error
+	// ResetLighting 将键盘灯效恢复为出厂默认设置。
+	ResetLighting() error
+	// BacklightTimeout 读取键盘背光是否在 30 秒空闲时自动熄灭。
+	BacklightTimeout() (bool, error)
+	// SetBacklightTimeout 设置键盘背光自动熄灭。
+	SetBacklightTimeout(enabled bool) error
 }
 
 // AppearanceStore 保存界面的外观模式。config.Store 满足这个接口。
@@ -75,6 +85,9 @@ type Controller struct {
 
 	fanTimerMu sync.Mutex
 	fanTimer   *time.Timer
+
+	lightTimerMu sync.Mutex
+	lightTimer   *time.Timer
 
 	actions chan action
 	stop    chan struct{}
@@ -171,6 +184,14 @@ func (c *Controller) read() (model.Overview, *domain.MonitorData, string) {
 
 	if fanState, err := c.hw.FanState(); err == nil {
 		overview.FanState = fanState
+	}
+
+	if lighting, err := c.hw.Lighting(); err == nil {
+		overview.Lighting = lighting
+	}
+
+	if timeout, err := c.hw.BacklightTimeout(); err == nil {
+		overview.BacklightTimeout = timeout
 	}
 
 	monitor, err := c.hw.Monitor()
@@ -275,6 +296,11 @@ func (c *Controller) Stop() {
 			c.fanTimer.Stop()
 		}
 		c.fanTimerMu.Unlock()
+		c.lightTimerMu.Lock()
+		if c.lightTimer != nil {
+			c.lightTimer.Stop()
+		}
+		c.lightTimerMu.Unlock()
 	})
 }
 
@@ -313,6 +339,41 @@ func (c *Controller) SetFanConfigDebounced(config domain.FanConfig, delay time.D
 // SetCoolBoost 排队切换酷冷强冷加速开关。
 func (c *Controller) SetCoolBoost(enabled bool, onError func(error)) bool {
 	return c.enqueue(func() error { return c.hw.SetCoolBoost(enabled) }, onError)
+}
+
+// SetLighting 排队应用键盘灯效配置。
+func (c *Controller) SetLighting(config domain.RGBConfig, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetLighting(config) }, onError)
+}
+
+// SetLightingDebounced 在防抖延迟后排队应用键盘灯效配置。
+//
+// 适合滑块拖动或连续调色场景：变动期间重置计时，停顿后下发，避免请求堵塞硬件队列。
+func (c *Controller) SetLightingDebounced(config domain.RGBConfig, delay time.Duration, onError func(error)) {
+	c.lightTimerMu.Lock()
+	defer c.lightTimerMu.Unlock()
+
+	if delay <= 0 {
+		delay = 180 * time.Millisecond
+	}
+
+	if c.lightTimer != nil {
+		c.lightTimer.Stop()
+	}
+
+	c.lightTimer = time.AfterFunc(delay, func() {
+		c.SetLighting(config, onError)
+	})
+}
+
+// ResetLighting 排队重置键盘灯效为默认出厂设置。
+func (c *Controller) ResetLighting(onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.ResetLighting() }, onError)
+}
+
+// SetBacklightTimeout 排队设置键盘背光 30 秒超时自动休眠。
+func (c *Controller) SetBacklightTimeout(enabled bool, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetBacklightTimeout(enabled) }, onError)
 }
 
 // enqueue 把一次写入放进队列。

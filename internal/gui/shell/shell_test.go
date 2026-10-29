@@ -152,11 +152,29 @@ func TestAnotherPageShowsThatItIsNotThereYet(t *testing.T) {
 		window.View(c)
 	}, 1120, 720)
 
-	if err := tt.Click("灯效"); err != nil {
+	if err := tt.Click("性能"); err != nil {
 		t.Fatal(err)
 	}
 	if !tt.HasText("这一页还在路上") {
 		t.Errorf("the window has no %q in %q", "这一页还在路上", tt.Texts())
+	}
+}
+
+func TestNavigatingToLightingPage(t *testing.T) {
+	ctrl := controller.New(&guitest.Hardware{}, &guitest.Store{})
+	defer ctrl.Stop()
+
+	window := shell.New(ctrl, shell.WithApply(func(theme.Mode) {}))
+
+	tt := ui.NewTester(func(c *ui.Context) {
+		window.View(c)
+	}, 1120, 720)
+
+	if err := tt.Click("灯效"); err != nil {
+		t.Fatal(err)
+	}
+	if !tt.HasText("键盘 RGB 灯效") {
+		t.Errorf("the window has no lighting page title in %q", tt.Texts())
 	}
 }
 

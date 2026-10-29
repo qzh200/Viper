@@ -21,6 +21,10 @@ type Hardware struct {
 	Power domain.PowerMode
 	// FansState 是机器当前的风扇配置与状态。
 	FansState domain.FanState
+	// LightingConfig 是机器当前的键盘灯效配置。
+	LightingConfig domain.RGBConfig
+	// BacklightTimeoutState 是键盘背光 30 秒休眠开关。
+	BacklightTimeoutState bool
 	// InstanceName 是后端驱动实例的名字。
 	InstanceName string
 	// RouteName 是连接通道的名字。
@@ -36,6 +40,12 @@ type Hardware struct {
 	FanWrites []domain.FanConfig
 	// CoolBoostWrites 记下每次写入了什么强冷设置。
 	CoolBoostWrites []bool
+	// LightWrites 记下每次写入了什么灯效配置。
+	LightWrites []domain.RGBConfig
+	// ResetLightCalls 记录重置灯效的调用次数。
+	ResetLightCalls int
+	// TimeoutWrites 记下每次写入了什么背光超时设置。
+	TimeoutWrites []bool
 }
 
 // Interface 返回这个替身，让它可以被塞进控制器。
@@ -99,6 +109,60 @@ func (h *Hardware) SetCoolBoost(enabled bool) error {
 	}
 	h.CoolBoostWrites = append(h.CoolBoostWrites, enabled)
 	h.FansState.CoolBoost = enabled
+	return nil
+}
+
+// Lighting 读取当前键盘 RGB 灯效配置。
+func (h *Hardware) Lighting() (domain.RGBConfig, error) {
+	if h.Err != nil {
+		return domain.RGBConfig{}, h.Err
+	}
+	return h.LightingConfig, nil
+}
+
+// SetLighting 应用键盘灯效配置并记下来。
+func (h *Hardware) SetLighting(config domain.RGBConfig) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.LightWrites = append(h.LightWrites, config)
+	h.LightingConfig = config
+	return nil
+}
+
+// ResetLighting 恢复出厂默认灯效并记下来。
+func (h *Hardware) ResetLighting() error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.ResetLightCalls++
+	h.LightingConfig = domain.RGBConfig{
+		Effect:     domain.EffectStatic,
+		Speed:      3,
+		Brightness: 100,
+		PerZone:    true,
+	}
+	for i := range h.LightingConfig.Zones {
+		h.LightingConfig.Zones[i] = domain.RGBColor{R: 255, G: 255, B: 255}
+	}
+	return nil
+}
+
+// BacklightTimeout 读取背光超时开关。
+func (h *Hardware) BacklightTimeout() (bool, error) {
+	if h.Err != nil {
+		return false, h.Err
+	}
+	return h.BacklightTimeoutState, nil
+}
+
+// SetBacklightTimeout 设置背光超时开关并记下来。
+func (h *Hardware) SetBacklightTimeout(enabled bool) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.TimeoutWrites = append(h.TimeoutWrites, enabled)
+	h.BacklightTimeoutState = enabled
 	return nil
 }
 

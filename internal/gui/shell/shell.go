@@ -226,6 +226,8 @@ func (s *Shell) content(c *ui.Context) {
 		pages.Home(c, s.ctrl, s.state)
 	case "fans":
 		pages.Fans(c, s.ctrl, s.state)
+	case "lighting":
+		pages.Lighting(c, s.ctrl, s.state)
 	default:
 		widgets.Note(c, "这一页还在路上。")
 	}
