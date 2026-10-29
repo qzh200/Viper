@@ -14,9 +14,7 @@ try {
         'viper',
         'agcheck',
         'fanproto',
-        'winkey',
-        'gpucross',
-        'smbiosdump'
+        'winkey'
     )
 
     foreach ($name in $commands) {

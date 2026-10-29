@@ -48,12 +48,6 @@ func (a *App) SetWinKeyLocked(locked bool) error {
 	return nil
 }
 
-// StickyKeys 查询操作系统粘滞键当前状态。
-func (a *App) StickyKeys() (bool, error) { return hardware.StickyKeys() }
-
-// SetStickyKeys 启用或停用操作系统粘滞键。
-func (a *App) SetStickyKeys(enabled bool) error { return hardware.SetStickyKeys(enabled) }
-
 // DiscreteGPU 查询当前是否工作在纯独显直连模式。
 func (a *App) DiscreteGPU() (bool, error) {
 	backend, err := a.hardware()

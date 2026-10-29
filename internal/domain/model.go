@@ -107,11 +107,8 @@ func DecodePowerMode(value uint64) PowerMode {
 }
 
 // AvailablePowerModes 返回机型支持的可用电源模式列表。
-func AvailablePowerModes(isPredator bool) []PowerMode {
-	if isPredator {
-		return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
-	}
-	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerEco}
+func AvailablePowerModes() []PowerMode {
+	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
 }
 
 // ParsePowerMode 根据名称解析电源模式。

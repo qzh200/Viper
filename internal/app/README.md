@@ -1,6 +1,6 @@
 # app
 
-`app` 是 Viper 应用程序的核心业务协调层，负责组装底层硬件后端（`machine`）、操作系统服务（`quickaccess`）、配置存储（`config`）与显卡驱动遥测（`nvidia`），提供高层次、统一的业务 API。
+`app` 是 Viper 应用程序的核心业务协调层，负责组装底层硬件后端（`machine`）、操作系统服务（`quickaccess`）与配置存储（`config`），提供高层次、统一的业务 API。
 
 ## 架构职责
 
@@ -16,9 +16,9 @@
 - **`fans.go`**：CPU 与 GPU 风扇模式（自动/全速/自定义）、转速占空比及 CoolBoost 强冷开关。
 - **`lighting.go`**：键盘 RGB 灯效读取与配置、4 分区独立调色、亮度调节、30 秒自动休眠开关与一键恢复出厂白色背光。
 - **`scenarios.go`**：命名场景管理（创建、保存、列举、应用、删除）以及电源档位与场景的绑定/解绑。
-- **`switches.go`**：外设与功能开关控制，包括 Windows 徽标键锁定、屏幕 LCD Overdrive 响应时间超速、开机声音及操作系统粘滞键。
+- **`switches.go`**：外设与功能开关控制，包括 Windows 徽标键锁定、屏幕 LCD Overdrive 响应时间超速及开机声音。
 - **`quickaccess.go`**：与 QuickAccess 服务协同，管理关机 USB 供电阈值、显卡显示模式、Windows 深色主题、窗口透明效果、任务栏隐藏及屏幕保护程序。
-- **`readings.go`**：统一遥测与状态采集，组合整机硬件监控数据与 NVIDIA NVML 原生显卡指标。
+- **`readings.go`**：统一遥测与状态采集，提供基于原厂服务的整机硬件监控数据。
 
 ## 使用示例
 

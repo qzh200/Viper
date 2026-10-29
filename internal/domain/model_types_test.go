@@ -65,26 +65,22 @@ func TestTheNumbersOfThePerformanceProfiles(t *testing.T) {
 }
 
 func TestTheProfilesOfAMachine(t *testing.T) {
-	quiet := AvailablePowerModes(false)
-	found := false
-	for _, mode := range quiet {
+	modes := AvailablePowerModes()
+	foundQuiet := false
+	foundTurbo := false
+	for _, mode := range modes {
 		if mode == PowerQuiet {
-			found = true
+			foundQuiet = true
 		}
-	}
-	if !found {
-		t.Errorf("每一台机器都有静音档，%v 里没有", quiet)
-	}
-
-	predator := AvailablePowerModes(true)
-	found = false
-	for _, mode := range predator {
 		if mode == PowerTurbo {
-			found = true
+			foundTurbo = true
 		}
 	}
-	if !found {
-		t.Errorf("Predator 有加速档，%v 里没有", predator)
+	if !foundQuiet {
+		t.Errorf("可用档位中应该有静音档，%v 里没有", modes)
+	}
+	if !foundTurbo {
+		t.Errorf("可用档位中应该有极速档，%v 里没有", modes)
 	}
 }
 

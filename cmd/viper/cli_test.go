@@ -29,7 +29,7 @@ func TestStatusShowsTheReadings(t *testing.T) {
 	}
 }
 
-func TestTelemetryAndPowerStatus(t *testing.T) {
+func TestTelemetry(t *testing.T) {
 	installFakes(t)
 
 	out, _, err := capture(t, "telemetry")
@@ -38,14 +38,6 @@ func TestTelemetryAndPowerStatus(t *testing.T) {
 	}
 	if !strings.Contains(out, "CPU temperature   : 87 C") {
 		t.Errorf("遥测里没有温度:\n%s", out)
-	}
-
-	out, _, err = capture(t, "powerstatus")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "Power supply") {
-		t.Errorf("电源状态里没有电源:\n%s", out)
 	}
 }
 

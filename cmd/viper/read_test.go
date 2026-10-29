@@ -42,7 +42,7 @@ func TestReadTheSwitchesOfTheMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"LCD overdrive : off", "Windows key   : off", "Sticky keys   : off"} {
+	for _, want := range []string{"LCD overdrive : off", "Windows key   : off"} {
 		if !containsText(out, want) {
 			t.Errorf("输出里没有 %q:\n%s", want, out)
 		}

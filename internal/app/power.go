@@ -89,5 +89,5 @@ func storedPowerMode(mode hardware.PowerMode) uint64 {
 
 // AvailablePowerModes 返回当前机型支持的电源模式列表。
 func (a *App) AvailablePowerModes() []hardware.PowerMode {
-	return hardware.AvailablePowerModes(hardware.IsPredator())
+	return hardware.AvailablePowerModes()
 }

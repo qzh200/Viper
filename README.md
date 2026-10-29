@@ -11,12 +11,9 @@ Viper 采用 Go 语言开发，具备低资源开销、无额外运行时依赖�
 ### 1. 状态监控与硬件遥测
 - **整机运行遥测**：采集 CPU/GPU 温度、风扇实际转速（RPM）、核心频率、利用率及各核心独立主频。
 - **系统指标监控**：监控主板温度、物理内存使用率/频率、有线以太网与 Wi-Fi 的即时上下行网络速率。
-- **独立显卡深入遥测**：原生调用 NVIDIA NVML（`nvml.dll`）采集显存利用率、显存已用容量、当前显卡 P-State 档位及最大加速主频。
-- **轻量电源与电池状态**：直接通过 Win32 API 查询交流电源连接、电池百分比与充电状态，免提权、免依赖后台服务。
 
 ### 2. 电源与性能档位调控
 - 支持 **Quiet（静音）**、**Balanced（平衡）**、**Performance（高性能）**、**Turbo（极速超频）** 与 **Eco（节能）** 模式。
-- 自动检测机器是否属于掠夺者（Predator）系列，动态适配可用性能档位。
 
 ### 3. 风扇策略与强冷加速
 - **运转模式**：
@@ -32,7 +29,7 @@ Viper 采用 Go 语言开发，具备低资源开销、无额外运行时依赖�
 
 ### 5. 显卡模式切换与外设开关
 - **显卡显示模式**：支持在 **Hybrid（混合）**、**Discrete（独显直连）** 与 **Auto（自动切换）** 之间切换。
-- **游戏外设开关**：支持锁定/解锁 Windows 徽标键、启用/停用屏幕 LCD Overdrive 响应时间加速、开机声音音效以及 Windows 粘滞键。
+- **游戏外设开关**：支持锁定/解锁 Windows 徽标键、启用/停用屏幕 LCD Overdrive 响应时间加速、开机声音音效。
 
 ### 6. QuickAccess 系统协同集成
 - **关机充电管理**：支持开启/关闭关机状态下的 USB 端口对外供电，并设置终止供电的电池阈值（10%、20%、30%）。
@@ -52,16 +49,13 @@ Viper/
 │   ├── viper/          # 主命令行控制中心入口
 │   ├── agcheck/        # 原厂服务协议探测与读写验证工具
 │   ├── fanproto/       # 风扇控制协议响应时间取证工具
-│   ├── gpucross/       # NVML 与原厂服务遥测读数交叉比对工具
-│   ├── smbiosdump/     # SMBIOS 固件原始结构解析工具
 │   └── winkey/         # Windows 键锁定逻辑探测工具
 ├── internal/
 │   ├── app/            # 核心业务协调层与场景引擎
 │   ├── machine/        # 基于原厂服务的硬件控制驱动实现
 │   ├── agentservice/   # AcerAgentService TCP 封包与解包协议库
 │   ├── quickaccess/    # Acer QuickAccess TLS/WebSocket/AES 加密通信库
-│   ├── hardware/       # 硬件接口、SMBIOS 解析与 Win32 电源查询
-│   ├── nvidia/         # NVIDIA NVML 原生显卡驱动遥测接口
+│   ├── hardware/       # 硬件接口与领域数据模型定义
 │   ├── config/         # 本地 JSON 配置文件管理库 (%APPDATA%/Viper)
 │   └── probe/          # 诊断工具复用的协议探针与回环验证套件
 ├── build.ps1           # 自动化构建脚本
@@ -87,8 +81,6 @@ Viper/
 - `bin/agcheck.exe`
 - `bin/fanproto.exe`
 - `bin/winkey.exe`
-- `bin/gpucross.exe`
-- `bin/smbiosdump.exe`
 
 也可单独编译主程序：
 ```powershell
@@ -104,10 +96,7 @@ go build -o bin/viper.exe ./cmd/viper
 # 查看实时硬件温度、风扇转速与负载
 viper status
 
-# 查看供电与电池状态（免提权）
-viper powerstatus
-
-# 查看独立显卡深入遥测指标（NVML）
+# 查看实时硬件遥测指标
 viper telemetry
 
 # 输出硬件能力、驱动状态与配置路径全景诊断报告
@@ -237,8 +226,6 @@ viper scenario delete 游戏模式
   - `agcheck machine`：通过 `machine.Backend` 读取结构化硬件视图。
   - `agcheck verify`：对各项硬件功能执行自动化改动并立即还原初始状态，验证读写有效性。
 - **`fanproto`**：指定模式与 CPU/GPU 占空比下发给服务，并在其后 2、4、6 秒追踪实际转速变化。
-- **`gpucross`**：交叉比对 NVML 原生采集数据与宏碁原厂服务监控数据的一致性。
-- **`smbiosdump`**：提取底层固件表并以十六进制打印 SMBIOS 处理器与内存插槽的原始数据。
 - **`winkey`**：测试 Windows 徽标键锁定的写入时延与读回生效过程。
 
 ---

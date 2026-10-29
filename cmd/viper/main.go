@@ -84,8 +84,6 @@ func run(args []string) error {
 		return runScenario(args[1:])
 	case "telemetry", "gpuinfo":
 		return runTelemetry()
-	case "powerstatus":
-		return runPowerStatus()
 	case "diag", "diagnostics":
 		return runDiag()
 	case "help", "-h", "--help":
@@ -102,8 +100,7 @@ func usage() {
 
 Usage:
   viper status                      live temperatures and fan speeds
-  viper powerstatus                  power supply and battery, no rights needed
-  viper telemetry                    graphics card, no rights needed
+  viper telemetry                    live hardware telemetry
   viper scenario list                show the saved scenes
   viper scenario save <name>         store the lighting and the fans
   viper scenario apply <name>        apply a scene
@@ -124,7 +121,6 @@ Usage:
   viper profile                     show overdrive and key lock state
   viper profile overdrive <on|off>  toggle the display overdrive
   viper profile winkey <on|off>     lock or unlock the Windows key
-  viper profile stickykeys <on|off> switch the sticky keys on or off
   viper gpu                         show the graphics mode
   viper gpu <mode>                  set hybrid|discrete|auto
   viper charge                      show the charging settings
@@ -176,16 +172,6 @@ func runStatus() error {
 
 	fmt.Fprintln(stdout, "route  :", application.Route())
 
-	power, err := application.PowerStatus()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(stdout)
-	fmt.Fprintln(stdout, "  Power supply      :", power)
-	if power.OnBattery {
-		fmt.Fprintln(stdout, "  Battery           :", power.BatteryPercent, "%")
-	}
-
 	telemetry, err := application.Telemetry()
 	if err != nil {
 		return err
@@ -218,16 +204,6 @@ func printTelemetry(telemetry app.Telemetry) {
 		fmt.Fprintf(stdout, "  Core clocks       : %d cores, %d to %d MHz\n",
 			len(clocks), minOf(clocks), maxOf(clocks))
 	}
-
-	for _, card := range telemetry.Cards {
-		fmt.Fprintln(stdout)
-		fmt.Fprintln(stdout, "  Graphics card     :", card.Name)
-		fmt.Fprintln(stdout, "  Memory clock      :", card.MemoryClockMHz, "MHz")
-		fmt.Fprintln(stdout, "  Video memory      :", formatBytes(card.MemoryUsedBytes), "of", formatBytes(card.MemoryTotalBytes))
-		if card.IsIdle() {
-			fmt.Fprintln(stdout, "  The card is idle")
-		}
-	}
 }
 
 func minOf(values []int) int {
@@ -248,19 +224,6 @@ func maxOf(values []int) int {
 		}
 	}
 	return largest
-}
-
-func formatBytes(value uint64) string {
-	switch {
-	case value >= 1<<30:
-		return fmt.Sprintf("%.1f GB", float64(value)/(1<<30))
-	case value >= 1<<20:
-		return fmt.Sprintf("%.0f MB", float64(value)/(1<<20))
-	case value >= 1<<10:
-		return fmt.Sprintf("%.0f kB", float64(value)/(1<<10))
-	default:
-		return fmt.Sprintf("%d bytes", value)
-	}
 }
 
 func runScenario(args []string) error {
@@ -375,30 +338,6 @@ func runTelemetry() error {
 	return nil
 }
 
-func runPowerStatus() error {
-	application, err := newApp()
-	if err != nil {
-		return err
-	}
-	defer application.Close()
-
-	power, err := application.PowerStatus()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(stdout, "  Power supply      :", power)
-	if power.OnBattery {
-		fmt.Fprintln(stdout, "  Battery           :", power.BatteryPercent, "%")
-	}
-	if power.BatteryLow {
-		fmt.Fprintln(stdout, "  The battery is running low")
-	}
-	if power.BatteryCritical {
-		fmt.Fprintln(stdout, "  The battery is almost empty")
-	}
-	return nil
-}
-
 func runFan(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -507,9 +446,6 @@ func runPower(args []string) error {
 	mode, ok := hardware.ParsePowerMode(strings.ToLower(args[0]))
 	if !ok {
 		return fmt.Errorf("unknown performance profile %q", args[0])
-	}
-	if mode == hardware.PowerTurbo && !hardware.IsPredator() {
-		return fmt.Errorf("turbo is exclusive to the Predator series")
 	}
 	if err := application.SetPowerMode(mode); err != nil {
 		return err
@@ -727,12 +663,6 @@ func runProfile(args []string) error {
 		} else {
 			fmt.Fprintln(stdout, "  Windows key   :", onOff(locked))
 		}
-
-		sticky, err := application.StickyKeys()
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(stdout, "  Sticky keys   :", onOff(sticky))
 		return nil
 	}
 
@@ -762,19 +692,6 @@ func runProfile(args []string) error {
 			return err
 		}
 		fmt.Fprintln(stdout, "Windows key:", onOff(locked))
-		return nil
-	case "stickykeys", "sticky":
-		if len(args) < 2 {
-			return fmt.Errorf("usage: viper profile stickykeys <on|off>")
-		}
-		enabled, err := parseOnOff(args[1])
-		if err != nil {
-			return err
-		}
-		if err := application.SetStickyKeys(enabled); err != nil {
-			return err
-		}
-		fmt.Fprintln(stdout, "sticky keys:", onOff(enabled))
 		return nil
 	default:
 		return fmt.Errorf("unknown profile command %q", args[0])
@@ -902,15 +819,6 @@ func runDiag() error {
 	fmt.Fprintln(stdout, "  instance        :", instance)
 	fmt.Fprintln(stdout, "  route           :", application.Route())
 
-	identity, err := application.Identity()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(stdout, "  model           :", identity.Product)
-	fmt.Fprintln(stdout, "  family          :", identity.Family)
-	isPredator := hardware.IsPredatorModel(identity.Product, identity.Family)
-	fmt.Fprintln(stdout, "  Predator series :", onOff(isPredator))
-
 	modes := make([]string, 0, 4)
 	for _, mode := range application.AvailablePowerModes() {
 		modes = append(modes, mode.String())
@@ -953,9 +861,6 @@ func runDiag() error {
 
 	bootSound, err := application.BootSound()
 	report("boot sound", onOff(bootSound), err)
-
-	sticky, err := application.StickyKeys()
-	report("sticky keys", onOff(sticky), err)
 
 	locked, err := application.WinKeyLocked()
 	report("Windows key", onOff(locked), err)

@@ -31,11 +31,6 @@ func TestTheTelemetryOfTheMachine(t *testing.T) {
 		t.Errorf("内存频率是 %d，不是 5600", telemetry.Monitor.RAMFrequencyMHz)
 	}
 
-	for _, card := range telemetry.Cards {
-		if card.UsagePercent < 0 || card.UsagePercent > 100 {
-			t.Errorf("显卡报的负载是 %d%%", card.UsagePercent)
-		}
-	}
 }
 
 func TestTheTelemetryOfAMachineThatIsNotThere(t *testing.T) {

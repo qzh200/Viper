@@ -105,7 +105,9 @@ func (c *Client) upgrade() error {
 		"Sec-WebSocket-Key: " + base64.StdEncoding.EncodeToString(key) + "\r\n" +
 		"Sec-WebSocket-Version: 13\r\n\r\n"
 
-	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	if c.timeout > 0 {
+		c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	}
 	if _, err := io.WriteString(c.conn, request); err != nil {
 		return fmt.Errorf("quickaccess: write websocket upgrade: %w", err)
 	}
@@ -152,8 +154,13 @@ func (c *Client) handshake() error {
 	if err != nil {
 		return fmt.Errorf("quickaccess: read auth response: %w", err)
 	}
-	if intType, _ := answer["PacketType"].(float64); int(intType) != packetAuth {
-		return fmt.Errorf("quickaccess: auth response unexpected type %v", answer["PacketType"])
+	data, _ := answer["Data"].(string)
+	expected, err := encryptAES([]byte(question), []byte(keyB))
+	if err != nil {
+		return err
+	}
+	if data != base64.StdEncoding.EncodeToString(expected) {
+		return fmt.Errorf("quickaccess: the service answered the authentication with an unknown question")
 	}
 	return nil
 }
@@ -310,45 +317,36 @@ func (c *Client) writeJSON(value any) error {
 }
 
 func (c *Client) writeFrame(opcode byte, payload []byte) error {
-	var header [10]byte
-	header[0] = 0x80 | (opcode & 0x0F)
-
 	length := len(payload)
-	headerLen := 2
+	frame := make([]byte, 0, 14+length)
+	frame = append(frame, 0x80|(opcode&0x0F))
+
 	switch {
 	case length <= 125:
-		header[1] = 0x80 | byte(length)
+		frame = append(frame, 0x80|byte(length))
 	case length <= 65535:
-		header[1] = 0x80 | 126
-		binary.BigEndian.PutUint16(header[2:4], uint16(length))
-		headerLen = 4
+		frame = append(frame, 0x80|126, byte(length>>8), byte(length))
 	default:
-		header[1] = 0x80 | 127
-		binary.BigEndian.PutUint64(header[2:10], uint64(length))
-		headerLen = 10
+		frame = append(frame, 0x80|127)
+		var extended [8]byte
+		binary.BigEndian.PutUint64(extended[:], uint64(length))
+		frame = append(frame, extended[:]...)
 	}
 
 	var mask [4]byte
 	if _, err := rand.Read(mask[:]); err != nil {
 		return err
 	}
-
-	masked := make([]byte, length)
-	for i := range payload {
-		masked[i] = payload[i] ^ mask[i%4]
+	frame = append(frame, mask[:]...)
+	for i, b := range payload {
+		frame = append(frame, b^mask[i%4])
 	}
 
-	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
-	if _, err := c.conn.Write(header[:headerLen]); err != nil {
-		return err
+	if c.timeout > 0 {
+		c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
 	}
-	if _, err := c.conn.Write(mask[:]); err != nil {
-		return err
-	}
-	if _, err := c.conn.Write(masked); err != nil {
-		return err
-	}
-	return nil
+	_, err := c.conn.Write(frame)
+	return err
 }
 
 func (c *Client) readJSON() (map[string]any, error) {

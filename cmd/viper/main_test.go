@@ -292,23 +292,13 @@ func TestDescribeGPUFan(t *testing.T) {
 	}
 }
 
-func TestMinMaxAndBytes(t *testing.T) {
+func TestMinMax(t *testing.T) {
 	values := []int{3, 9, 5}
 	if got := minOf(values); got != 3 {
 		t.Errorf("最小的是 %d", got)
 	}
 	if got := maxOf(values); got != 9 {
 		t.Errorf("最大的是 %d", got)
-	}
-
-	if got := formatBytes(512); got != "512 bytes" {
-		t.Errorf("%q", got)
-	}
-	if got := formatBytes(2048); got != "2 kB" {
-		t.Errorf("%q", got)
-	}
-	if got := formatBytes(4 << 30); got != "4.0 GB" {
-		t.Errorf("%q", got)
 	}
 }
 

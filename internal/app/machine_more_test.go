@@ -9,58 +9,6 @@ import (
 	"viper/internal/hardware"
 )
 
-func TestThePowerStatusOfTheMachine(t *testing.T) {
-
-	application := newTestAppWithoutMachine(t)
-
-	status, err := application.PowerStatus()
-	if err != nil {
-		t.Skipf("the power status cannot be read on this system: %v", err)
-	}
-	if !status.OnAC && !status.OnBattery {
-		t.Errorf("the machine reports %+v, want either the supply or the battery", status)
-	}
-}
-
-func TestTheIdentityOfTheMachine(t *testing.T) {
-	application := newTestAppWithoutMachine(t)
-
-	identity, err := application.Identity()
-	if err != nil {
-		t.Skipf("the identity cannot be read on this system: %v", err)
-	}
-	if identity.Manufacturer == "" {
-		t.Error("the machine has no manufacturer")
-	}
-}
-
-func TestTheStickyKeysOfTheMachine(t *testing.T) {
-
-	application := newTestAppWithoutMachine(t)
-
-	enabled, err := application.StickyKeys()
-	if err != nil {
-		t.Skipf("the sticky keys cannot be read on this system: %v", err)
-	}
-
-	_ = enabled
-}
-
-func TestTheGraphicsTelemetryOfTheMachine(t *testing.T) {
-
-	application := newTestAppWithoutMachine(t)
-
-	telemetry, err := application.Telemetry()
-	if err != nil {
-		t.Skipf("the telemetry of the card cannot be read on this system: %v", err)
-	}
-	for _, card := range telemetry.Cards {
-		if card.UsagePercent < 0 || card.UsagePercent > 100 {
-			t.Errorf("the card reports the load %d percent", card.UsagePercent)
-		}
-	}
-}
-
 func TestTheAvailableProfilesOfTheMachine(t *testing.T) {
 	application := newTestAppWithoutMachine(t)
 
