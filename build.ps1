@@ -12,6 +12,7 @@ try {
     # 定义待编译的子程序列表
     $commands = @(
         'viper',
+        'viperui',
         'agcheck',
         'fanproto',
         'winkey'

@@ -1,4 +1,4 @@
-﻿// Package config 提供用户配置、灯效预设、风扇策略与场景绑定的持久化存储。
+// Package config 提供用户配置、灯效预设、风扇策略与场景绑定的持久化存储。
 package config
 
 import (
@@ -58,6 +58,16 @@ type Scenario struct {
 	Fans     Fans     `json:"fans"`
 }
 
+// 界面外观模式的取值，与 internal/gui/theme 的模式一一对应。
+const (
+	// ThemeAuto 让界面跟随系统的外观。
+	ThemeAuto = "auto"
+	// ThemeLight 让界面用亮色。
+	ThemeLight = "light"
+	// ThemeDark 让界面用暗色。
+	ThemeDark = "dark"
+)
+
 // Settings 承载应用程序的全部持久化配置信息。
 type Settings struct {
 	Lighting         Lighting            `json:"lighting"`
@@ -66,6 +76,8 @@ type Settings struct {
 	BacklightTimeout bool                `json:"backlightTimeout"`
 	Scenarios        map[string]Scenario `json:"scenarios"`
 	Bindings         map[string]string   `json:"bindings"`
+	// Theme 保存界面的外观模式：auto、light 或 dark。
+	Theme string `json:"theme"`
 }
 
 func (s Settings) copy() Settings {
@@ -108,6 +120,7 @@ func Default() Settings {
 		BacklightTimeout: true,
 		Scenarios:        map[string]Scenario{},
 		Bindings:         map[string]string{},
+		Theme:            ThemeAuto,
 	}
 }
 
@@ -152,6 +165,23 @@ func (s *Store) Settings() Settings {
 
 // Path 返回当前配置文件的物理存储路径。
 func (s *Store) Path() string { return s.path }
+
+// Theme 返回保存的界面外观模式：auto、light 或 dark。
+// 旧版本留下的配置文件没有这一项，此时按 auto 处理。
+func (s *Store) Theme() string {
+	mode := s.Settings().Theme
+	if mode == "" {
+		return ThemeAuto
+	}
+	return mode
+}
+
+// SetTheme 保存界面外观模式，并原子刷写到配置文件。
+func (s *Store) SetTheme(mode string) error {
+	return s.Update(func(s *Settings) {
+		s.Theme = mode
+	})
+}
 
 // Save 将内存中的配置原子刷写到磁盘文件。
 func (s *Store) Save() error {

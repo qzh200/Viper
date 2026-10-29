@@ -1,4 +1,4 @@
-﻿// agcheck 是一款针对 AcerAgentService 通信协议与硬件读写能力的真机诊断与验证工具。
+// agcheck 是一款针对 AcerAgentService 通信协议与硬件读写能力的真机诊断与验证工具。
 package main
 
 import (

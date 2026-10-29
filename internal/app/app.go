@@ -1,4 +1,4 @@
-﻿// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
+// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
 package app
 
 import (

@@ -1,4 +1,4 @@
-﻿// Package machine 基于 AcerAgentService 实现 domain.Gaming 接口。
+// Package machine 基于 AcerAgentService 实现 domain.Gaming 接口。
 package machine
 
 import (
