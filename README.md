@@ -46,6 +46,7 @@ Viper 采用 Go 语言开发，具备低资源开销、无额外运行时依赖�
 ```text
 Viper/
 ├── cmd/
+│   ├── viperui/        # 原生 GPU 自绘图形控制中心 (MyGo)
 │   ├── viper/          # 主命令行控制中心入口
 │   ├── agcheck/        # 原厂服务协议探测与读写验证工具
 │   ├── fanproto/       # 风扇控制协议响应时间取证工具
