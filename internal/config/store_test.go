@@ -223,8 +223,8 @@ func TestDefaultSettingsAreTheAutomaticMode(t *testing.T) {
 	if settings.Lighting.Speed != 3 {
 		t.Errorf("the lighting starts with the speed %d, want 3", settings.Lighting.Speed)
 	}
-	if settings.Lighting.Brightness != 50 {
-		t.Errorf("the lighting starts with the brightness %d, want 50", settings.Lighting.Brightness)
+	if settings.Lighting.Brightness != 5 {
+		t.Errorf("the lighting starts with the brightness %d, want 5", settings.Lighting.Brightness)
 	}
 	if settings.Lighting.PerZone {
 		t.Error("the lighting starts with the zones on their own")

@@ -85,9 +85,17 @@ type Controller struct {
 
 	fanTimerMu sync.Mutex
 	fanTimer   *time.Timer
+	fanMu      sync.Mutex
+	pendingFan *domain.FanConfig
+	pendingFanErr func(error)
+	fanInFlight bool
 
 	lightTimerMu sync.Mutex
 	lightTimer   *time.Timer
+	lightMu      sync.Mutex
+	pendingLight *domain.RGBConfig
+	pendingLightErr func(error)
+	lightInFlight bool
 
 	actions chan action
 	stop    chan struct{}
@@ -212,22 +220,26 @@ func (c *Controller) Work() {
 	for {
 		select {
 		case pending := <-c.actions:
-			err := pending.run()
-			if pending.onError != nil {
-				pending.onError(err)
-			}
-			c.mu.Lock()
-			if err != nil {
-				c.err = err.Error()
-			} else {
-				c.err = ""
-			}
-			c.mu.Unlock()
+			c.executeAction(pending)
 			c.Refresh()
 		default:
 			return
 		}
 	}
+}
+
+func (c *Controller) executeAction(pending action) {
+	err := pending.run()
+	if pending.onError != nil {
+		pending.onError(err)
+	}
+	c.mu.Lock()
+	if err != nil {
+		c.err = err.Error()
+	} else {
+		c.err = ""
+	}
+	c.mu.Unlock()
 }
 
 // StepSmooth 步进一步平滑插值。如果有数值正在过渡，返回 true 并更新快照；
@@ -270,6 +282,12 @@ func (c *Controller) Start(interval time.Duration, onChange func()) {
 			select {
 			case <-c.stop:
 				return
+			case pending := <-c.actions:
+				c.executeAction(pending)
+				c.Refresh()
+				if onChange != nil {
+					onChange()
+				}
 			case <-hwTicker.C:
 				c.Work()
 				c.Refresh()
@@ -296,11 +314,18 @@ func (c *Controller) Stop() {
 			c.fanTimer.Stop()
 		}
 		c.fanTimerMu.Unlock()
+		c.fanMu.Lock()
+		c.pendingFan = nil
+		c.fanMu.Unlock()
+
 		c.lightTimerMu.Lock()
 		if c.lightTimer != nil {
 			c.lightTimer.Stop()
 		}
 		c.lightTimerMu.Unlock()
+		c.lightMu.Lock()
+		c.pendingLight = nil
+		c.lightMu.Unlock()
 	})
 }
 
@@ -311,8 +336,48 @@ func (c *Controller) SetPowerMode(mode domain.PowerMode, onError func(error)) bo
 }
 
 // SetFanConfig 排队应用风扇运转模式与占空比配置。
+//
+// 针对自定义模式下连续拖动风扇占空比滑块的场景，采用单在途 + 最新待决合并机制：
+// 如果底层正在执行上一次写入，新配置原子覆盖 pending 变量，
+// 待底层写入返回后自动提取最新配置继续写入，避免在通道中堆积过期的中间状态，
+// 从源头彻底消除高频写入造成的延迟卡顿与服务报错。
 func (c *Controller) SetFanConfig(config domain.FanConfig, onError func(error)) bool {
-	return c.enqueue(func() error { return c.hw.SetFans(config) }, onError)
+	c.fanMu.Lock()
+	c.pendingFan = &config
+	c.pendingFanErr = onError
+	if c.fanInFlight {
+		c.fanMu.Unlock()
+		return true
+	}
+	c.fanInFlight = true
+	c.fanMu.Unlock()
+
+	return c.enqueue(func() error {
+		for {
+			c.fanMu.Lock()
+			cfg := c.pendingFan
+			errCb := c.pendingFanErr
+			c.pendingFan = nil
+			c.pendingFanErr = nil
+			if cfg == nil {
+				c.fanInFlight = false
+				c.fanMu.Unlock()
+				return nil
+			}
+			c.fanMu.Unlock()
+
+			err := c.hw.SetFans(*cfg)
+			if errCb != nil {
+				errCb(err)
+			}
+			if err != nil {
+				c.fanMu.Lock()
+				c.fanInFlight = false
+				c.fanMu.Unlock()
+				return err
+			}
+		}
+	}, onError)
 }
 
 // SetFanConfigDebounced 在防抖延迟后排队应用风扇配置。
@@ -342,8 +407,48 @@ func (c *Controller) SetCoolBoost(enabled bool, onError func(error)) bool {
 }
 
 // SetLighting 排队应用键盘灯效配置。
+//
+// 针对滑块连续拖动与调色盘取色场景，采用单在途 + 最新待决合并机制：
+// 如果底层正在执行上一次写入，新配置原子覆盖 pending 变量，
+// 待底层写入返回后自动提取最新配置继续写入，避免在通道中堆积过期的中间状态，
+// 从源头彻底消除高频写入造成的延迟卡顿与服务报错。
 func (c *Controller) SetLighting(config domain.RGBConfig, onError func(error)) bool {
-	return c.enqueue(func() error { return c.hw.SetLighting(config) }, onError)
+	c.lightMu.Lock()
+	c.pendingLight = &config
+	c.pendingLightErr = onError
+	if c.lightInFlight {
+		c.lightMu.Unlock()
+		return true
+	}
+	c.lightInFlight = true
+	c.lightMu.Unlock()
+
+	return c.enqueue(func() error {
+		for {
+			c.lightMu.Lock()
+			cfg := c.pendingLight
+			errCb := c.pendingLightErr
+			c.pendingLight = nil
+			c.pendingLightErr = nil
+			if cfg == nil {
+				c.lightInFlight = false
+				c.lightMu.Unlock()
+				return nil
+			}
+			c.lightMu.Unlock()
+
+			err := c.hw.SetLighting(*cfg)
+			if errCb != nil {
+				errCb(err)
+			}
+			if err != nil {
+				c.lightMu.Lock()
+				c.lightInFlight = false
+				c.lightMu.Unlock()
+				return err
+			}
+		}
+	}, onError)
 }
 
 // SetLightingDebounced 在防抖延迟后排队应用键盘灯效配置。

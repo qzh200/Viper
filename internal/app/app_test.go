@@ -16,8 +16,8 @@ func TestToStoredLightingLimitsTheValues(t *testing.T) {
 	}
 
 	stored := toStoredLighting(config)
-	if stored.Brightness != 100 {
-		t.Errorf("the stored brightness is %d, want 100", stored.Brightness)
+	if stored.Brightness != 5 {
+		t.Errorf("the stored brightness is %d, want 5", stored.Brightness)
 	}
 	if stored.Speed != 9 {
 		t.Errorf("the stored speed is %d, want 9", stored.Speed)
@@ -32,12 +32,12 @@ func TestToStoredLightingKeepsValidValues(t *testing.T) {
 		Effect:     domain.EffectBreathing,
 		Speed:      5,
 		Direction:  0,
-		Brightness: 60,
+		Brightness: 3,
 	}
 
 	stored := toStoredLighting(config)
-	if stored.Brightness != 60 {
-		t.Errorf("the stored brightness is %d, want 60", stored.Brightness)
+	if stored.Brightness != 3 {
+		t.Errorf("the stored brightness is %d, want 3", stored.Brightness)
 	}
 	if stored.Speed != 5 {
 		t.Errorf("the stored speed is %d, want 5", stored.Speed)

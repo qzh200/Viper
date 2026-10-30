@@ -110,8 +110,18 @@ func TestOpeningAServiceThatIsNotThere(t *testing.T) {
 
 func TestTheBrightnessOfTheKeyboard(t *testing.T) {
 	service := newFakeService()
-	service.answers[agentservice.FunctionLighting] = answer(
-		map[string]any{"brightness": 42}, agentservice.ResultOK)
+	service.devices = answer([]any{
+		map[string]any{
+			"device_index":      0,
+			"device_type":       5,
+			"brightness":        4,
+			"active_mode_index": 1,
+			"vector_of_modes": []any{
+				map[string]any{"mode_name": "DIRECT", "mode_value": 255},
+				map[string]any{"mode_name": "STATIC", "mode_value": 0},
+			},
+		},
+	}, agentservice.ResultOK)
 
 	backend := newBackend(t, service)
 
@@ -119,8 +129,8 @@ func TestTheBrightnessOfTheKeyboard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("读取亮度失败: %v", err)
 	}
-	if brightness != 42 {
-		t.Fatalf("亮度是 %d，不是 42", brightness)
+	if brightness != 4 {
+		t.Fatalf("亮度是 %d，不是 4", brightness)
 	}
 }
 

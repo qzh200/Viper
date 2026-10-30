@@ -79,16 +79,27 @@ func TestThatTheLastErrorIsReportedWhenTheReadingKeepsFailing(t *testing.T) {
 
 func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
-
 	service.answers[agentservice.FunctionLighting] = answer(
-		map[string]any{"brightness": 10}, agentservice.ResultOK)
-	service.stale = map[string]bool{agentservice.FunctionLighting: true}
+		map[string]any{"brightness": 3}, agentservice.ResultOK)
+	// 设备一直报 5 档，写下去的 3 档没有生效。
+	service.devices = answer([]any{
+		map[string]any{
+			"device_index":      0,
+			"device_type":       5,
+			"brightness":        5,
+			"active_mode_index": 1,
+			"vector_of_modes": []any{
+				map[string]any{"mode_name": "DIRECT", "mode_value": 255},
+				map[string]any{"mode_name": "STATIC", "mode_value": 0},
+			},
+		},
+	}, agentservice.ResultOK)
 
 	fastVerify(t)
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	err := backend.SetLighting(domain.RGBConfig{Brightness: 90})
+	err := backend.SetLighting(domain.RGBConfig{Brightness: 3})
 	if err == nil {
 		t.Fatal("机器没有接受这个亮度时该报错")
 	}
@@ -103,26 +114,38 @@ func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 		"LEDs": []any{
 			map[string]any{"LED_id": 0, "color": "#00FF00", "status": 1},
 		},
-		"brightness": 50,
+		"brightness": 3,
 		"color":      "#ff0000",
 		"effect":     "STATIC",
 		"speed":      3,
 		"direction":  0,
 	}, agentservice.ResultOK)
-	service.stale = map[string]bool{agentservice.FunctionLighting: true}
+	// 设备亮度与写下去的不一样，核验就该拦下来。
+	service.devices = answer([]any{
+		map[string]any{
+			"device_index":      0,
+			"device_type":       5,
+			"brightness":        5,
+			"active_mode_index": 1,
+			"vector_of_modes": []any{
+				map[string]any{"mode_name": "DIRECT", "mode_value": 255},
+				map[string]any{"mode_name": "STATIC", "mode_value": 0},
+			},
+		},
+	}, agentservice.ResultOK)
 
 	fastVerify(t)
 	backend := newBackend(t, service)
 
-	config := domain.RGBConfig{Brightness: 50, Speed: 3, PerZone: true}
+	config := domain.RGBConfig{Brightness: 3, Speed: 3, PerZone: true}
 	config.Zones[0] = domain.RGBColor{R: 255}
 
 	err := backend.SetLighting(config)
 	if err == nil {
 		t.Fatal("机器没有接受这个颜色时该报错")
 	}
-	if !strings.Contains(err.Error(), "分区") {
-		t.Fatalf("错误里没有说清是分区: %v", err)
+	if !strings.Contains(err.Error(), "亮度") {
+		t.Fatalf("错误里没有说清是亮度: %v", err)
 	}
 }
 
@@ -130,19 +153,32 @@ func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionLighting] = answer(map[string]any{
 		"LEDs":       []any{},
-		"brightness": 50,
+		"brightness": 3,
 		"effect":     "STATIC",
 		"speed":      3,
 		"direction":  0,
 	}, agentservice.ResultOK)
-	service.stale = map[string]bool{agentservice.FunctionLighting: true}
+	// 设备亮度对得上，但跑的灯效不是波形。
+	service.devices = answer([]any{
+		map[string]any{
+			"device_index":      0,
+			"device_type":       5,
+			"brightness":        3,
+			"active_mode_index": 1,
+			"vector_of_modes": []any{
+				map[string]any{"mode_name": "DIRECT", "mode_value": 255},
+				map[string]any{"mode_name": "STATIC", "mode_value": 0},
+				map[string]any{"mode_name": "WAVE", "mode_value": 3},
+			},
+		},
+	}, agentservice.ResultOK)
 
 	fastVerify(t)
 	backend := newBackend(t, service)
 
 	err := backend.SetLighting(domain.RGBConfig{
 		Effect:     domain.EffectWave,
-		Brightness: 50,
+		Brightness: 3,
 		Speed:      3,
 	})
 	if err == nil {
@@ -272,8 +308,8 @@ func TestThatTheResetOfTheLightingIsWrittenToTheService(t *testing.T) {
 	if effect := parameter["effect"]; effect != "STATIC" {
 		t.Errorf("复位的灯效是 %v，不是静态", effect)
 	}
-	if brightness := parameter["brightness"]; brightness != 100 {
-		t.Errorf("复位的亮度是 %v，不是 100", brightness)
+	if brightness := parameter["brightness"]; brightness != 5 {
+		t.Errorf("复位的亮度是 %v，不是 5", brightness)
 	}
 }
 

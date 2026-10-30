@@ -388,3 +388,103 @@ func TestLightingControlAndDebounce(t *testing.T) {
 		t.Errorf("expected timeout true write, got %v", machine.TimeoutWrites)
 	}
 }
+
+func TestHighFrequencyLightingWritesCoalesce(t *testing.T) {
+	machine := &guitest.Hardware{}
+	ctrl := controller.New(machine, &guitest.Store{})
+	defer ctrl.Stop()
+
+	// 模拟调色板极高频拖拽（例如 100 次连续写入）
+	for i := 1; i <= 100; i++ {
+		ok := ctrl.SetLighting(domain.RGBConfig{
+			Brightness: uint64(i),
+		}, nil)
+		if !ok {
+			t.Fatalf("write %d was unexpectedly refused", i)
+		}
+	}
+
+	ctrl.Work()
+
+	// 100 次高频写入应当被合并为极少量实际底层硬件写入（只有最初在途和最终待决）
+	if len(machine.LightWrites) == 0 {
+		t.Fatal("expected at least one write to hardware")
+	}
+	if len(machine.LightWrites) > 2 {
+		t.Errorf("expected at most 2 hardware writes due to coalescing, got %d", len(machine.LightWrites))
+	}
+	// 无论合并了几次，最后一次写入硬件的一定是最终目标值（100）
+	lastWrite := machine.LightWrites[len(machine.LightWrites)-1]
+	if lastWrite.Brightness != 100 {
+		t.Errorf("expected final brightness 100, got %d", lastWrite.Brightness)
+	}
+}
+
+func TestFanControlAndCoalescing(t *testing.T) {
+	machine := &guitest.Hardware{}
+	ctrl := controller.New(machine, &guitest.Store{})
+	defer ctrl.Stop()
+
+	// 1. 测试 SetFanConfig 高频合并
+	for i := 1; i <= 50; i++ {
+		ok := ctrl.SetFanConfig(domain.FanConfig{
+			CPUMode:    domain.FanCustom,
+			CPUPercent: i,
+		}, nil)
+		if !ok {
+			t.Fatalf("fan write %d was unexpectedly refused", i)
+		}
+	}
+	ctrl.Work()
+	if len(machine.FanWrites) == 0 || len(machine.FanWrites) > 2 {
+		t.Errorf("expected 1 or 2 fan writes, got %d", len(machine.FanWrites))
+	}
+	lastFan := machine.FanWrites[len(machine.FanWrites)-1]
+	if lastFan.CPUPercent != 50 {
+		t.Errorf("expected final CPUPercent 50, got %d", lastFan.CPUPercent)
+	}
+
+	// 2. 测试 SetFanConfigDebounced
+	ctrl.SetFanConfigDebounced(domain.FanConfig{CPUMode: domain.FanAuto}, 20*time.Millisecond, nil)
+	ctrl.SetFanConfigDebounced(domain.FanConfig{CPUMode: domain.FanMax}, 20*time.Millisecond, nil)
+	time.Sleep(50 * time.Millisecond)
+	ctrl.Work()
+	lastDebouncedFan := machine.FanWrites[len(machine.FanWrites)-1]
+	if lastDebouncedFan.CPUMode != domain.FanMax {
+		t.Errorf("expected debounced fan mode FanMax, got %v", lastDebouncedFan.CPUMode)
+	}
+
+	// 3. 测试 SetCoolBoost
+	if !ctrl.SetCoolBoost(true, nil) {
+		t.Fatal("SetCoolBoost failed to enqueue")
+	}
+	ctrl.Work()
+	if len(machine.CoolBoostWrites) != 1 || !machine.CoolBoostWrites[0] {
+		t.Errorf("expected coolboost true, got %v", machine.CoolBoostWrites)
+	}
+}
+
+func TestFailureCallbacks(t *testing.T) {
+	expectedErr := errors.New("hardware error")
+	machine := &guitest.Hardware{SetErr: expectedErr}
+	ctrl := controller.New(machine, &guitest.Store{})
+	defer ctrl.Stop()
+
+	var gotErr error
+	ctrl.SetLighting(domain.RGBConfig{Brightness: 50}, func(err error) {
+		gotErr = err
+	})
+	ctrl.Work()
+	if gotErr == nil || gotErr.Error() != expectedErr.Error() {
+		t.Errorf("expected %v, got %v", expectedErr, gotErr)
+	}
+
+	var gotFanErr error
+	ctrl.SetFanConfig(domain.FanConfig{CPUMode: domain.FanAuto}, func(err error) {
+		gotFanErr = err
+	})
+	ctrl.Work()
+	if gotFanErr == nil || gotFanErr.Error() != expectedErr.Error() {
+		t.Errorf("expected %v, got %v", expectedErr, gotFanErr)
+	}
+}

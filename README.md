@@ -23,8 +23,8 @@ Viper 采用 Go 语言开发，具备低资源开销、无额外运行时依赖�
 - **CoolBoost 强冷加速**：支持一键开启或关闭硬件强冷加速。
 
 ### 4. 键盘 RGB 背光与灯效
-- **动态动画效果**：常亮（Static）、呼吸（Breathing）、霓虹（Neon）、波浪（Wave）、切换（Shifting）、缩放（Zoom）、流星（Meteor）、闪烁（Twinkling）。
-- **个性化调节**：支持 4 分区独立 HEX 调色（`#RRGGBB`）、速度（1-9 档）、方向（顺/逆时针）及亮度（0-100%）。
+- **动态动画效果**：常亮（Static）、呼吸（Breathing）、霓虹（Neon）、波形（Wave）、切换（Shifting）、缩放（Zoom）、流星雨（Meteor）、闪烁（Twinkling）共 8 种，与官方灯效面板一致。
+- **个性化调节**：支持 4 分区独立 HEX 调色（`#RRGGBB`）、速度（1-9 连续可调）与亮度（1-5 档，5 为最亮）。
 - **休眠与重置**：支持键盘背光 30 秒空闲自动熄灭开关，以及一键重置为出厂纯白常亮。
 
 ### 5. 显卡模式切换与外设开关
@@ -142,17 +142,17 @@ viper lighting
 # 重置背光为出厂默认纯白色常亮
 viper lighting reset
 
-# 设置动态灯效速度（1-9）与亮度（0-100）
-viper light speed 3
-viper light brightness 80
+# 设置动态灯效速度（1-9）与亮度（1-5 档，5 为最亮）
+viper lighting set speed 3
+viper lighting set brightness 4
 
-# 切换灯效动画模式
-viper light effect wave
-viper light effect breathing
+# 切换灯效动画模式（static/breathing/neon/wave/switch/scale/meteor/flash）
+viper lighting set effect wave
+viper lighting set effect breathing
 
 # 设置全局颜色或指定分区颜色（1-4 分区）
-viper light color #FF0055
-viper light zone 1 #00FFCC
+viper lighting set color #FF0055
+viper lighting set zone 1 #00FFCC all
 
 # 开启或关闭键盘背光 30 秒空闲自动休眠熄灭
 viper light timeout on

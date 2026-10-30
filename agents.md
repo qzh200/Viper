@@ -139,6 +139,24 @@ Viper/
   - 负载部分：UTF-8 JSON 格式字符串，形如 `{"Function":"...", "Parameter":...}`。
 - **流式解包**：由于服务响应未声明长度，采用花括号深度平衡（Brace Nesting Depth）算法提取完整的 JSON 响应对象。
 
+### A2. 键盘灯效 (`LIGHTING`) 的真机约定
+以下结论来自本机 Predator 的实测，改动灯效相关代码前请先对照：
+
+- **真值来源**：`LIGHTING` 的读取只是服务自己缓存的写入值，
+  硬件真正生效的亮度与灯效模式在设备列表（`GET_CONNECTED_DEVICE`）的
+  `brightness` 与 `active_mode_index` 里。写后核验要以设备列表为准。
+- **亮度只有 1 到 5 档**：写 0 或超出上限都会被服务钳回上限，
+  所以亮度用档位表示，不要用百分比。
+- **速度范围 1 到 9**，越界被钳回上限。
+- **方向只有波形（`WAVE`）与切换（`SHIFTING`）有意义**，
+  其余灯效方向固定为 0，官方界面也不暴露这个选项。
+- **省略字段会被清成 `null`**：一次写入必须带齐
+  `brightness`、`color`、`colortype`、`device`、`direction`、`duration`、
+  `effect`、`speed`、`subindex`，否则没写的设置会丢。
+- **分区直控写 `device: 1`**，硬件才会切到 `DIRECT` 模式按四个 LED 分色；
+  读回时也要带上设备号，否则服务只回 0 号设备那份设置，看不到分区颜色。
+- **`LED_id` 的起点不统一**：分区写从 0 起算，全局写从 1 起算。
+
 ### B. Acer QuickAccess 协议 (`internal/quickaccess`)
 - **传输层**：TLS Socket，默认监听 `127.0.0.1:5141`（跳过自签名证书验证）。
 - **握手流程**：

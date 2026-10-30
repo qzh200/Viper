@@ -186,7 +186,7 @@ func TestToStoredLightingLimitsTheSpeed(t *testing.T) {
 
 func TestToStoredLightingLimitsTheBrightness(t *testing.T) {
 	stored := toStoredLighting(domain.RGBConfig{Brightness: 0})
-	if stored.Brightness != 0 {
-		t.Errorf("the stored brightness is %d, want 0", stored.Brightness)
+	if stored.Brightness != 1 {
+		t.Errorf("the stored brightness is %d, want 1", stored.Brightness)
 	}
 }

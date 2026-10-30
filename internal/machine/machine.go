@@ -16,9 +16,11 @@ var ErrNoProvider = errors.New("machine: 这一项需要固件接口，原厂服
 // Service 定义与原厂服务交互的通信接口抽象。
 type Service interface {
 	Get(function string) (agentservice.Answer, error)
+	GetFrom(function string, device int) (agentservice.Answer, error)
 	Set(function string, parameter any) (agentservice.Answer, error)
 	MonitorData() (agentservice.Answer, error)
 	Capability(function string) (agentservice.Answer, error)
+	Devices() (agentservice.Answer, error)
 	Close() error
 }
 
@@ -67,6 +69,18 @@ func (b *Backend) get(function string) (agentservice.Answer, error) {
 	answer, err := b.service.Get(function)
 	if err != nil {
 		return agentservice.Answer{}, fmt.Errorf("machine: 读取 %s 失败: %w", function, err)
+	}
+	if err, failed := answer.Err(); failed {
+		return agentservice.Answer{}, err
+	}
+	return answer, nil
+}
+
+// getFrom 读某个设备上的设置。
+func (b *Backend) getFrom(function string, device int) (agentservice.Answer, error) {
+	answer, err := b.service.GetFrom(function, device)
+	if err != nil {
+		return agentservice.Answer{}, fmt.Errorf("machine: 读取 %s 的 %d 号设备失败: %w", function, device, err)
 	}
 	if err, failed := answer.Err(); failed {
 		return agentservice.Answer{}, err

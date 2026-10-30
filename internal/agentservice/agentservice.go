@@ -192,6 +192,14 @@ func (c *Client) Get(function string) (Answer, error) {
 	return c.ask(PacketGetUpdatedData, function, nil)
 }
 
+// GetFrom 查询指定设备上的当前设置值。
+//
+// 真机实测：灯光的读取需要带上设备号，否则服务只回 0 号设备的设置，
+// 读不到分区直控那一份。
+func (c *Client) GetFrom(function string, device int) (Answer, error) {
+	return c.ask(PacketGetUpdatedData, function, map[string]any{"device": device})
+}
+
 // Devices 枚举当前接入的设备列表。
 func (c *Client) Devices() (Answer, error) {
 	return c.ask(PacketGetConnectedDevice, "", nil)

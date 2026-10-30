@@ -256,3 +256,108 @@ func TestOverviewKeepsItsTime(t *testing.T) {
 		t.Error("the overview lost its time")
 	}
 }
+
+func TestLightingEffectHelpers(t *testing.T) {
+	if !LightingEffectCanColor(domain.EffectStatic) {
+		t.Error("static should allow color adjustment")
+	}
+	if LightingEffectCanColor(domain.EffectNeon) {
+		t.Error("neon should not allow color adjustment")
+	}
+	if LightingEffectCanColor(domain.EffectWave) {
+		t.Error("wave should not allow color adjustment")
+	}
+	if !LightingEffectCanColor(domain.EffectBreathing) {
+		t.Error("breathing should allow color adjustment")
+	}
+
+	if LightingEffectCanSpeed(domain.EffectStatic) {
+		t.Error("static should not allow speed adjustment")
+	}
+	if !LightingEffectCanSpeed(domain.EffectWave) {
+		t.Error("wave should allow speed adjustment")
+	}
+	if !LightingEffectCanSpeed(domain.EffectNeon) {
+		t.Error("neon should allow speed adjustment")
+	}
+
+	effects := LightingEffects()
+	if len(effects) != 8 {
+		t.Errorf("expected 8 lighting effects, got %d", len(effects))
+	}
+	labels := LightingEffectLabels()
+	if len(labels) != 8 || labels[0] != "静态" {
+		t.Errorf("unexpected labels: %v", labels)
+	}
+	if idx := LightingEffectIndex(domain.EffectBreathing); idx != 1 {
+		t.Errorf("expected breathing index 1, got %d", idx)
+	}
+	if eff := LightingEffectFromIndex(1); eff != domain.EffectBreathing {
+		t.Errorf("expected EffectBreathing from index 1, got %v", eff)
+	}
+	if eff := LightingEffectFromIndex(999); eff != domain.EffectStatic {
+		t.Errorf("expected fallback EffectStatic, got %v", eff)
+	}
+	if name := ZoneName(0); name != "分区 1 (WASD/左侧)" {
+		t.Errorf("unexpected zone 0 name: %s", name)
+	}
+	if name := ZoneName(9); name != "分区 10" {
+		t.Errorf("unexpected zone 9 name: %s", name)
+	}
+	presets := LightingPresetColors()
+	if len(presets) == 0 {
+		t.Error("expected preset colors")
+	}
+
+	red := HueToRGB(0)
+	if red.R != 255 || red.G != 0 || red.B != 0 {
+		t.Errorf("Hue 0 want red, got %+v", red)
+	}
+	green := HueToRGB(120)
+	if green.G != 255 {
+		t.Errorf("Hue 120 want green, got %+v", green)
+	}
+	blue := HueToRGB(240)
+	if blue.B != 255 {
+		t.Errorf("Hue 240 want blue, got %+v", blue)
+	}
+
+	if h := RGBToHue(red); h > 1 && h < 359 {
+		t.Errorf("red Hue want ~0, got %v", h)
+	}
+	if h := RGBToHue(green); math.Abs(h-120) > 1 {
+		t.Errorf("green Hue want ~120, got %v", h)
+	}
+	if h := RGBToHue(domain.RGBColor{R: 128, G: 128, B: 128}); h != 0 {
+		t.Errorf("gray Hue want 0, got %v", h)
+	}
+
+	// 测试 HSV <-> RGB 往返与极限情况
+	white := HSVToRGB(0, 0, 1.0)
+	if white.R != 255 || white.G != 255 || white.B != 255 {
+		t.Errorf("HSV(0,0,1) want white, got %+v", white)
+	}
+	black := HSVToRGB(0, 0, 0)
+	if black.R != 0 || black.G != 0 || black.B != 0 {
+		t.Errorf("HSV(0,0,0) want black, got %+v", black)
+	}
+	cyan := HSVToRGB(180, 1.0, 1.0)
+	if cyan.R != 0 || cyan.G != 255 || cyan.B != 255 {
+		t.Errorf("HSV(180,1,1) want cyan, got %+v", cyan)
+	}
+	mag := HSVToRGB(300, 1.0, 1.0)
+	if mag.R != 255 || mag.G != 0 || mag.B != 255 {
+		t.Errorf("HSV(300,1,1) want magenta, got %+v", mag)
+	}
+
+	hWhite, sWhite, vWhite := RGBToHSV(domain.RGBColor{R: 255, G: 255, B: 255})
+	if sWhite != 0 || vWhite != 1.0 {
+		t.Errorf("RGBToHSV(white) want s=0, v=1, got s=%v, v=%v", sWhite, vWhite)
+	}
+	_ = hWhite
+	hBlack, sBlack, vBlack := RGBToHSV(domain.RGBColor{R: 0, G: 0, B: 0})
+	if sBlack != 0 || vBlack != 0 {
+		t.Errorf("RGBToHSV(black) want s=0, v=0, got s=%v, v=%v", sBlack, vBlack)
+	}
+	_ = hBlack
+}

@@ -122,8 +122,8 @@ func (g *fakeGaming) ResetLighting() error {
 		Effect:     domain.EffectStatic,
 		Speed:      3,
 		Direction:  0,
-		Brightness: 100,
-		PerZone:    true,
+		Brightness: 5,
+		PerZone:    false,
 	}
 	for i := range config.Zones {
 		config.Zones[i] = white

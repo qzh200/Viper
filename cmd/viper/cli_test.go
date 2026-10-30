@@ -115,10 +115,10 @@ func TestLightingCommand(t *testing.T) {
 	}
 
 	before := machine.lighting.Zones
-	if _, _, err := capture(t, "lighting", "set", "brightness", "80"); err != nil {
+	if _, _, err := capture(t, "lighting", "set", "brightness", "4"); err != nil {
 		t.Fatal(err)
 	}
-	if machine.lighting.Brightness != 80 {
+	if machine.lighting.Brightness != 4 {
 		t.Errorf("亮度没写进去: %d", machine.lighting.Brightness)
 	}
 	if machine.lighting.Zones != before {

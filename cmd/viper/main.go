@@ -147,9 +147,9 @@ so the command needs that service to be running.
 
 Lighting options:
   effect <name>      static|breathing|neon|wave|switch|scale|meteor|flash
-  speed <n>          animation speed
-  direction <n>      animation direction, 0 or 1
-  brightness <0-100> overall brightness
+  speed <n>          animation speed, 1 to 9
+  direction <n>      animation direction, 0 or 1 (wave and switch only)
+  brightness <1-5>   backlight brightness, 1 to 5
   color <#RRGGBB>    one colour for every zone
   zone <n> <#RRGGBB> colour of a single zone, may be repeated
   all                finish the zone colours, every zone keeps its own colour
@@ -515,11 +515,13 @@ func showLighting(application *app.App) error {
 		fmt.Fprintln(stdout, "  machine     : not readable, showing what Viper wrote last")
 		config = application.StoredLighting()
 	} else {
-		fmt.Fprintf(stdout, "  brightness  : %d\n", config.Brightness)
+		fmt.Fprintf(stdout, "  brightness  : %d (1-5)\n", config.Brightness)
 	}
 	fmt.Fprintf(stdout, "  effect      : %s\n", config.Effect)
-	fmt.Fprintf(stdout, "  speed       : %d\n", config.Speed)
-	fmt.Fprintf(stdout, "  direction   : %d\n", config.Direction)
+	fmt.Fprintf(stdout, "  speed       : %d (1-9)\n", config.Speed)
+	if config.Effect.HasDirection() {
+		fmt.Fprintf(stdout, "  direction   : %d\n", config.Direction)
+	}
 	for i, zone := range config.Zones {
 		fmt.Fprintf(stdout, "  zone %d      : #%02X%02X%02X\n", i+1, zone.R, zone.G, zone.B)
 	}

@@ -107,7 +107,7 @@ func Default() Settings {
 			Effect:     0,
 			Speed:      3,
 			Direction:  0,
-			Brightness: 50,
+			Brightness: 5,
 			PerZone:    false,
 		},
 		Fans: Fans{

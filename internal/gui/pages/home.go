@@ -27,14 +27,30 @@ type State struct {
 
 	// LightingTab 是灯效页面的当前标签（0: 全局设置，1: 分区设置）。
 	LightingTab int
-	// LightingBrightness 是键盘背光目标亮度（0~100）。
+	// LightingBrightness 是键盘背光档位（0~4 档，0 档对应熄灭，4 档对应最高亮度）。
 	LightingBrightness float64
 	// LightingBrightnessInited 标记 LightingBrightness 是否已初始化。
 	LightingBrightnessInited bool
-	// LightingSpeed 是动态灯效速率档位（0: 慢速, 1: 正常, 2: 快速）。
-	LightingSpeed int
-	// LightingDirection 是流动方向（0: 向左, 1: 向右）。
+	// LightingSpeed 是动态灯效速度（1~9）。
+	LightingSpeed float64
+	// LightingSpeedInited 标记 LightingSpeed 是否已初始化。
+	LightingSpeedInited bool
+	// LightingDirection 是动态灯效流动方向（0: 向左 ◄, 1: 向右 ►）。
 	LightingDirection int
+	// LightingDirectionInited 标记 LightingDirection 是否已初始化。
+	LightingDirectionInited bool
+	// SelectedEffect 是全局设置下选中的灯效模式。
+	SelectedEffect domain.LightingEffect
+	// SelectedEffectInited 标记 SelectedEffect 是否已初始化。
+	SelectedEffectInited bool
+	// ColorHue 是当前调色板的色相角度（0~360度）。
+	ColorHue float64
+	// ColorHueInited 标记 ColorHue 是否已初始化。
+	ColorHueInited bool
+	// ColorSat 是当前调色板的饱和度（0.0~1.0）。
+	ColorSat float64
+	// ColorSatInited 标记 ColorSat 是否已初始化。
+	ColorSatInited bool
 	// SelectedZone 是分区设置下当前选中的分区下标（0~3）。
 	SelectedZone int
 	// ZoneColors 是 4 分区各自的当前调色。
@@ -55,13 +71,16 @@ func NewState() *State {
 		CPUDuty:            50,
 		GPUDuty:            50,
 		LightingTab:        0,
-		LightingBrightness: 100,
-		LightingSpeed:      1,
+		LightingBrightness: 4,
+		LightingSpeed:      5,
 		LightingDirection:  0,
+		SelectedEffect:     domain.EffectStatic,
+		ColorHue:           200, // 默认冰蓝系
+		ColorSat:           1.0,
 		SelectedZone:       0,
-		PerZone:            true,
+		PerZone:            false,
 		ZoneColors: [4]domain.RGBColor{
-			{R: 0, G: 136, B: 255},
+			{R: 0, G: 174, B: 243},
 			{R: 0, G: 230, B: 118},
 			{R: 255, G: 145, B: 0},
 			{R: 213, G: 0, B: 249},

@@ -31,7 +31,8 @@ func (a *App) SaveScenario(name string) error {
 
 	if lighting, err := a.Lighting(); err == nil {
 		stored := toStoredLighting(lighting)
-		if stored.Brightness == 0 {
+		if lighting.Brightness == 0 {
+			// 机器没报出亮度，就用设置里存的那一档。
 			stored.Brightness = settings.Lighting.Brightness
 		}
 		scenario.Lighting = stored

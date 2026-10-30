@@ -6,6 +6,7 @@ package model
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -366,15 +367,18 @@ type LightingEffectItem struct {
 }
 
 // LightingEffects 返回支持的键盘动态灯效列表。
+//
+// 顺序与宏碁官方灯效面板一致：静态、呼吸、霓虹、波形、切换、缩放、流星、闪烁。
 func LightingEffects() []LightingEffectItem {
 	return []LightingEffectItem{
-		{Effect: domain.EffectStatic, Name: "静态常亮", Desc: "经典全域单色常亮，专注不刺眼"},
-		{Effect: domain.EffectBreathing, Name: "呼吸渐变", Desc: "明暗起伏如呼吸节奏，静谧电竞氛围"},
-		{Effect: domain.EffectNeon, Name: "霓虹变色", Desc: "全光谱平滑循环变色，流光溢彩"},
-		{Effect: domain.EffectWave, Name: "波浪滚动", Desc: "彩虹光波横向穿梭流动，动感十足"},
-		{Effect: domain.EffectScale, Name: "缩放脉冲", Desc: "中心向两端缩放扩张与收缩光波"},
-		{Effect: domain.EffectMeteor, Name: "流星划过", Desc: "高速流星拖尾自一侧划过键盘"},
-		{Effect: domain.EffectFlash, Name: "动感闪烁", Desc: "节奏跃动爆闪，激情电竞战意"},
+		{Effect: domain.EffectStatic, Name: "静态", Desc: "经典全域单色常亮，专注不刺眼"},
+		{Effect: domain.EffectBreathing, Name: "呼吸", Desc: "明暗起伏如呼吸节奏，静谧电竞氛围"},
+		{Effect: domain.EffectNeon, Name: "霓虹", Desc: "全光谱平滑循环变色，流光溢彩"},
+		{Effect: domain.EffectWave, Name: "波形", Desc: "彩虹光波横向穿梭流动，动感十足"},
+		{Effect: domain.EffectSwitch, Name: "切换", Desc: "双色交替渐变，呼吸感十足"},
+		{Effect: domain.EffectScale, Name: "缩放", Desc: "中心向两端缩放扩张与收缩光波"},
+		{Effect: domain.EffectMeteor, Name: "流星雨", Desc: "高速流星拖尾自一侧划过键盘"},
+		{Effect: domain.EffectFlash, Name: "闪烁", Desc: "节奏跃动爆闪，激情电竞战意"},
 	}
 }
 
@@ -429,16 +433,123 @@ type PresetColor struct {
 	Color domain.RGBColor
 }
 
-// LightingPresetColors 返回快捷精选色盘。
+// LightingPresetColors 返回快捷精选色盘（12款经典高饱和电竞色彩）。
 func LightingPresetColors() []PresetColor {
 	return []PresetColor{
-		{Name: "掠夺蓝", Color: domain.RGBColor{R: 0, G: 136, B: 255}},
+		{Name: "掠夺蓝", Color: domain.RGBColor{R: 0, G: 174, B: 243}},
 		{Name: "极光青", Color: domain.RGBColor{R: 0, G: 230, B: 118}},
 		{Name: "烈焰红", Color: domain.RGBColor{R: 255, G: 23, B: 68}},
 		{Name: "赛博紫", Color: domain.RGBColor{R: 213, G: 0, B: 249}},
-		{Name: "暖光橙", Color: domain.RGBColor{R: 255, G: 145, B: 0}},
-		{Name: "柠檬黄", Color: domain.RGBColor{R: 255, G: 234, B: 0}},
+		{Name: "炽热橙", Color: domain.RGBColor{R: 255, G: 109, B: 0}},
+		{Name: "日光金", Color: domain.RGBColor{R: 255, G: 234, B: 0}},
+		{Name: "深邃蓝", Color: domain.RGBColor{R: 0, G: 112, B: 243}},
+		{Name: "珊瑚粉", Color: domain.RGBColor{R: 255, G: 64, B: 129}},
+		{Name: "薄荷绿", Color: domain.RGBColor{R: 29, G: 233, B: 182}},
 		{Name: "冰纯白", Color: domain.RGBColor{R: 255, G: 255, B: 255}},
-		{Name: "关闭", Color: domain.RGBColor{R: 0, G: 0, B: 0}},
+		{Name: "幽灵灰", Color: domain.RGBColor{R: 90, G: 105, B: 120}},
+		{Name: "熄灭黑", Color: domain.RGBColor{R: 0, G: 0, B: 0}},
 	}
+}
+
+// HueToRGB 根据色相角度（0~360度）计算对应的全饱和高亮 RGB。
+func HueToRGB(hue float64) domain.RGBColor {
+	return HSVToRGB(hue, 1.0, 1.0)
+}
+
+// HSVToRGB 将 Hue(0~360), Saturation(0~1), Value(0~1) 转换为 RGB 颜色。
+func HSVToRGB(h, s, v float64) domain.RGBColor {
+	h = math.Mod(h, 360)
+	if h < 0 {
+		h += 360
+	}
+	if s < 0 {
+		s = 0
+	} else if s > 1 {
+		s = 1
+	}
+	if v < 0 {
+		v = 0
+	} else if v > 1 {
+		v = 1
+	}
+
+	c := v * s
+	x := c * (1.0 - math.Abs(math.Mod(h/60.0, 2.0)-1.0))
+	m := v - c
+
+	var r1, g1, b1 float64
+	switch {
+	case h < 60:
+		r1, g1, b1 = c, x, 0
+	case h < 120:
+		r1, g1, b1 = x, c, 0
+	case h < 180:
+		r1, g1, b1 = 0, c, x
+	case h < 240:
+		r1, g1, b1 = 0, x, c
+	case h < 300:
+		r1, g1, b1 = x, 0, c
+	default:
+		r1, g1, b1 = c, 0, x
+	}
+
+	return domain.RGBColor{
+		R: uint8(math.Round((r1 + m) * 255)),
+		G: uint8(math.Round((g1 + m) * 255)),
+		B: uint8(math.Round((b1 + m) * 255)),
+	}
+}
+
+// RGBToHSV 将 RGB 转换为精确的 Hue(0~360), Saturation(0~1), Value(0~1)。
+func RGBToHSV(col domain.RGBColor) (h, s, v float64) {
+	r := float64(col.R) / 255.0
+	g := float64(col.G) / 255.0
+	b := float64(col.B) / 255.0
+
+	maxVal := math.Max(r, math.Max(g, b))
+	minVal := math.Min(r, math.Min(g, b))
+	delta := maxVal - minVal
+
+	v = maxVal
+	if maxVal > 1e-4 {
+		s = delta / maxVal
+	} else {
+		s = 0
+	}
+
+	if delta < 1e-4 {
+		h = 0
+	} else {
+		switch maxVal {
+		case r:
+			h = math.Mod((g-b)/delta, 6)
+		case g:
+			h = (b-r)/delta + 2
+		case b:
+			h = (r-g)/delta + 4
+		}
+		h *= 60
+		if h < 0 {
+			h += 360
+		}
+	}
+	return h, s, v
+}
+
+// RGBToHue 计算 RGB 颜色的主色相角度（0~360度）。
+func RGBToHue(col domain.RGBColor) float64 {
+	h, _, _ := RGBToHSV(col)
+	return h
+}
+
+// LightingEffectCanColor 判断灯效模式是否允许调整颜色。
+// 霓虹与波形由全光谱流动驱动，不支持自定义颜色；其余模式均可调色。
+func LightingEffectCanColor(effect domain.LightingEffect) bool {
+	return effect != domain.EffectNeon && effect != domain.EffectWave
+}
+
+// LightingEffectCanSpeed 判断灯效模式是否允许调节动画速度。
+// 静态模式为常亮无动画，其余动态模式均可调速。
+func LightingEffectCanSpeed(effect domain.LightingEffect) bool {
+	return effect != domain.EffectStatic
 }

@@ -60,9 +60,9 @@ func (a *App) SetLighting(value domain.RGBConfig) error {
 }
 
 func clampLighting(value domain.RGBConfig) domain.RGBConfig {
-	value.Speed = clamp(value.Speed, 1, 9)
+	value.Speed = clamp(value.Speed, domain.SpeedMin, domain.SpeedMax)
 	value.Direction = clamp(value.Direction, 0, 1)
-	value.Brightness = clamp(value.Brightness, 0, 100)
+	value.Brightness = clamp(value.Brightness, domain.BrightnessMin, domain.BrightnessMax)
 	return value
 }
 
@@ -105,8 +105,8 @@ func (a *App) ResetLighting() error {
 			Effect:     uint64(domain.EffectStatic),
 			Speed:      3,
 			Direction:  0,
-			Brightness: 100,
-			PerZone:    true,
+			Brightness: domain.BrightnessMax,
+			PerZone:    false,
 		}
 		for i := range s.Lighting.Zones {
 			s.Lighting.Zones[i] = config.LightingColor{R: 255, G: 255, B: 255}

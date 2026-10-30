@@ -136,15 +136,39 @@ type RGBColor struct {
 	B uint8
 }
 
+// 键盘背光在原厂服务里的量程。
+//
+// 真机实测：亮度只有 1 到 5 档，写 0 或超出上限都会被服务钳回上限，
+// 因此这里用档位而不是百分比描述亮度。
+const (
+	// BrightnessMin 是背光最低的一档。
+	BrightnessMin uint64 = 1
+	// BrightnessMax 是背光最高的一档。
+	BrightnessMax uint64 = 5
+)
+
+// 动态灯效的速度量程。
+//
+// 真机实测：服务接受 1 到 9，越界会被钳回上限。
+const (
+	// SpeedMin 是灯效最慢的速度。
+	SpeedMin uint64 = 1
+	// SpeedMax 是灯效最快的速度。
+	SpeedMax uint64 = 9
+)
+
 // RGBConfig 描述背光灯效的完整配置参数。
 type RGBConfig struct {
 	// Effect 指定灯效模式。
 	Effect LightingEffect
-	// Speed 指定动态灯效速度。
+	// Speed 指定动态灯效速度，取值 1 到 9。
 	Speed uint64
-	// Direction 指定灯效流动方向（如 0 或 1）。
+	// Direction 指定灯效流动方向。
+	//
+	// 真机实测：只有波形与切换这两种灯效有方向，其余灯效方向固定；
+	// 因此这个值只对那两种灯效有意义。
 	Direction uint64
-	// Brightness 指定亮度百分比或等级。
+	// Brightness 指定背光档位，取值 1 到 5。
 	Brightness uint64
 	// Zones 包含各分区颜色（支持 4 分区）。
 	Zones [4]RGBColor
@@ -154,6 +178,14 @@ type RGBConfig struct {
 	ColourReadable bool
 	// EffectReadable 标识灯效模式是否可读。
 	EffectReadable bool
+}
+
+// HasDirection 判断该灯效是否有流动方向。
+//
+// 真机实测的设备能力表里，只有波形与切换两种灯效带方向，
+// 其余灯效的方向字段是空值。
+func (e LightingEffect) HasDirection() bool {
+	return e == EffectWave || e == EffectSwitch
 }
 
 // LightingEffect 表示背光动画效果类型。

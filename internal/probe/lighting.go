@@ -10,12 +10,16 @@ type LightingLED struct {
 
 // LightingReading 记录从服务获取的原始灯效完整参数。
 type LightingReading struct {
-	LEDs       []LightingLED `json:"LEDs"`
-	Color      string        `json:"color"`
-	Brightness int           `json:"brightness"`
-	Effect     string        `json:"effect"`
-	Speed      int           `json:"speed"`
-	Direction  int           `json:"direction"`
+	LEDs       []LightingLED     `json:"LEDs"`
+	Color      string            `json:"color"`
+	Brightness int               `json:"brightness"`
+	Effect     string            `json:"effect"`
+	Speed      int               `json:"speed"`
+	Direction  int               `json:"direction"`
+	Colortype  int               `json:"colortype"`
+	Device     int               `json:"device"`
+	Duration   int               `json:"duration"`
+	Subindex   map[string]string `json:"subindex"`
 }
 
 // ReadLighting 读取当前的原始键盘灯效参数。
@@ -33,16 +37,25 @@ func ReadLighting(service Service) (LightingReading, error) {
 }
 
 // LightingPayload 构造用于写入原厂服务的灯效字典。
+//
+// 真机实测：服务会把没写的字段清成 null，
+// 所以这里把读到的字段原样写回去，避免丢设置。
 func LightingPayload(reading LightingReading) map[string]any {
 	payload := map[string]any{
 		"brightness": reading.Brightness,
 		"effect":     reading.Effect,
 		"speed":      reading.Speed,
 		"direction":  reading.Direction,
+		"colortype":  reading.Colortype,
+		"device":     reading.Device,
+		"duration":   reading.Duration,
 	}
 
 	if reading.Color != "" {
 		payload["color"] = reading.Color
+	}
+	if len(reading.Subindex) > 0 {
+		payload["subindex"] = reading.Subindex
 	}
 	if len(reading.LEDs) > 0 {
 		leds := make([]any, 0, len(reading.LEDs))

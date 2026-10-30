@@ -25,7 +25,7 @@ func TestSetLightingRemembersTheLighting(t *testing.T) {
 		Effect:     domain.EffectWave,
 		Speed:      5,
 		Direction:  1,
-		Brightness: 80,
+		Brightness: 4,
 		PerZone:    true,
 	}
 	lighting.Zones[0] = domain.RGBColor{R: 199, G: 0, B: 135}
@@ -45,8 +45,8 @@ func TestSetLightingRemembersTheLighting(t *testing.T) {
 	if stored.Effect != uint64(domain.EffectWave) {
 		t.Errorf("the stored effect is %d, want %d", stored.Effect, domain.EffectWave)
 	}
-	if stored.Brightness != 80 {
-		t.Errorf("the stored brightness is %d, want 80", stored.Brightness)
+	if stored.Brightness != 4 {
+		t.Errorf("the stored brightness is %d, want 4", stored.Brightness)
 	}
 	if stored.Zones[0] != (config.LightingColor{R: 199, G: 0, B: 135}) {
 		t.Errorf("the stored first zone is %+v, want the magenta", stored.Zones[0])
@@ -72,8 +72,8 @@ func TestSetLightingLimitsTheStoredValues(t *testing.T) {
 	if stored.Direction != 1 {
 		t.Errorf("the stored direction is %d, want 1", stored.Direction)
 	}
-	if stored.Brightness != 100 {
-		t.Errorf("the stored brightness is %d, want 100", stored.Brightness)
+	if stored.Brightness != 5 {
+		t.Errorf("the stored brightness is %d, want 5", stored.Brightness)
 	}
 }
 
@@ -91,11 +91,11 @@ func TestResetLightingWritesWhiteAndRemembersIt(t *testing.T) {
 	if written.Effect != domain.EffectStatic {
 		t.Errorf("the written effect is %d, want the static one", written.Effect)
 	}
-	if written.Brightness != 100 {
-		t.Errorf("the written brightness is %d, want 100", written.Brightness)
+	if written.Brightness != 5 {
+		t.Errorf("the written brightness is %d, want 5", written.Brightness)
 	}
-	if !written.PerZone {
-		t.Error("the written lighting does not carry the zones on their own")
+	if written.PerZone {
+		t.Error("the written lighting carries the zones on their own")
 	}
 	for i, colour := range written.Zones {
 		if colour != (domain.RGBColor{R: 255, G: 255, B: 255}) {
@@ -104,8 +104,8 @@ func TestResetLightingWritesWhiteAndRemembersIt(t *testing.T) {
 	}
 
 	stored := application.store.Settings().Lighting
-	if stored.Brightness != 100 {
-		t.Errorf("the stored brightness is %d, want 100", stored.Brightness)
+	if stored.Brightness != 5 {
+		t.Errorf("the stored brightness is %d, want 5", stored.Brightness)
 	}
 	if stored.Zones[0] != (config.LightingColor{R: 255, G: 255, B: 255}) {
 		t.Errorf("the stored first zone is %+v, want white", stored.Zones[0])
@@ -241,7 +241,7 @@ func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
 		GPUPercent: 40,
 		CoolBoost:  true,
 	}
-	machine.brightness = 80
+	machine.brightness = 4
 
 	if err := application.SaveScenario("game"); err != nil {
 		t.Fatal(err)
@@ -254,8 +254,8 @@ func TestSaveScenarioTakesTheStateOfTheMachine(t *testing.T) {
 	if scenario.Fans.CPUPercent != 70 {
 		t.Errorf("the scene holds the duty cycle %d, want 70", scenario.Fans.CPUPercent)
 	}
-	if scenario.Lighting.Brightness != 80 {
-		t.Errorf("the scene holds the brightness %d, want 80", scenario.Lighting.Brightness)
+	if scenario.Lighting.Brightness != 4 {
+		t.Errorf("the scene holds the brightness %d, want 4", scenario.Lighting.Brightness)
 	}
 }
 
@@ -264,15 +264,15 @@ func TestSaveScenarioKeepsTheBrightnessOfTheSettings(t *testing.T) {
 	application, machine := newTestAppWith(t)
 	machine.brightness = 0
 	application.store.Update(func(s *config.Settings) {
-		s.Lighting.Brightness = 65
+		s.Lighting.Brightness = 3
 	})
 
 	if err := application.SaveScenario("game"); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := application.Scenarios()["game"].Lighting.Brightness; got != 65 {
-		t.Errorf("the scene holds the brightness %d, want 65", got)
+	if got := application.Scenarios()["game"].Lighting.Brightness; got != 3 {
+		t.Errorf("the scene holds the brightness %d, want 3", got)
 	}
 }
 

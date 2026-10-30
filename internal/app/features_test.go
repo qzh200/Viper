@@ -213,8 +213,8 @@ func TestTheLightingThatIsWrittenIsTheLightingThatIsStored(t *testing.T) {
 	if written.Direction != 1 {
 		t.Errorf("the written direction is %d, want 1", written.Direction)
 	}
-	if written.Brightness != 100 {
-		t.Errorf("the written brightness is %d, want 100", written.Brightness)
+	if written.Brightness != 5 {
+		t.Errorf("the written brightness is %d, want 5", written.Brightness)
 	}
 
 	stored := application.store.Settings().Lighting

@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
+	"viper/internal/domain"
 	"viper/internal/gui/model"
 	"viper/internal/gui/theme"
 	"viper/internal/gui/widgets"
@@ -289,5 +290,36 @@ func TestTheLevelColorFollowsTheLevel(t *testing.T) {
 		if !tt.HasText(want) {
 			t.Errorf("there is no %q in %q", want, tt.Texts())
 		}
+	}
+}
+
+func TestColorWheelWidget(t *testing.T) {
+	changedHue := 0.0
+	changedSat := 0.0
+	tt := ui.NewTester(func(c *ui.Context) {
+		widgets.ColorWheel(c, widgets.ColorWheelSpec{
+			Size:       140,
+			Hue:        180,
+			Saturation: 0.8,
+			Color:      domain.RGBColor{R: 0, G: 174, B: 243},
+			OnChange: func(h, s float64) {
+				changedHue = h
+				changedSat = s
+			},
+		})
+	}, 200, 200)
+
+	tt.Frame()
+	if tt.Image() == nil {
+		t.Error("expected color wheel image to be rendered")
+	}
+
+	// 模拟点击与按住拖动色轮
+	tt.Press(100, 70)
+	tt.Move(110, 70)
+	tt.Release(110, 70)
+
+	if changedHue == 0.0 && changedSat == 0.0 {
+		t.Error("expected OnChange to be called on pointer press/drag")
 	}
 }
