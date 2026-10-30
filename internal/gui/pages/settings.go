@@ -239,24 +239,15 @@ func servicesSection(c *ui.Context, overview model.Overview) {
 func aboutSection(c *ui.Context) {
 	t := c.Theme()
 
-	widgets.Card(c, "关于 Viper 控制中心", func() {
-		ui.Column(c).Gap(10).Children(func() {
-			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-				widgets.IconBadge(c, widgets.IconDisplay, t.Accent, 36)
-				ui.Column(c).Gap(2).Children(func() {
-					ui.Row(c).Gap(8).AlignItems(ui.Baseline).Children(func() {
-						ui.Text(c, "Viper 控制中心").FontSize(15).Bold().TextColor(t.Text)
-						ui.Text(c, "v1.0.0 Release").FontSize(11).TextColor(t.Accent)
-					})
-					ui.Text(c, "宏碁 Predator (掠夺者) 与 Nitro (暗影骑士) 专属轻量硬件调控工具套件").FontSize(11).TextColor(t.TextMuted)
+	widgets.Card(c, "关于", func() {
+		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
+			widgets.IconBadge(c, widgets.IconDisplay, t.Accent, 32)
+			ui.Column(c).Gap(2).Children(func() {
+				ui.Row(c).Gap(8).AlignItems(ui.Baseline).Children(func() {
+					ui.Text(c, "Viper 控制中心").FontSize(14).Bold().TextColor(t.Text)
+					ui.Text(c, "v1.0.0").FontSize(11).TextColor(t.TextMuted)
 				})
-			})
-
-			ui.Row(c).Gap(8).Children(func() {
-				widgets.Pill(c, "纯 Go 原生实现 (0 Chromium 依赖)", t.Accent)
-				widgets.Pill(c, "MyGo GPU 硬件加速绘制", widgets.ColorGPU)
-				widgets.Pill(c, "极低内存占用 (<35MB)", widgets.ColorMemory)
-				widgets.Pill(c, "Windows 10/11 x64", widgets.ColorCPU)
+				ui.Text(c, "轻量原生宏碁游戏本控制套件 · 纯 Go 自绘").FontSize(11).TextColor(t.TextMuted)
 			})
 		})
 	})

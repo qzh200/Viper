@@ -41,7 +41,7 @@ func TestSettingsPageShowsReadingsAndControls(t *testing.T) {
 		"AcerAgentService",
 		"TCP 127.0.0.1:46933",
 		"config.json (原子写保护)",
-		"关于 Viper 控制中心",
+		"关于",
 		"Viper 控制中心",
 	} {
 		if !tt.HasText(want) {
