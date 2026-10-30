@@ -146,6 +146,21 @@ func TestAnotherPageShowsThatItIsNotThereYet(t *testing.T) {
 	ctrl := controller.New(&guitest.Hardware{}, &guitest.Store{})
 	defer ctrl.Stop()
 
+	window := shell.New(ctrl, shell.WithApply(func(theme.Mode) {}), shell.WithPage("unknown"))
+
+	tt := ui.NewTester(func(c *ui.Context) {
+		window.View(c)
+	}, 1120, 720)
+
+	if !tt.HasText("这一页还在路上") {
+		t.Errorf("the window has no %q in %q", "这一页还在路上", tt.Texts())
+	}
+}
+
+func TestNavigatingToSettingsPage(t *testing.T) {
+	ctrl := controller.New(&guitest.Hardware{}, &guitest.Store{})
+	defer ctrl.Stop()
+
 	window := shell.New(ctrl, shell.WithApply(func(theme.Mode) {}))
 
 	tt := ui.NewTester(func(c *ui.Context) {
@@ -155,8 +170,8 @@ func TestAnotherPageShowsThatItIsNotThereYet(t *testing.T) {
 	if err := tt.Click("设置"); err != nil {
 		t.Fatal(err)
 	}
-	if !tt.HasText("这一页还在路上") {
-		t.Errorf("the window has no %q in %q", "这一页还在路上", tt.Texts())
+	if !tt.HasText("系统与控制中心设置") {
+		t.Errorf("the window has no settings page title in %q", tt.Texts())
 	}
 }
 

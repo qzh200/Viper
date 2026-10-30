@@ -234,33 +234,39 @@ func gamingSwitchesCard(c *ui.Context, ctrl *controller.Controller, overview mod
 		ui.Column(c).Gap(12).Children(func() {
 			// 1. LCD 响应时间超速加速 (Overdrive)
 			lcdOverdrive := overview.LCDOverdrive
-			ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
-				Background(t.Background).Border(1, t.Border).Children(func() {
+			rowLCD := ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
+				Background(t.Background).Border(1, t.Border).Cursor(ui.CursorPointer).Children(func() {
 				widgets.IconBadge(c, widgets.IconDisplay, t.Accent, 32)
 				ui.Column(c).Gap(2).Grow(1).Children(func() {
 					ui.Text(c, "LCD 响应时间超速 (Overdrive)").FontSize(13).Bold().TextColor(t.Text)
 					ui.Text(c, "液晶面板加速至 3ms 响应，显著抑制高速竞技画面拖影").FontSize(11).TextColor(t.TextMuted)
 				})
-				sw := ui.Switch(c, &lcdOverdrive)
+				sw := ui.Switch(c, &lcdOverdrive).Label("LCD 响应时间超速 (Overdrive)")
 				if sw.Changed() {
 					ctrl.SetLCDOverdrive(lcdOverdrive, nil)
 				}
 			})
+			if rowLCD.Clicked() {
+				ctrl.SetLCDOverdrive(!lcdOverdrive, nil)
+			}
 
 			// 2. CoolBoost 强冷散热加速
 			coolBoost := overview.FanState.CoolBoost
-			ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
-				Background(t.Background).Border(1, t.Border).Children(func() {
+			rowCool := ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
+				Background(t.Background).Border(1, t.Border).Cursor(ui.CursorPointer).Children(func() {
 				widgets.IconBadge(c, widgets.IconFan, widgets.ColorBoard, 32)
 				ui.Column(c).Gap(2).Grow(1).Children(func() {
 					ui.Text(c, "CoolBoost 强冷加速").FontSize(13).Bold().TextColor(t.Text)
 					ui.Text(c, "激进提升双 AeroBlade 风扇进风量，保障满载不降频").FontSize(11).TextColor(t.TextMuted)
 				})
-				sw := ui.Switch(c, &coolBoost)
+				sw := ui.Switch(c, &coolBoost).Label("CoolBoost 强冷加速")
 				if sw.Changed() {
 					ctrl.SetCoolBoost(coolBoost, nil)
 				}
 			})
+			if rowCool.Clicked() {
+				ctrl.SetCoolBoost(!coolBoost, nil)
+			}
 		})
 	})
 }

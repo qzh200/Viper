@@ -62,6 +62,10 @@ type Hardware interface {
 	WinKeyLocked() (bool, error)
 	// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
 	SetWinKeyLocked(locked bool) error
+	// BootSound 查询开机启动音效是否开启。
+	BootSound() (bool, error)
+	// SetBootSound 设置开机启动音效开关。
+	SetBootSound(enabled bool) error
 }
 
 // AppearanceStore 保存界面的外观模式。config.Store 满足这个接口。
@@ -230,6 +234,10 @@ func (c *Controller) read() (model.Overview, *domain.MonitorData, string) {
 
 	if winLocked, err := c.hw.WinKeyLocked(); err == nil {
 		overview.WinKeyLocked = winLocked
+	}
+
+	if bootSound, err := c.hw.BootSound(); err == nil {
+		overview.BootSound = bootSound
 	}
 
 	monitor, err := c.hw.Monitor()
@@ -524,6 +532,11 @@ func (c *Controller) SetLCDOverdrive(enabled bool, onError func(error)) bool {
 // SetWinKeyLocked 排队设置 Windows 徽标键锁定开关。
 func (c *Controller) SetWinKeyLocked(locked bool, onError func(error)) bool {
 	return c.enqueue(func() error { return c.hw.SetWinKeyLocked(locked) }, onError)
+}
+
+// SetBootSound 排队设置开机启动音效开关。
+func (c *Controller) SetBootSound(enabled bool, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetBootSound(enabled) }, onError)
 }
 
 // enqueue 把一次写入放进队列。

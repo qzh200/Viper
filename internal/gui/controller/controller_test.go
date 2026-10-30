@@ -526,6 +526,15 @@ func TestPerformanceSwitchesAndGPUMode(t *testing.T) {
 		t.Errorf("expected WinKeyLocked true, got %v", machine.WinKeyLockedWrites)
 	}
 
+	// 4. 测试开机音效开关
+	if !ctrl.SetBootSound(true, nil) {
+		t.Fatal("SetBootSound failed to enqueue")
+	}
+	ctrl.Work()
+	if len(machine.BootSoundWrites) != 1 || !machine.BootSoundWrites[0] {
+		t.Errorf("expected BootSound true, got %v", machine.BootSoundWrites)
+	}
+
 	// 快照核验
 	snap := ctrl.Snapshot()
 	if snap.GPUMode != domain.GPUModeDiscrete {
@@ -536,5 +545,8 @@ func TestPerformanceSwitchesAndGPUMode(t *testing.T) {
 	}
 	if !snap.WinKeyLocked {
 		t.Error("expected snapshot WinKeyLocked true")
+	}
+	if !snap.BootSound {
+		t.Error("expected snapshot BootSound true")
 	}
 }

@@ -33,6 +33,8 @@ type Hardware struct {
 	LCDOverdriveState bool
 	// WinKeyLockedState 标记 Win 键是否被锁定。
 	WinKeyLockedState bool
+	// BootSoundState 标记开机音效是否开启。
+	BootSoundState bool
 	// InstanceName 是后端驱动实例的名字。
 	InstanceName string
 	// RouteName 是连接通道的名字。
@@ -60,6 +62,8 @@ type Hardware struct {
 	LCDOverdriveWrites []bool
 	// WinKeyLockedWrites 记下每次写入了什么 Win 键锁定设置。
 	WinKeyLockedWrites []bool
+	// BootSoundWrites 记下每次写入了什么开机音效设置。
+	BootSoundWrites []bool
 }
 
 // Interface 返回这个替身，让它可以被塞进控制器。
@@ -239,6 +243,24 @@ func (h *Hardware) SetWinKeyLocked(locked bool) error {
 	}
 	h.WinKeyLockedWrites = append(h.WinKeyLockedWrites, locked)
 	h.WinKeyLockedState = locked
+	return nil
+}
+
+// BootSound 查询开机启动音效是否开启。
+func (h *Hardware) BootSound() (bool, error) {
+	if h.Err != nil {
+		return false, h.Err
+	}
+	return h.BootSoundState, nil
+}
+
+// SetBootSound 设置开机启动音效开关并记下来。
+func (h *Hardware) SetBootSound(enabled bool) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.BootSoundWrites = append(h.BootSoundWrites, enabled)
+	h.BootSoundState = enabled
 	return nil
 }
 

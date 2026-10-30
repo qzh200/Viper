@@ -93,6 +93,8 @@ type Overview struct {
 	LCDOverdrive bool
 	// WinKeyLocked 标记 Windows 徽标键是否处于禁用锁定状态。
 	WinKeyLocked bool
+	// BootSound 标记开机自检问候音效是否开启。
+	BootSound bool
 	// Metrics 是首页展示的指标。
 	Metrics []Metric
 	// Monitor 是这次读到的整机遥测，界面要用那些没变成指标的数字。

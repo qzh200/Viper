@@ -230,6 +230,8 @@ func (s *Shell) content(c *ui.Context) {
 		pages.Lighting(c, s.ctrl, s.state)
 	case "power":
 		pages.Power(c, s.ctrl, s.state)
+	case "settings":
+		pages.Settings(c, s.ctrl, s.state, s.apply)
 	default:
 		widgets.Note(c, "这一页还在路上。")
 	}

@@ -115,6 +115,39 @@ func TestPowerPageSwitchGPUMode(t *testing.T) {
 	}
 }
 
+func TestPowerPageSwitches(t *testing.T) {
+	machine := &guitest.Hardware{
+		LCDOverdriveState: false,
+		FansState: domain.FanState{
+			CoolBoost: false,
+		},
+	}
+	ctrl := controller.New(machine, &guitest.Store{})
+	state := pages.NewState()
+
+	tt := ui.NewTester(func(c *ui.Context) {
+		pages.Power(c, ctrl, state)
+	}, 980, 680)
+
+	// 点击 LCD Overdrive
+	if err := tt.Click("LCD 响应时间超速 (Overdrive)"); err != nil {
+		t.Fatal(err)
+	}
+	ctrl.Work()
+	if len(machine.LCDOverdriveWrites) != 1 || !machine.LCDOverdriveWrites[0] {
+		t.Errorf("expected LCDOverdriveWrites true, got %v", machine.LCDOverdriveWrites)
+	}
+
+	// 点击 CoolBoost 强冷
+	if err := tt.Click("CoolBoost 强冷加速"); err != nil {
+		t.Fatal(err)
+	}
+	ctrl.Work()
+	if len(machine.CoolBoostWrites) != 1 || !machine.CoolBoostWrites[0] {
+		t.Errorf("expected CoolBoostWrites true, got %v", machine.CoolBoostWrites)
+	}
+}
+
 func TestPowerPageErrorNote(t *testing.T) {
 	machine := &guitest.Hardware{
 		Err: errors.New("原厂驱动异常"),
