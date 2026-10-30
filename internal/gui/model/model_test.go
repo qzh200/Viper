@@ -361,3 +361,58 @@ func TestLightingEffectHelpers(t *testing.T) {
 	}
 	_ = hBlack
 }
+
+func TestPerformanceModelHelpers(t *testing.T) {
+	modes := []domain.PowerMode{
+		domain.PowerQuiet,
+		domain.PowerBalanced,
+		domain.PowerPerformance,
+		domain.PowerTurbo,
+		domain.PowerEco,
+		domain.PowerUnknown,
+	}
+	for _, m := range modes {
+		if desc := PowerModeDesc(m); desc == "" {
+			t.Errorf("expected description for power mode %v", m)
+		}
+	}
+
+	if len(GPUModeLabels()) != 3 {
+		t.Errorf("expected 3 gpu mode labels, got %d", len(GPUModeLabels()))
+	}
+	if FormatGPUMode(domain.GPUModeDiscrete) != "独显直连" {
+		t.Errorf("expected '独显直连', got %s", FormatGPUMode(domain.GPUModeDiscrete))
+	}
+	if FormatGPUMode(domain.GPUModeAuto) != "自动切换" {
+		t.Errorf("expected '自动切换', got %s", FormatGPUMode(domain.GPUModeAuto))
+	}
+	if FormatGPUMode(domain.GPUModeHybrid) != "混合输出" {
+		t.Errorf("expected '混合输出', got %s", FormatGPUMode(domain.GPUModeHybrid))
+	}
+
+	if GPUModeIndex(domain.GPUModeDiscrete) != 1 {
+		t.Errorf("expected index 1 for Discrete, got %d", GPUModeIndex(domain.GPUModeDiscrete))
+	}
+	if GPUModeIndex(domain.GPUModeAuto) != 2 {
+		t.Errorf("expected index 2 for Auto, got %d", GPUModeIndex(domain.GPUModeAuto))
+	}
+	if GPUModeIndex(domain.GPUModeHybrid) != 0 {
+		t.Errorf("expected index 0 for Hybrid, got %d", GPUModeIndex(domain.GPUModeHybrid))
+	}
+
+	if GPUModeFromIndex(1) != domain.GPUModeDiscrete {
+		t.Errorf("expected Discrete from index 1, got %v", GPUModeFromIndex(1))
+	}
+	if GPUModeFromIndex(2) != domain.GPUModeAuto {
+		t.Errorf("expected Auto from index 2, got %v", GPUModeFromIndex(2))
+	}
+	if GPUModeFromIndex(0) != domain.GPUModeHybrid {
+		t.Errorf("expected Hybrid from index 0, got %v", GPUModeFromIndex(0))
+	}
+
+	for _, gm := range []domain.GPUMode{domain.GPUModeHybrid, domain.GPUModeDiscrete, domain.GPUModeAuto} {
+		if desc := GPUModeDesc(gm); desc == "" {
+			t.Errorf("expected non-empty desc for %v", gm)
+		}
+	}
+}

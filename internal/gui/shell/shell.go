@@ -228,6 +228,8 @@ func (s *Shell) content(c *ui.Context) {
 		pages.Fans(c, s.ctrl, s.state)
 	case "lighting":
 		pages.Lighting(c, s.ctrl, s.state)
+	case "power":
+		pages.Power(c, s.ctrl, s.state)
 	default:
 		widgets.Note(c, "这一页还在路上。")
 	}

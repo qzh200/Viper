@@ -48,6 +48,20 @@ type Hardware interface {
 	BacklightTimeout() (bool, error)
 	// SetBacklightTimeout 设置键盘背光自动熄灭。
 	SetBacklightTimeout(enabled bool) error
+	// GPUMode 查询当前的显卡工作模式。
+	GPUMode() (domain.GPUMode, error)
+	// SetGPUMode 切换显卡模式（混合/独显直连/自动）。
+	SetGPUMode(mode domain.GPUMode) error
+	// DiscreteGPU 查询当前是否工作在纯独显直连模式。
+	DiscreteGPU() (bool, error)
+	// LCDOverdrive 查询屏幕响应时间超速加速功能是否开启。
+	LCDOverdrive() (bool, error)
+	// SetLCDOverdrive 设置屏幕 LCD Overdrive 响应时间加速开关。
+	SetLCDOverdrive(enabled bool) error
+	// WinKeyLocked 查询 Windows 徽标键是否处于锁定禁用状态。
+	WinKeyLocked() (bool, error)
+	// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
+	SetWinKeyLocked(locked bool) error
 }
 
 // AppearanceStore 保存界面的外观模式。config.Store 满足这个接口。
@@ -83,19 +97,19 @@ type Controller struct {
 	// smoothing 标记是否启用平滑缓动（后台运行时启用）。
 	smoothing bool
 
-	fanTimerMu sync.Mutex
-	fanTimer   *time.Timer
-	fanMu      sync.Mutex
-	pendingFan *domain.FanConfig
+	fanTimerMu    sync.Mutex
+	fanTimer      *time.Timer
+	fanMu         sync.Mutex
+	pendingFan    *domain.FanConfig
 	pendingFanErr func(error)
-	fanInFlight bool
+	fanInFlight   bool
 
-	lightTimerMu sync.Mutex
-	lightTimer   *time.Timer
-	lightMu      sync.Mutex
-	pendingLight *domain.RGBConfig
+	lightTimerMu    sync.Mutex
+	lightTimer      *time.Timer
+	lightMu         sync.Mutex
+	pendingLight    *domain.RGBConfig
 	pendingLightErr func(error)
-	lightInFlight bool
+	lightInFlight   bool
 
 	actions chan action
 	stop    chan struct{}
@@ -200,6 +214,22 @@ func (c *Controller) read() (model.Overview, *domain.MonitorData, string) {
 
 	if timeout, err := c.hw.BacklightTimeout(); err == nil {
 		overview.BacklightTimeout = timeout
+	}
+
+	if gpuMode, err := c.hw.GPUMode(); err == nil {
+		overview.GPUMode = gpuMode
+	}
+
+	if discrete, err := c.hw.DiscreteGPU(); err == nil {
+		overview.DiscreteGPU = discrete
+	}
+
+	if overdrive, err := c.hw.LCDOverdrive(); err == nil {
+		overview.LCDOverdrive = overdrive
+	}
+
+	if winLocked, err := c.hw.WinKeyLocked(); err == nil {
+		overview.WinKeyLocked = winLocked
 	}
 
 	monitor, err := c.hw.Monitor()
@@ -479,6 +509,21 @@ func (c *Controller) ResetLighting(onError func(error)) bool {
 // SetBacklightTimeout 排队设置键盘背光 30 秒超时自动休眠。
 func (c *Controller) SetBacklightTimeout(enabled bool, onError func(error)) bool {
 	return c.enqueue(func() error { return c.hw.SetBacklightTimeout(enabled) }, onError)
+}
+
+// SetGPUMode 排队切换显卡模式（混合/独显直连/自动）。
+func (c *Controller) SetGPUMode(mode domain.GPUMode, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetGPUMode(mode) }, onError)
+}
+
+// SetLCDOverdrive 排队设置屏幕响应时间超速加速开关。
+func (c *Controller) SetLCDOverdrive(enabled bool, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetLCDOverdrive(enabled) }, onError)
+}
+
+// SetWinKeyLocked 排队设置 Windows 徽标键锁定开关。
+func (c *Controller) SetWinKeyLocked(locked bool, onError func(error)) bool {
+	return c.enqueue(func() error { return c.hw.SetWinKeyLocked(locked) }, onError)
 }
 
 // enqueue 把一次写入放进队列。

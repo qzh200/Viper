@@ -25,6 +25,14 @@ type Hardware struct {
 	LightingConfig domain.RGBConfig
 	// BacklightTimeoutState 是键盘背光 30 秒休眠开关。
 	BacklightTimeoutState bool
+	// GPUModeState 是机器当前的显卡工作模式。
+	GPUModeState domain.GPUMode
+	// DiscreteGPUState 标记是否处于独显直连。
+	DiscreteGPUState bool
+	// LCDOverdriveState 标记是否开启屏幕超速。
+	LCDOverdriveState bool
+	// WinKeyLockedState 标记 Win 键是否被锁定。
+	WinKeyLockedState bool
 	// InstanceName 是后端驱动实例的名字。
 	InstanceName string
 	// RouteName 是连接通道的名字。
@@ -46,6 +54,12 @@ type Hardware struct {
 	ResetLightCalls int
 	// TimeoutWrites 记下每次写入了什么背光超时设置。
 	TimeoutWrites []bool
+	// GPUModeWrites 记下每次写入了什么显卡模式。
+	GPUModeWrites []domain.GPUMode
+	// LCDOverdriveWrites 记下每次写入了什么屏幕超速设置。
+	LCDOverdriveWrites []bool
+	// WinKeyLockedWrites 记下每次写入了什么 Win 键锁定设置。
+	WinKeyLockedWrites []bool
 }
 
 // Interface 返回这个替身，让它可以被塞进控制器。
@@ -163,6 +177,68 @@ func (h *Hardware) SetBacklightTimeout(enabled bool) error {
 	}
 	h.TimeoutWrites = append(h.TimeoutWrites, enabled)
 	h.BacklightTimeoutState = enabled
+	return nil
+}
+
+// GPUMode 查询当前的显卡工作模式。
+func (h *Hardware) GPUMode() (domain.GPUMode, error) {
+	if h.Err != nil {
+		return domain.GPUModeHybrid, h.Err
+	}
+	return h.GPUModeState, nil
+}
+
+// SetGPUMode 切换显卡模式并记下来。
+func (h *Hardware) SetGPUMode(mode domain.GPUMode) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.GPUModeWrites = append(h.GPUModeWrites, mode)
+	h.GPUModeState = mode
+	return nil
+}
+
+// DiscreteGPU 查询当前是否工作在纯独显直连模式。
+func (h *Hardware) DiscreteGPU() (bool, error) {
+	if h.Err != nil {
+		return false, h.Err
+	}
+	return h.DiscreteGPUState, nil
+}
+
+// LCDOverdrive 查询屏幕响应时间超速加速功能是否开启。
+func (h *Hardware) LCDOverdrive() (bool, error) {
+	if h.Err != nil {
+		return false, h.Err
+	}
+	return h.LCDOverdriveState, nil
+}
+
+// SetLCDOverdrive 设置屏幕 LCD Overdrive 响应时间加速开关。
+func (h *Hardware) SetLCDOverdrive(enabled bool) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.LCDOverdriveWrites = append(h.LCDOverdriveWrites, enabled)
+	h.LCDOverdriveState = enabled
+	return nil
+}
+
+// WinKeyLocked 查询 Windows 徽标键是否处于锁定禁用状态。
+func (h *Hardware) WinKeyLocked() (bool, error) {
+	if h.Err != nil {
+		return false, h.Err
+	}
+	return h.WinKeyLockedState, nil
+}
+
+// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
+func (h *Hardware) SetWinKeyLocked(locked bool) error {
+	if h.SetErr != nil {
+		return h.SetErr
+	}
+	h.WinKeyLockedWrites = append(h.WinKeyLockedWrites, locked)
+	h.WinKeyLockedState = locked
 	return nil
 }
 

@@ -488,3 +488,53 @@ func TestFailureCallbacks(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedErr, gotFanErr)
 	}
 }
+
+func TestPerformanceSwitchesAndGPUMode(t *testing.T) {
+	machine := &guitest.Hardware{
+		GPUModeState:      domain.GPUModeHybrid,
+		DiscreteGPUState:  false,
+		LCDOverdriveState: false,
+		WinKeyLockedState: false,
+	}
+	ctrl := controller.New(machine, &guitest.Store{})
+	defer ctrl.Stop()
+
+	// 1. 测试显卡模式切换
+	if !ctrl.SetGPUMode(domain.GPUModeDiscrete, nil) {
+		t.Fatal("SetGPUMode failed to enqueue")
+	}
+	ctrl.Work()
+	if len(machine.GPUModeWrites) != 1 || machine.GPUModeWrites[0] != domain.GPUModeDiscrete {
+		t.Errorf("expected GPUModeDiscrete write, got %v", machine.GPUModeWrites)
+	}
+
+	// 2. 测试 LCD 超频开关
+	if !ctrl.SetLCDOverdrive(true, nil) {
+		t.Fatal("SetLCDOverdrive failed to enqueue")
+	}
+	ctrl.Work()
+	if len(machine.LCDOverdriveWrites) != 1 || !machine.LCDOverdriveWrites[0] {
+		t.Errorf("expected LCDOverdrive true, got %v", machine.LCDOverdriveWrites)
+	}
+
+	// 3. 测试 Win 键锁定开关
+	if !ctrl.SetWinKeyLocked(true, nil) {
+		t.Fatal("SetWinKeyLocked failed to enqueue")
+	}
+	ctrl.Work()
+	if len(machine.WinKeyLockedWrites) != 1 || !machine.WinKeyLockedWrites[0] {
+		t.Errorf("expected WinKeyLocked true, got %v", machine.WinKeyLockedWrites)
+	}
+
+	// 快照核验
+	snap := ctrl.Snapshot()
+	if snap.GPUMode != domain.GPUModeDiscrete {
+		t.Errorf("expected snapshot GPUMode discrete, got %v", snap.GPUMode)
+	}
+	if !snap.LCDOverdrive {
+		t.Error("expected snapshot LCDOverdrive true")
+	}
+	if !snap.WinKeyLocked {
+		t.Error("expected snapshot WinKeyLocked true")
+	}
+}

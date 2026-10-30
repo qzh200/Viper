@@ -14,6 +14,8 @@ import (
 type State struct {
 	// PowerIndex 是用户刚点中的性能档位下标；-1 表示没有待确认的选择。
 	PowerIndex int
+	// GPUModeIndex 是用户刚点中的显卡工作模式下标；-1 表示没有待确认的选择。
+	GPUModeIndex int
 	// FanModeIndex 是用户刚点中的风扇模式下标；-1 表示没有待确认的选择。
 	FanModeIndex int
 	// CPUDuty 是自定义模式下 CPU 风扇的目标占空比（0~100）。
@@ -67,6 +69,7 @@ type State struct {
 func NewState() *State {
 	return &State{
 		PowerIndex:         -1,
+		GPUModeIndex:       -1,
 		FanModeIndex:       -1,
 		CPUDuty:            50,
 		GPUDuty:            50,

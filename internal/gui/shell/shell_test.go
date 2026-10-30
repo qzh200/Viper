@@ -152,7 +152,7 @@ func TestAnotherPageShowsThatItIsNotThereYet(t *testing.T) {
 		window.View(c)
 	}, 1120, 720)
 
-	if err := tt.Click("性能"); err != nil {
+	if err := tt.Click("设置"); err != nil {
 		t.Fatal(err)
 	}
 	if !tt.HasText("这一页还在路上") {
@@ -193,6 +193,13 @@ func TestNavigatingToFansPage(t *testing.T) {
 	}
 	if !tt.HasText("风扇与散热控制") {
 		t.Errorf("the window has no fans page title in %q", tt.Texts())
+	}
+
+	if err := tt.Click("性能"); err != nil {
+		t.Fatal(err)
+	}
+	if !tt.HasText("性能与功耗调控") {
+		t.Errorf("the window has no power page title in %q", tt.Texts())
 	}
 }
 

@@ -85,6 +85,14 @@ type Overview struct {
 	Lighting domain.RGBConfig
 	// BacklightTimeout 表示背光是否在 30 秒空闲时自动熄灭。
 	BacklightTimeout bool
+	// GPUMode 是当前生效的显卡工作模式。
+	GPUMode domain.GPUMode
+	// DiscreteGPU 标记当前是否处于纯独显直连状态。
+	DiscreteGPU bool
+	// LCDOverdrive 标记屏幕响应时间超速加速是否开启。
+	LCDOverdrive bool
+	// WinKeyLocked 标记 Windows 徽标键是否处于禁用锁定状态。
+	WinKeyLocked bool
 	// Metrics 是首页展示的指标。
 	Metrics []Metric
 	// Monitor 是这次读到的整机遥测，界面要用那些没变成指标的数字。
@@ -552,4 +560,75 @@ func LightingEffectCanColor(effect domain.LightingEffect) bool {
 // 静态模式为常亮无动画，其余动态模式均可调速。
 func LightingEffectCanSpeed(effect domain.LightingEffect) bool {
 	return effect != domain.EffectStatic
+}
+
+// PowerModeDesc 返回性能档位的简要特性说明。
+func PowerModeDesc(mode domain.PowerMode) string {
+	switch mode {
+	case domain.PowerQuiet:
+		return "风扇静音运行，严格控制发热，适合图书馆与静音办公"
+	case domain.PowerBalanced:
+		return "日常使用的综合平衡方案，功耗与噪音智能自适应"
+	case domain.PowerPerformance:
+		return "解锁 CPU 与 GPU 功耗释放墙，激进散热保障高帧率"
+	case domain.PowerTurbo:
+		return "满血功耗与满载超频状态，双风扇拉满压制极限热量"
+	case domain.PowerEco:
+		return "最大化电池续航与节能，限制峰值核心频率与功耗"
+	default:
+		return "系统默认性能调校策略"
+	}
+}
+
+// FormatGPUMode 返回显卡工作模式的中文名称。
+func FormatGPUMode(mode domain.GPUMode) string {
+	switch mode {
+	case domain.GPUModeDiscrete:
+		return "独显直连"
+	case domain.GPUModeAuto:
+		return "自动切换"
+	default:
+		return "混合输出"
+	}
+}
+
+// GPUModeLabels 返回显卡模式的选项标签。
+func GPUModeLabels() []string {
+	return []string{"混合输出", "独显直连", "自动切换"}
+}
+
+// GPUModeIndex 返回给定显卡模式在 GPUModeLabels 里的下标。
+func GPUModeIndex(mode domain.GPUMode) int {
+	switch mode {
+	case domain.GPUModeDiscrete:
+		return 1
+	case domain.GPUModeAuto:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// GPUModeFromIndex 将下标还原为 GPUMode。
+func GPUModeFromIndex(index int) domain.GPUMode {
+	switch index {
+	case 1:
+		return domain.GPUModeDiscrete
+	case 2:
+		return domain.GPUModeAuto
+	default:
+		return domain.GPUModeHybrid
+	}
+}
+
+// GPUModeDesc 返回显卡工作模式的说明。
+func GPUModeDesc(mode domain.GPUMode) string {
+	switch mode {
+	case domain.GPUModeDiscrete:
+		return "独显直接连接内屏与外接屏幕，绕过核显减少延迟，电竞游戏帧率更高"
+	case domain.GPUModeAuto:
+		return "由系统与驱动根据运行应用与负载动态智能调度显卡通道"
+	default:
+		return "独显渲染并由核显输出屏幕，日常使用与续航更持久，兼顾能效"
+	}
 }
