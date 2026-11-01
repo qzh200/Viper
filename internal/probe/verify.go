@@ -9,7 +9,6 @@ import (
 	"viper/internal/machine"
 )
 
-// Machine 定义硬件自动化验证所依赖的设备控制接口集合。
 type Machine interface {
 	Instance() string
 
@@ -30,7 +29,6 @@ type Machine interface {
 	SetFans(config domain.FanConfig) error
 }
 
-// StepResult 记录单项功能测试与状态复原的执行结果。
 type StepResult struct {
 	Name       string
 	Skipped    bool
@@ -38,12 +36,10 @@ type StepResult struct {
 	RestoreErr error
 }
 
-// OK 检查测试步骤是否成功应用并成功恢复初始状态。
 func (r StepResult) OK() bool {
 	return r.ApplyErr == nil && r.RestoreErr == nil && !r.Skipped
 }
 
-// Original 保存各项硬件控制功能在测试前的原始状态快照。
 type Original struct {
 	Lighting  domain.RGBConfig
 	Backlight domain.BacklightState
@@ -54,7 +50,6 @@ type Original struct {
 	Fans      domain.FanState
 }
 
-// Verify 执行全套硬件功能的读写校验流程：先备份现有状态，依次触发改动并校验，最后还原初始设定。
 func Verify(device Machine, raw Service) (Original, []StepResult, error) {
 	var original Original
 

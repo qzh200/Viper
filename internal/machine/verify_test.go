@@ -81,7 +81,6 @@ func TestThatALightingThatWasNotAcceptedIsReported(t *testing.T) {
 	service := newFakeService()
 	service.answers[agentservice.FunctionLighting] = answer(
 		map[string]any{"brightness": 3}, agentservice.ResultOK)
-	// 设备一直报 5 档，写下去的 3 档没有生效。
 	service.devices = answer([]any{
 		map[string]any{
 			"device_index":      0,
@@ -120,7 +119,6 @@ func TestThatAColourThatWasNotAcceptedIsReported(t *testing.T) {
 		"speed":      3,
 		"direction":  0,
 	}, agentservice.ResultOK)
-	// 设备亮度与写下去的不一样，核验就该拦下来。
 	service.devices = answer([]any{
 		map[string]any{
 			"device_index":      0,
@@ -158,7 +156,6 @@ func TestThatAnEffectThatWasNotAcceptedIsReported(t *testing.T) {
 		"speed":      3,
 		"direction":  0,
 	}, agentservice.ResultOK)
-	// 设备亮度对得上，但跑的灯效不是波形。
 	service.devices = answer([]any{
 		map[string]any{
 			"device_index":      0,

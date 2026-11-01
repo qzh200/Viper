@@ -7,13 +7,11 @@ import (
 	"viper/internal/domain"
 )
 
-// FanStatus 组合风扇当前硬件状态与 GPU 模式可读性标记。
 type FanStatus struct {
 	domain.FanState
 	GPUModeReadable bool
 }
 
-// Fans 读取当前 CPU 与 GPU 风扇的转速模式与百分比。
 func (a *App) Fans() (FanStatus, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -35,13 +33,11 @@ func (a *App) Fans() (FanStatus, error) {
 	return status, nil
 }
 
-// FanState 返回当前风扇状态，满足 controller.Hardware 接口。
 func (a *App) FanState() (domain.FanState, error) {
 	st, err := a.Fans()
 	return st.FanState, err
 }
 
-// SetFans 应用新的风扇配置并同步持久化到本地配置文件。
 func (a *App) SetFans(fans domain.FanConfig) error {
 	if !knownFanMode(fans.CPUMode) {
 		return fmt.Errorf("app: 处理器风扇的行为 %q 不认识", fans.CPUMode)
@@ -102,7 +98,6 @@ func storedFanMode(mode domain.FanMode) uint64 {
 	}
 }
 
-// SetCoolBoost 开启或关闭 CoolBoost 强冷加速。
 func (a *App) SetCoolBoost(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -119,7 +114,6 @@ func (a *App) SetCoolBoost(enabled bool) error {
 	return nil
 }
 
-// CoolBoost 查询 CoolBoost 强冷是否已开启。
 func (a *App) CoolBoost() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {

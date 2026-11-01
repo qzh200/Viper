@@ -63,7 +63,6 @@ func TestSettingsPageSwitchAppearance(t *testing.T) {
 		})
 	}, 980, 680)
 
-	// 点击“深色模式”
 	if err := tt.Click("深色模式"); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +86,6 @@ func TestSettingsPageBootSoundToggle(t *testing.T) {
 		pages.Settings(c, ctrl, state, nil)
 	}, 980, 680)
 
-	// 点击开机音效开关
 	if err := tt.Click("开机专属问候音效 (Boot Sound)"); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +107,6 @@ func TestSettingsPageBacklightTimeoutToggle(t *testing.T) {
 		pages.Settings(c, ctrl, state, nil)
 	}, 980, 680)
 
-	// 点击背光休眠开关
 	if err := tt.Click("键盘背光 30 秒空闲自动休眠"); err != nil {
 		t.Fatal(err)
 	}

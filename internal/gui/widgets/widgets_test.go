@@ -314,7 +314,6 @@ func TestColorWheelWidget(t *testing.T) {
 		t.Error("expected color wheel image to be rendered")
 	}
 
-	// 模拟点击与按住拖动色轮
 	tt.Press(100, 70)
 	tt.Move(110, 70)
 	tt.Release(110, 70)

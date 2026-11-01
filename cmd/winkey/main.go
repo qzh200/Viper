@@ -1,4 +1,3 @@
-// winkey 用于向 AcerAgentService 写入并验证 Windows 徽标键锁定的生效时延与行为响应。
 package main
 
 import (

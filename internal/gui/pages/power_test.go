@@ -76,7 +76,6 @@ func TestPowerPageSwitchPowerMode(t *testing.T) {
 		pages.Power(c, ctrl, state)
 	}, 980, 680)
 
-	// 点击“狂暴”
 	if err := tt.Click("狂暴"); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +100,6 @@ func TestPowerPageSwitchGPUMode(t *testing.T) {
 		pages.Power(c, ctrl, state)
 	}, 980, 680)
 
-	// 点击“独显直连”
 	if err := tt.Click("独显直连"); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +127,6 @@ func TestPowerPageSwitches(t *testing.T) {
 		pages.Power(c, ctrl, state)
 	}, 980, 680)
 
-	// 点击 LCD Overdrive
 	if err := tt.Click("LCD 响应时间超速 (Overdrive)"); err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +135,6 @@ func TestPowerPageSwitches(t *testing.T) {
 		t.Errorf("expected LCDOverdriveWrites true, got %v", machine.LCDOverdriveWrites)
 	}
 
-	// 点击 CoolBoost 强冷
 	if err := tt.Click("CoolBoost 强冷加速"); err != nil {
 		t.Fatal(err)
 	}

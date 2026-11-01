@@ -1,4 +1,3 @@
-// Package pages 实现 Viper 界面的各个页面。
 package pages
 
 import (
@@ -10,7 +9,6 @@ import (
 	"viper/internal/gui/widgets"
 )
 
-// Settings 画系统设置与关于页面。
 func Settings(c *ui.Context, ctrl *controller.Controller, state *State, onThemeChange func(theme.Mode)) {
 	overview := ctrl.Snapshot()
 
@@ -21,21 +19,16 @@ func Settings(c *ui.Context, ctrl *controller.Controller, state *State, onThemeC
 			widgets.ErrorNote(c, overview.Error)
 		}
 
-		// 1. 外观模式个性化
 		appearanceSection(c, ctrl, onThemeChange)
 
-		// 2. 原厂硬件特色外设调校
 		hardwareFeaturesSection(c, ctrl, overview)
 
-		// 3. 服务连接与底层驱动诊断
 		servicesSection(c, overview)
 
-		// 4. 关于 Viper 与平台规格
 		aboutSection(c)
 	})
 }
 
-// settingsHero 画设置页面顶部的招牌横幅。
 func settingsHero(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 
@@ -49,7 +42,6 @@ func settingsHero(c *ui.Context, overview model.Overview) {
 				ui.Text(c, "外观主题偏好 · 原厂外设调校 · 服务连接与驱动诊断").FontSize(12).TextColor(t.TextMuted).NoWrap()
 			})
 
-			// 原厂服务状态指示
 			dotCol := t.Danger
 			dotText := "原厂服务未连接"
 			if overview.Connected {
@@ -61,7 +53,6 @@ func settingsHero(c *ui.Context, overview model.Overview) {
 	})
 }
 
-// appearanceSection 画外观与个性化选择卡片。
 func appearanceSection(c *ui.Context, ctrl *controller.Controller, onThemeChange func(theme.Mode)) {
 	t := c.Theme()
 	currentMode := ctrl.ThemeMode()
@@ -131,7 +122,6 @@ func appearanceSection(c *ui.Context, ctrl *controller.Controller, onThemeChange
 				}
 			})
 
-			// 渲染平滑机制说明
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(8, 12).Radius(8).
 				Background(t.Background).Children(func() {
 				widgets.IconElement(c, widgets.IconActivity, 14, t.Accent)
@@ -141,13 +131,11 @@ func appearanceSection(c *ui.Context, ctrl *controller.Controller, onThemeChange
 	})
 }
 
-// hardwareFeaturesSection 画宏碁原厂特色与外设功能开关。
 func hardwareFeaturesSection(c *ui.Context, ctrl *controller.Controller, overview model.Overview) {
 	t := c.Theme()
 
 	widgets.Card(c, "原厂硬件特色调校", func() {
 		ui.Column(c).Gap(12).Children(func() {
-			// 1. 开机启动音效 (Boot Sound)
 			bootSound := overview.BootSound
 			rowBoot := ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
 				Background(t.Background).Border(1, t.Border).Cursor(ui.CursorPointer).Children(func() {
@@ -165,7 +153,6 @@ func hardwareFeaturesSection(c *ui.Context, ctrl *controller.Controller, overvie
 				ctrl.SetBootSound(!bootSound, nil)
 			}
 
-			// 2. 键盘背光 30 秒休眠 (Backlight Sleep Timeout)
 			backlightSleep := overview.BacklightTimeout
 			rowSleep := ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10).Radius(10).
 				Background(t.Background).Border(1, t.Border).Cursor(ui.CursorPointer).Children(func() {
@@ -186,13 +173,11 @@ func hardwareFeaturesSection(c *ui.Context, ctrl *controller.Controller, overvie
 	})
 }
 
-// servicesSection 画底层服务通信与驱动诊断看板。
 func servicesSection(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 
 	widgets.Card(c, "驱动服务与连接状态", func() {
 		ui.Row(c).Gap(12).Children(func() {
-			// 驱动实例
 			instance := overview.Instance
 			if instance == "" {
 				instance = "AcerAgentService (未载入)"
@@ -203,7 +188,6 @@ func servicesSection(c *ui.Context, overview model.Overview) {
 				ui.Text(c, instance).FontSize(13).Bold().TextColor(t.Text).NoWrap()
 			})
 
-			// 通讯通道
 			route := overview.Route
 			if route == "" {
 				route = "TCP 127.0.0.1:46933"
@@ -214,14 +198,12 @@ func servicesSection(c *ui.Context, overview model.Overview) {
 				ui.Text(c, route).FontSize(13).Bold().TextColor(t.Text).NoWrap()
 			})
 
-			// 配置存储
 			ui.Column(c).Grow(1).MinWidth(0).Padding(10).Gap(4).Radius(8).
 				Background(t.Background).Border(1, t.Border).Children(func() {
 				ui.Text(c, "本地配置存储").FontSize(11).TextColor(t.TextMuted)
 				ui.Text(c, "config.json (原子写保护)").FontSize(13).Bold().TextColor(t.Text).NoWrap()
 			})
 
-			// 最近遥测刷新时间
 			timeStr := "—"
 			if !overview.Updated.IsZero() {
 				timeStr = overview.Updated.Format("15:04:05")
@@ -235,7 +217,6 @@ func servicesSection(c *ui.Context, overview model.Overview) {
 	})
 }
 
-// aboutSection 画关于 Viper 的技术规格卡片。
 func aboutSection(c *ui.Context) {
 	t := c.Theme()
 

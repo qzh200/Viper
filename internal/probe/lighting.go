@@ -2,13 +2,11 @@ package probe
 
 import "viper/internal/agentservice"
 
-// LightingLED 表示单个背光分区 LED 的 ID 与 HEX 颜色。
 type LightingLED struct {
 	LEDID int    `json:"LED_id"`
 	Color string `json:"color"`
 }
 
-// LightingReading 记录从服务获取的原始灯效完整参数。
 type LightingReading struct {
 	LEDs       []LightingLED     `json:"LEDs"`
 	Color      string            `json:"color"`
@@ -22,7 +20,6 @@ type LightingReading struct {
 	Subindex   map[string]string `json:"subindex"`
 }
 
-// ReadLighting 读取当前的原始键盘灯效参数。
 func ReadLighting(service Service) (LightingReading, error) {
 	answer, err := service.Get(agentservice.FunctionLighting)
 	if err != nil {
@@ -36,10 +33,6 @@ func ReadLighting(service Service) (LightingReading, error) {
 	return reading, nil
 }
 
-// LightingPayload 构造用于写入原厂服务的灯效字典。
-//
-// 真机实测：服务会把没写的字段清成 null，
-// 所以这里把读到的字段原样写回去，避免丢设置。
 func LightingPayload(reading LightingReading) map[string]any {
 	payload := map[string]any{
 		"brightness": reading.Brightness,
@@ -71,7 +64,6 @@ func LightingPayload(reading LightingReading) map[string]any {
 	return payload
 }
 
-// WriteLighting 向服务下发原始灯效数据。
 func WriteLighting(service Service, reading LightingReading) error {
 	answer, err := service.Set(agentservice.FunctionLighting, LightingPayload(reading))
 	if err != nil {

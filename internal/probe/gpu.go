@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// MonitorValue 从监控原始 JSON 数据中提取指定键的值。
 func MonitorValue(data json.RawMessage, name string) (any, bool) {
 	var document map[string]any
 	if err := json.Unmarshal(data, &document); err != nil {
@@ -15,7 +14,6 @@ func MonitorValue(data json.RawMessage, name string) (any, bool) {
 	return value, ok
 }
 
-// GraphicsLines 过滤并提取原始监控数据中涉及 GPU、时钟与占用的字段文本行。
 func GraphicsLines(data json.RawMessage) []string {
 	var document any
 	if err := json.Unmarshal(data, &document); err != nil {

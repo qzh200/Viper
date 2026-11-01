@@ -1,4 +1,3 @@
-// Package app 协调配置存储、硬件后端及 QuickAccess 服务，提供顶层业务接口。
 package app
 
 import (
@@ -31,7 +30,6 @@ const (
 	routeService = "原厂服务 AcerAgentService"
 )
 
-// App 是 Viper 控制中心的核心应用实例，负责统一组织硬件交互与本地配置管理。
 type App struct {
 	mu sync.Mutex
 
@@ -54,10 +52,8 @@ type App struct {
 
 var serviceAddress string
 
-// SetServiceAddress 设置原厂服务 AcerAgentService 的默认监听地址。
 func SetServiceAddress(address string) { serviceAddress = address }
 
-// New 创建使用默认用户配置的 App 实例。
 func New() (*App, error) {
 	store, err := config.Open()
 	if err != nil {
@@ -66,29 +62,24 @@ func New() (*App, error) {
 	return NewWithStore(store), nil
 }
 
-// NewWithStore 使用指定的配置存储实例构建 App。
 func NewWithStore(store *config.Store) *App {
 	return &App{store: store, serviceAddress: serviceAddress}
 }
 
-// NewWithBackend 使用预置的硬件控制后端与配置存储构建 App。
 func NewWithBackend(store *config.Store, backend abilities) *App {
 	return &App{store: store, backend: backend}
 }
 
-// NewWithQuickAccess 使用预置的 QuickAccess 客户端构建 App。
 func NewWithQuickAccess(store *config.Store, client QuickAccess) *App {
 	return &App{store: store, quickClient: client}
 }
 
-// SetQuickAccessOptions 设置 QuickAccess 连接选项。
 func (a *App) SetQuickAccessOptions(options quickaccess.Options) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.quickOptions = options
 }
 
-// Close 关闭应用并断开后端硬件服务连接。
 func (a *App) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -129,7 +120,6 @@ func openMachine(address string) (domain.Gaming, string, error) {
 	return backend, routeService, nil
 }
 
-// SetBackendOpener 自定义硬件后端连接工厂函数，主要用于单元测试与模拟注入。
 func (a *App) SetBackendOpener(open func() (domain.Gaming, string, error)) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -137,7 +127,6 @@ func (a *App) SetBackendOpener(open func() (domain.Gaming, string, error)) {
 	a.openBackend = open
 }
 
-// Route 返回当前与硬件后端建立连接的通道名称。
 func (a *App) Route() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -165,5 +154,4 @@ func (a *App) connect(open func() (abilities, error)) (abilities, error) {
 	return backend, nil
 }
 
-// SettingsPath 返回当前生效配置文件的物理路径。
 func (a *App) SettingsPath() string { return a.store.Path() }

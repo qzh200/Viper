@@ -1,5 +1,3 @@
-﻿# package.ps1 - 将 Viper 与官方核心底层驱动组件打包为免安装独立发行包
-
 $ErrorActionPreference = "Stop"
 
 Write-Host ">>> [1/4] 编译全部 Viper 可执行程序..." -ForegroundColor Cyan

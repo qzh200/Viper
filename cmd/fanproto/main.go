@@ -1,4 +1,3 @@
-// fanproto 用于向 AcerAgentService 发送不同风扇模式和占空比参数，观察并记录转速响应变化。
 package main
 
 import (

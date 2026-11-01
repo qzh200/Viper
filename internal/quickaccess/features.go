@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// QuickAccess 服务支持的功能命令常量。
 const (
 	CommandUSBCharge          = "USBCharge"
 	CommandUSBChargeSwitch    = "USBChargeSwitch"
@@ -18,19 +17,14 @@ const (
 	CommandScreenSaverTimeout = "ScreenSaverTimeout"
 )
 
-// DisplayMode 表示显卡显示输出工作模式。
 type DisplayMode int
 
 const (
-	// DisplayModeHybrid 混合输出模式。
-	DisplayModeHybrid DisplayMode = 1
-	// DisplayModeDiscrete 独立显卡直连模式。
+	DisplayModeHybrid   DisplayMode = 1
 	DisplayModeDiscrete DisplayMode = 2
-	// DisplayModeAuto 自动显示切换模式。
-	DisplayModeAuto DisplayMode = 3
+	DisplayModeAuto     DisplayMode = 3
 )
 
-// String 返回显示模式的文本表示。
 func (d DisplayMode) String() string {
 	switch d {
 	case DisplayModeHybrid:
@@ -44,7 +38,6 @@ func (d DisplayMode) String() string {
 	}
 }
 
-// ParseDisplayMode 解析显示模式字符串。
 func ParseDisplayMode(name string) (DisplayMode, bool) {
 	switch name {
 	case "hybrid", "optimus", "mshybrid":
@@ -58,7 +51,6 @@ func ParseDisplayMode(name string) (DisplayMode, bool) {
 	}
 }
 
-// USBChargeLimit 查询关机 USB 供电电量下限阈值百分比。
 func (c *Client) USBChargeLimit() (int, error) {
 	result, err := c.Get(CommandUSBCharge)
 	if err != nil {
@@ -71,7 +63,6 @@ func (c *Client) USBChargeLimit() (int, error) {
 	return value, nil
 }
 
-// SetUSBChargeLimit 设置关机 USB 供电终止的电池百分比下限（通常为 10, 20 或 30）。
 func (c *Client) SetUSBChargeLimit(percent int) error {
 	switch percent {
 	case 10, 20, 30:
@@ -81,7 +72,6 @@ func (c *Client) SetUSBChargeLimit(percent int) error {
 	return c.Set(CommandUSBCharge, percent)
 }
 
-// USBChargeEnabled 查询关机 USB 供电功能是否开启。
 func (c *Client) USBChargeEnabled() (bool, error) {
 	result, err := c.Get(CommandUSBChargeSwitch)
 	if err != nil {
@@ -94,12 +84,10 @@ func (c *Client) USBChargeEnabled() (bool, error) {
 	return value, nil
 }
 
-// SetUSBChargeEnabled 启用或停用关机状态下的 USB 端口充电功能。
 func (c *Client) SetUSBChargeEnabled(enabled bool) error {
 	return c.Set(CommandUSBChargeSwitch, enabled)
 }
 
-// DisplayMode 查询当前的显卡显示模式。
 func (c *Client) DisplayMode() (DisplayMode, error) {
 	result, err := c.Get(CommandDisplayMode)
 	if err != nil {
@@ -112,7 +100,6 @@ func (c *Client) DisplayMode() (DisplayMode, error) {
 	return DisplayMode(value), nil
 }
 
-// SetDisplayMode 设置显卡显示模式。
 func (c *Client) SetDisplayMode(mode DisplayMode) error {
 	switch mode {
 	case DisplayModeHybrid, DisplayModeDiscrete, DisplayModeAuto:
@@ -122,7 +109,6 @@ func (c *Client) SetDisplayMode(mode DisplayMode) error {
 	return c.Set(CommandDisplayMode, int(mode))
 }
 
-// DarkMode 查询 Windows 深色模式开关。
 func (c *Client) DarkMode() (bool, error) {
 	result, err := c.Get(CommandDarkMode)
 	if err != nil {
@@ -135,12 +121,10 @@ func (c *Client) DarkMode() (bool, error) {
 	return value, nil
 }
 
-// SetDarkMode 设置系统深色/浅色模式。
 func (c *Client) SetDarkMode(enabled bool) error {
 	return c.Set(CommandDarkMode, enabled)
 }
 
-// TransparentEffect 查询系统窗口背景透明视觉特效开关。
 func (c *Client) TransparentEffect() (bool, error) {
 	result, err := c.Get(CommandTransparentEffect)
 	if err != nil {
@@ -153,12 +137,10 @@ func (c *Client) TransparentEffect() (bool, error) {
 	return value, nil
 }
 
-// SetTransparentEffect 启用或关闭系统窗口透明视觉特效。
 func (c *Client) SetTransparentEffect(enabled bool) error {
 	return c.Set(CommandTransparentEffect, switchNumber(enabled))
 }
 
-// AutoHideTaskbar 查询任务栏自动隐藏设置。
 func (c *Client) AutoHideTaskbar() (bool, error) {
 	result, err := c.Get(CommandAutoHideTaskbar)
 	if err != nil {
@@ -171,12 +153,10 @@ func (c *Client) AutoHideTaskbar() (bool, error) {
 	return value, nil
 }
 
-// SetAutoHideTaskbar 启用或关闭任务栏自动隐藏功能。
 func (c *Client) SetAutoHideTaskbar(enabled bool) error {
 	return c.Set(CommandAutoHideTaskbar, switchNumber(enabled))
 }
 
-// ScreenSaver 查询屏幕保护程序是否开启。
 func (c *Client) ScreenSaver() (bool, error) {
 	result, err := c.Get(CommandScreenSaver)
 	if err != nil {
@@ -189,12 +169,10 @@ func (c *Client) ScreenSaver() (bool, error) {
 	return value, nil
 }
 
-// SetScreenSaver 启用或停用屏幕保护程序。
 func (c *Client) SetScreenSaver(enabled bool) error {
 	return c.Set(CommandScreenSaver, enabled)
 }
 
-// ScreenSaverTimeout 获取屏幕保护程序的超时等待秒数。
 func (c *Client) ScreenSaverTimeout() (int, error) {
 	result, err := c.Get(CommandScreenSaverTimeout)
 	if err != nil {
@@ -207,7 +185,6 @@ func (c *Client) ScreenSaverTimeout() (int, error) {
 	return value, nil
 }
 
-// SetScreenSaverTimeout 设置屏幕保护程序激活前的空闲超时等待秒数。
 func (c *Client) SetScreenSaverTimeout(seconds int) error {
 	if seconds < 0 {
 		return fmt.Errorf("quickaccess: 屏保时间 %d 秒不是正数", seconds)

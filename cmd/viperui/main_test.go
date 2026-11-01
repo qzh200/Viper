@@ -10,16 +10,11 @@ import (
 	"viper/internal/gui/theme"
 )
 
-// fakeDesktop 是一台不会真开窗口的桌面。
 type fakeDesktop struct {
-	// windows 记下开过哪几扇窗口。
-	windows []mygo.WindowOptions
-	// appearance 记着这一次用的是哪种外观。
+	windows    []mygo.WindowOptions
 	appearance theme.Mode
-	// ran 记着主循环起没起。
-	ran bool
-	// quit 记着有没有让人退出。
-	quit bool
+	ran        bool
+	quit       bool
 }
 
 func (d *fakeDesktop) WhenReady(fn func()) { fn() }
@@ -87,7 +82,6 @@ func TestTheCommandLineWinsOverTheSavedAppearance(t *testing.T) {
 	if kit.appearance != theme.ModeLight {
 		t.Errorf("the appearance is %q, want the light one", kit.appearance)
 	}
-	// 命令行定的那个不写回配置。
 	if store.Theme() != "dark" {
 		t.Errorf("the store holds %q, want the dark one it had", store.Theme())
 	}

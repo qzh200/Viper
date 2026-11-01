@@ -1,4 +1,3 @@
-// Package quickaccess 实现与 Acer QuickAccess 服务的 TLS/WebSocket 安全握手与命令交互。
 package quickaccess
 
 import (
@@ -31,15 +30,11 @@ const (
 	defaultTimeout = 5 * time.Second
 )
 
-// 交互操作动作标识。
 const (
-	// ActionGet 表示查询状态操作。
 	ActionGet = "Get"
-	// ActionSet 表示写入设置操作。
 	ActionSet = "Set"
 )
 
-// Client 维护与 Acer QuickAccess 服务的加密连接。
 type Client struct {
 	conn net.Conn
 	read *bufio.Reader
@@ -48,13 +43,11 @@ type Client struct {
 	timeout time.Duration
 }
 
-// Options 定义连接 QuickAccess 服务的可选配置。
 type Options struct {
 	Address string
 	Timeout time.Duration
 }
 
-// Connect 建立与 QuickAccess 服务的 TLS 连接，完成 WebSocket 升级并执行 AES 鉴权握手。
 func Connect(options Options) (*Client, error) {
 	address := options.Address
 	if address == "" {
@@ -165,7 +158,6 @@ func (c *Client) handshake() error {
 	return nil
 }
 
-// Close 关闭与 QuickAccess 服务的连接。
 func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
@@ -176,7 +168,6 @@ func (c *Client) Close() error {
 	return err
 }
 
-// Get 向服务发送获取指定命令参数的请求。
 func (c *Client) Get(command string) (Result, error) {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -209,7 +200,6 @@ func (c *Client) Get(command string) (Result, error) {
 	return Result{}, fmt.Errorf("quickaccess: %s: 服务没有回答这个请求", command)
 }
 
-// Set 向服务发送设置命令及新值。
 func (c *Client) Set(command string, value any) error {
 	err := c.writeJSON(map[string]any{
 		"PacketType": packetRequest,
@@ -254,7 +244,6 @@ func answersCommand(answer map[string]any, command string) bool {
 	return name == "" || name == command
 }
 
-// Result 承载 QuickAccess 查询返回的值与描述信息。
 type Result struct {
 	Value       any
 	Text        string

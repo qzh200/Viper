@@ -8,14 +8,8 @@ import (
 	"viper/internal/domain"
 )
 
-// DefaultSmoothAlpha 是默认的平滑阻尼因子。
-//
-// 取 0.06 时，在 25ms 步进下，大约在 1000ms 左右平稳过渡到目标值，
-// 带来沉稳高级的指针质感，彻底消除读数暴跌骤升的过山车感。
 const DefaultSmoothAlpha = 0.06
 
-// Smoother 为硬件监控读数提供低通滤波与缓动阻尼平滑，
-// 杜绝读数大起大落剧烈跳跃，并自动清洗过滤宏碁原厂服务在休眠时返回的负数异常值（如 -1%）。
 type Smoother struct {
 	mu          sync.Mutex
 	initialized bool
@@ -45,22 +39,16 @@ type Smoother struct {
 	target domain.MonitorData
 }
 
-// NewSmoother 创建一个平滑缓冲器。
 func NewSmoother() *Smoother {
 	return &Smoother{}
 }
 
-// Initialized 返回平滑器是否已经加载过至少一次真实硬件读数。
 func (s *Smoother) Initialized() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.initialized
 }
 
-// SetTarget 设置最新的物理硬件数据。
-//
-// 第一次设置时会立即到位（不产生开机爬升动画）；
-// 随后的变动会先经过异常值清洗与滑动窗口加权滤波，彻底消除单点瞬时突发的直角跳变。
 func (s *Smoother) SetTarget(raw domain.MonitorData) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -71,8 +59,6 @@ func (s *Smoother) SetTarget(raw domain.MonitorData) {
 		return
 	}
 
-	// 维护 CPU / GPU 负载的滑动采样窗口（最近 4 次硬件采样），做加权移动平均，
-	// 彻底熨平 20%+ 瞬间砸到 0% 的离散跳跃，呈现温和的动态呼吸感：
 	s.cpuSamples = append(s.cpuSamples, clean.CPUUsagePercent)
 	if len(s.cpuSamples) > 4 {
 		s.cpuSamples = s.cpuSamples[len(s.cpuSamples)-4:]
@@ -85,7 +71,6 @@ func (s *Smoother) SetTarget(raw domain.MonitorData) {
 	}
 	clean.GPUUsagePercent = int(math.Round(weightedAverage(s.gpuSamples)))
 
-	// 网络速率：流量上升时积极跟随，流量下降时平缓衰减，杜绝数字在几百Kbps与0之间频繁闪烁：
 	clean.WIFIDownloadKbps = smoothNetworkRate(s.target.WIFIDownloadKbps, clean.WIFIDownloadKbps)
 	clean.WIFIUploadKbps = smoothNetworkRate(s.target.WIFIUploadKbps, clean.WIFIUploadKbps)
 	clean.EthernetDownloadKbps = smoothNetworkRate(s.target.EthernetDownloadKbps, clean.EthernetDownloadKbps)
@@ -94,7 +79,6 @@ func (s *Smoother) SetTarget(raw domain.MonitorData) {
 	s.target = clean
 }
 
-// Snap 立即将所有指标对齐到目标硬件数据，不产生平滑过渡。
 func (s *Smoother) Snap(raw domain.MonitorData) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,9 +106,6 @@ func (s *Smoother) snapLocked(target domain.MonitorData) {
 	s.ethUp = target.EthernetUploadKbps
 }
 
-// Step 执行一步平滑阻尼插值。
-//
-// alpha 在 (0, 1] 之间。若有数据正在过渡中，返回 true；当所有数值均已收敛至目标值，返回 false。
 func (s *Smoother) Step(alpha float64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -141,7 +122,6 @@ func (s *Smoother) Step(alpha float64) bool {
 	changed = lerp(&s.gpuTemp, float64(s.target.GPUTemperatureC), alpha, 0.05) || changed
 	changed = lerp(&s.boardTemp, float64(s.target.SystemTempC), alpha, 0.05) || changed
 
-	// 针对 CPU / GPU 负载设置 0.15% 的死区阈值，微幅无意义晃动不触发重绘，锁定稳定读数
 	changed = lerp(&s.cpuUsage, s.target.CPUUsagePercent, alpha, 0.15) || changed
 	changed = lerp(&s.gpuUsage, float64(s.target.GPUUsagePercent), alpha, 0.15) || changed
 	changed = lerp(&s.ramUsage, s.target.RAMUsagePercent, alpha, 0.05) || changed
@@ -157,7 +137,6 @@ func (s *Smoother) Step(alpha float64) bool {
 	changed = lerp(&s.ethDown, s.target.EthernetDownloadKbps, alpha, 0.2) || changed
 	changed = lerp(&s.ethUp, s.target.EthernetUploadKbps, alpha, 0.2) || changed
 
-	// 插值计算后再次钳制，坚决不允许浮点下溢产生负数
 	s.cpuTemp = math.Max(0, s.cpuTemp)
 	s.gpuTemp = math.Max(0, s.gpuTemp)
 	s.boardTemp = math.Max(0, s.boardTemp)
@@ -176,7 +155,6 @@ func (s *Smoother) Step(alpha float64) bool {
 	return changed
 }
 
-// Current 返回当前平滑帧的遥测数据以及指标列表。
 func (s *Smoother) Current() (domain.MonitorData, []Metric) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -251,11 +229,9 @@ func (s *Smoother) Current() (domain.MonitorData, []Metric) {
 	return data, metrics
 }
 
-// cleanMonitor 清洗过滤硬件遥测中的异常负数（例如独显休眠返回 -1、网卡离线返回 -1 等）。
 func cleanMonitor(raw domain.MonitorData) domain.MonitorData {
 	clean := raw
 
-	// 占用率严格限制在 0 到 100 之间
 	clean.CPUUsagePercent = clampFloat(clean.CPUUsagePercent, 0, 100)
 	if clean.GPUUsagePercent < 0 {
 		clean.GPUUsagePercent = 0
@@ -264,7 +240,6 @@ func cleanMonitor(raw domain.MonitorData) domain.MonitorData {
 	}
 	clean.RAMUsagePercent = clampFloat(clean.RAMUsagePercent, 0, 100)
 
-	// 温度、转速、频率与网络速率必须为非负物理量
 	clean.CPUTemperatureC = maxInt(0, clean.CPUTemperatureC)
 	clean.GPUTemperatureC = maxInt(0, clean.GPUTemperatureC)
 	clean.SystemTempC = maxInt(0, clean.SystemTempC)
@@ -283,13 +258,10 @@ func cleanMonitor(raw domain.MonitorData) domain.MonitorData {
 	return clean
 }
 
-// smoothNetworkRate 对网络突发流量进行低通滤波：上升积极响应，下降平缓衰减，杜绝数字闪烁。
 func smoothNetworkRate(oldRate, newRate float64) float64 {
 	if newRate > oldRate {
-		// 上升通道：80% 权重快速体现当前正在传输
 		return oldRate*0.20 + newRate*0.80
 	}
-	// 下降通道：平缓淡出衰减，避免瞬时没发包就直接掉到 0 剧烈抖动
 	return oldRate*0.45 + newRate*0.55
 }
 
@@ -310,7 +282,6 @@ func maxInt(a, b int) int {
 	return b
 }
 
-// weightedAverage 计算滑动窗口的加权平均，越新的采样权重大，越旧的采样提供稳定性支撑。
 func weightedAverage(samples []float64) float64 {
 	if len(samples) == 0 {
 		return 0
@@ -325,7 +296,6 @@ func weightedAverage(samples []float64) float64 {
 	return sum / weightSum
 }
 
-// lerp 执行一次单值插值，若差值在误差范围内则直接到位。
 func lerp(cur *float64, target float64, alpha float64, eps float64) bool {
 	diff := target - *cur
 	if math.Abs(diff) <= eps {

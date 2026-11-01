@@ -7,19 +7,13 @@ import (
 	"viper/internal/gui/theme"
 )
 
-// options 是 viperui 认得的命令行选项。
 type options struct {
-	// screenshot 是要存 PNG 的路径；空串表示不截屏。
 	screenshot string
-	// theme 是这一次运行要用的外观模式；空串表示用存下来的那个。
-	theme string
-	// page 是这一次运行打开的初始页面；空串表示默认总览页。
-	page string
-	// help 表示只打印用法。
-	help bool
+	theme      string
+	page       string
+	help       bool
 }
 
-// parseArgs 解析命令行参数。viperui 没有别的子命令，只有这两个选项。
 func parseArgs(args []string) (options, error) {
 	var result options
 	for len(args) > 0 {
@@ -56,7 +50,6 @@ func parseArgs(args []string) (options, error) {
 	return result, nil
 }
 
-// usage 打印用法。
 func usage(out io.Writer) {
 	fmt.Fprintln(out, `viperui - the native control centre of Acer gaming laptops
 

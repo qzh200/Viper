@@ -1,4 +1,3 @@
-// Package pages 实现 Viper 界面的各个页面。
 package pages
 
 import (
@@ -10,62 +9,35 @@ import (
 	"viper/internal/gui/widgets"
 )
 
-// State 保存页面在帧之间要记住的东西：用户在机器回应之前先选了什么。
 type State struct {
-	// PowerIndex 是用户刚点中的性能档位下标；-1 表示没有待确认的选择。
-	PowerIndex int
-	// GPUModeIndex 是用户刚点中的显卡工作模式下标；-1 表示没有待确认的选择。
-	GPUModeIndex int
-	// FanModeIndex 是用户刚点中的风扇模式下标；-1 表示没有待确认的选择。
-	FanModeIndex int
-	// CPUDuty 是自定义模式下 CPU 风扇的目标占空比（0~100）。
-	CPUDuty float64
-	// GPUDuty 是自定义模式下 GPU 风扇的目标占空比（0~100）。
-	GPUDuty float64
-	// CPUDutyInited 标记 CPUDuty 是否已初始化。
+	PowerIndex    int
+	GPUModeIndex  int
+	FanModeIndex  int
+	CPUDuty       float64
+	GPUDuty       float64
 	CPUDutyInited bool
-	// GPUDutyInited 标记 GPUDuty 是否已初始化。
 	GPUDutyInited bool
 
-	// LightingTab 是灯效页面的当前标签（0: 全局设置，1: 分区设置）。
-	LightingTab int
-	// LightingBrightness 是键盘背光档位（0~4 档，0 档对应熄灭，4 档对应最高亮度）。
-	LightingBrightness float64
-	// LightingBrightnessInited 标记 LightingBrightness 是否已初始化。
+	LightingTab              int
+	LightingBrightness       float64
 	LightingBrightnessInited bool
-	// LightingSpeed 是动态灯效速度（1~9）。
-	LightingSpeed float64
-	// LightingSpeedInited 标记 LightingSpeed 是否已初始化。
-	LightingSpeedInited bool
-	// LightingDirection 是动态灯效流动方向（0: 向左 ◄, 1: 向右 ►）。
-	LightingDirection int
-	// LightingDirectionInited 标记 LightingDirection 是否已初始化。
-	LightingDirectionInited bool
-	// SelectedEffect 是全局设置下选中的灯效模式。
-	SelectedEffect domain.LightingEffect
-	// SelectedEffectInited 标记 SelectedEffect 是否已初始化。
-	SelectedEffectInited bool
-	// ColorHue 是当前调色板的色相角度（0~360度）。
-	ColorHue float64
-	// ColorHueInited 标记 ColorHue 是否已初始化。
-	ColorHueInited bool
-	// ColorSat 是当前调色板的饱和度（0.0~1.0）。
-	ColorSat float64
-	// ColorSatInited 标记 ColorSat 是否已初始化。
-	ColorSatInited bool
-	// SelectedZone 是分区设置下当前选中的分区下标（0~3）。
-	SelectedZone int
-	// ZoneColors 是 4 分区各自的当前调色。
-	ZoneColors [4]domain.RGBColor
-	// ZoneColorsInited 标记 ZoneColors 是否已初始化。
-	ZoneColorsInited bool
-	// PerZone 是分区设置下的独立调色开关。
-	PerZone bool
-	// PerZoneInited 标记 PerZone 是否已初始化。
-	PerZoneInited bool
+	LightingSpeed            float64
+	LightingSpeedInited      bool
+	LightingDirection        int
+	LightingDirectionInited  bool
+	SelectedEffect           domain.LightingEffect
+	SelectedEffectInited     bool
+	ColorHue                 float64
+	ColorHueInited           bool
+	ColorSat                 float64
+	ColorSatInited           bool
+	SelectedZone             int
+	ZoneColors               [4]domain.RGBColor
+	ZoneColorsInited         bool
+	PerZone                  bool
+	PerZoneInited            bool
 }
 
-// NewState 返回一份干净的页面状态。
 func NewState() *State {
 	return &State{
 		PowerIndex:         -1,
@@ -78,7 +50,7 @@ func NewState() *State {
 		LightingSpeed:      5,
 		LightingDirection:  0,
 		SelectedEffect:     domain.EffectStatic,
-		ColorHue:           200, // 默认冰蓝系
+		ColorHue:           200,
 		ColorSat:           1.0,
 		SelectedZone:       0,
 		PerZone:            false,
@@ -91,9 +63,6 @@ func NewState() *State {
 	}
 }
 
-// Home 画首页：连接状态、性能档位、实时指标与曲线。
-//
-// 它只读 Controller 的快照，不直接碰硬件，因此画一帧不会等待原厂服务。
 func Home(c *ui.Context, ctrl *controller.Controller, state *State) {
 	overview := ctrl.Snapshot()
 	modes := overview.PowerModes
@@ -137,7 +106,6 @@ func Home(c *ui.Context, ctrl *controller.Controller, state *State) {
 	})
 }
 
-// hero 画顶部那条横幅：程序名、连接状态与性能档位。
 func hero(c *ui.Context, overview model.Overview, ctrl *controller.Controller,
 	state *State, modes []domain.PowerMode) {
 	t := c.Theme()
@@ -160,7 +128,6 @@ func hero(c *ui.Context, overview model.Overview, ctrl *controller.Controller,
 	})
 }
 
-// statusPill 画连接状态：连上了是一枚绿药丸，没连上是红的。
 func statusPill(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 	if overview.Connected && overview.Error == "" {
@@ -174,7 +141,6 @@ func statusPill(c *ui.Context, overview model.Overview) {
 	widgets.Pill(c, "未连接", t.Danger)
 }
 
-// subtitle 是横幅上那行小字：连的是哪条通道，几点几分。
 func subtitle(overview model.Overview) string {
 	if !overview.Connected {
 		return "没有连上原厂服务"
@@ -189,13 +155,11 @@ func subtitle(overview model.Overview) string {
 	return route + " · " + overview.Updated.Format("15:04:05")
 }
 
-// coreCard 画处理器与显卡的卡片：一个圆表、一台风扇与一行读数。
 func coreCard(c *ui.Context, overview model.Overview, name string, icon widgets.Icon,
 	tint ui.Color, temperature, fan model.Metric) ui.Element {
 	t := c.Theme()
 	monitor := overview.Monitor
 
-	// 一格读数：名字在上，数字在下。
 	stat := func(label, value string) {
 		ui.Column(c).Gap(2).Grow(1).Children(func() {
 			ui.Text(c, value).FontSize(15).Bold().TextColor(t.Text).NoWrap()
@@ -204,7 +168,6 @@ func coreCard(c *ui.Context, overview model.Overview, name string, icon widgets.
 	}
 
 	return widgets.Card(c, "", func() {
-		// 顶部：图标、名称、副标题（占用 · 频率）、状态胶囊。
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 			widgets.IconBadge(c, icon, tint, 34)
 			ui.Column(c).Gap(2).Grow(1).Children(func() {
@@ -216,7 +179,6 @@ func coreCard(c *ui.Context, overview model.Overview, name string, icon widgets.
 
 		ui.Spacer(c)
 
-		// 核心区：左侧温度圆表，右侧旋转风扇，居中对齐，告别横排拥挤。
 		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 			ui.Row(c).Grow(1).Center().Children(func() {
 				widgets.Gauge(c, widgets.RadialGauge{
@@ -239,7 +201,6 @@ func coreCard(c *ui.Context, overview model.Overview, name string, icon widgets.
 		ui.Spacer(c)
 		ui.Divider(c)
 
-		// 底部指标：核心占用与工作频率两格（去除了与圆表完全重复的“温度”）。
 		ui.Row(c).Gap(8).Children(func() {
 			if name == "CPU" {
 				stat("占用", model.FormatPercent(monitor.CPUUsagePercent))
@@ -252,13 +213,11 @@ func coreCard(c *ui.Context, overview model.Overview, name string, icon widgets.
 	}).Grow(1)
 }
 
-// memoryCard 画内存的卡片。
 func memoryCard(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 	memory := overview.Metric("内存占用")
 	monitor := overview.Monitor
 
-	// 一格读数：名字在上，数字在下。
 	stat := func(label, value string) {
 		ui.Column(c).Gap(2).Grow(1).Children(func() {
 			ui.Text(c, value).FontSize(14).Bold().TextColor(t.Text).NoWrap()
@@ -267,7 +226,6 @@ func memoryCard(c *ui.Context, overview model.Overview) {
 	}
 
 	widgets.Card(c, "", func() {
-		// 顶部：图标、标题、简要容量、状态胶囊。
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 			widgets.IconBadge(c, widgets.IconMemory, widgets.ColorMemory, 34)
 			ui.Column(c).Gap(2).Grow(1).Children(func() {
@@ -277,7 +235,6 @@ func memoryCard(c *ui.Context, overview model.Overview) {
 			widgets.Pill(c, memory.Level.Label(), gaugeTint(c, memory.Level, widgets.ColorMemory))
 		})
 
-		// 核心区：占用百分比 + 容量比例 + 进度条。
 		ui.Column(c).Gap(6).Children(func() {
 			ui.Row(c).AlignItems(ui.Baseline).Children(func() {
 				ui.Text(c, memory.Value).FontSize(26).Bold().TextColor(gaugeTint(c, memory.Level, widgets.ColorMemory))
@@ -290,7 +247,6 @@ func memoryCard(c *ui.Context, overview model.Overview) {
 
 		ui.Divider(c)
 
-		// 底部指标：已用、总量、频率。
 		ui.Row(c).Gap(6).Children(func() {
 			stat("已用", model.FormatMB(monitor.RAMTotalMB*monitor.RAMUsagePercent/100))
 			stat("总量", model.FormatMB(monitor.RAMTotalMB))
@@ -299,7 +255,6 @@ func memoryCard(c *ui.Context, overview model.Overview) {
 	})
 }
 
-// boardCard 画主板温度的卡片。
 func boardCard(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 	board := overview.Metric("主板温度")
@@ -316,7 +271,6 @@ func boardCard(c *ui.Context, overview model.Overview) {
 
 		ui.Spacer(c)
 
-		// 圆表与右侧温度档位说明。
 		ui.Row(c).Gap(16).AlignItems(ui.Center).Children(func() {
 			widgets.Gauge(c, widgets.RadialGauge{
 				Value:     board.Number,
@@ -337,12 +291,10 @@ func boardCard(c *ui.Context, overview model.Overview) {
 	}).Grow(1)
 }
 
-// networkCard 画网络的卡片：无线与有线的收发速率。
 func networkCard(c *ui.Context, overview model.Overview) {
 	t := c.Theme()
 	monitor := overview.Monitor
 
-	// 四个数摆成两行两列，每一格一样宽。
 	cell := func(value, label string) {
 		ui.Column(c).Gap(3).Children(func() {
 			ui.Text(c, value).FontSize(15).Bold().TextColor(t.Text).NoWrap()
@@ -368,14 +320,11 @@ func networkCard(c *ui.Context, overview model.Overview) {
 	}).Grow(1)
 }
 
-// powerPicker 画性能档位的选择器。用户点过之后，选择先留在页面的状态里，
-// 等机器真的换过去了再交还给机器说了算。
 func powerPicker(c *ui.Context, ctrl *controller.Controller, state *State,
 	modes []domain.PowerMode, overview model.Overview) {
 	selected := model.PowerModeIndex(modes, overview.PowerMode)
 	if state.PowerIndex >= 0 && state.PowerIndex < len(modes) {
 		if modes[state.PowerIndex] == overview.PowerMode {
-			// 机器已经照做了，这次临时选择可以忘掉。
 			state.PowerIndex = -1
 		} else {
 			selected = state.PowerIndex
@@ -393,14 +342,11 @@ func powerPicker(c *ui.Context, ctrl *controller.Controller, state *State,
 	state.PowerIndex = index
 	ctrl.SetPowerMode(modes[index], func(err error) {
 		if err != nil {
-			// 没换成功，就别让界面停在一个机器并不认可的选择上。
 			state.PowerIndex = -1
 		}
 	})
 }
 
-// gaugeTint 挑圆表与药丸的颜色：正常时用这一块自己的颜色，
-// 太高或太低时才换成警告与危险色。
 func gaugeTint(c *ui.Context, level model.Level, base ui.Color) ui.Color {
 	switch level {
 	case model.LevelWarn:

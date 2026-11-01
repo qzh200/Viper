@@ -8,7 +8,6 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// runDisplayMode 处理显卡显示输出模式的查询与切换。
 func runDisplayMode(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -40,7 +39,6 @@ func runDisplayMode(args []string) error {
 	return nil
 }
 
-// runDarkMode 处理系统深色主题模式的查询与切换。
 func runDarkMode(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -68,7 +66,6 @@ func runDarkMode(args []string) error {
 	return nil
 }
 
-// runTransparent 处理系统窗口透明度视觉效果的查询与开关。
 func runTransparent(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -96,7 +93,6 @@ func runTransparent(args []string) error {
 	return nil
 }
 
-// runTaskbar 处理任务栏自动隐藏设置的查询与开关。
 func runTaskbar(args []string) error {
 	application, err := newApp()
 	if err != nil {
@@ -124,7 +120,6 @@ func runTaskbar(args []string) error {
 	return nil
 }
 
-// runScreenSaver 处理屏幕保护程序的开关与超时等待秒数设置。
 func runScreenSaver(args []string) error {
 	application, err := newApp()
 	if err != nil {

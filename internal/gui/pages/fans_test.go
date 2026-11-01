@@ -61,7 +61,6 @@ func TestFansPageSwitchMode(t *testing.T) {
 		pages.Fans(c, ctrl, state)
 	}, 980, 620)
 
-	// 点击“全速”
 	if err := tt.Click("全速"); err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +69,6 @@ func TestFansPageSwitchMode(t *testing.T) {
 		t.Errorf("state.FanModeIndex is %d, want 1", state.FanModeIndex)
 	}
 
-	// 此时应该排队了一次写入
 	ctrl.Work()
 	if len(machine.FanWrites) != 1 {
 		t.Fatalf("expected 1 fan write, got %d", len(machine.FanWrites))
@@ -100,12 +98,10 @@ func TestFansPageCustomModeShowsSliders(t *testing.T) {
 		t.Error("custom mode should show duty cycle slider labels")
 	}
 
-	// 验证初始化读入
 	if state.CPUDuty != 75 || state.GPUDuty != 80 {
 		t.Errorf("expected duties 75 and 80, got CPU=%f, GPU=%f", state.CPUDuty, state.GPUDuty)
 	}
 
-	// 测试滑到 0% 时绝不被弹回
 	state.CPUDuty = 0
 	tt.Frame()
 	if !tt.HasText("0%") {

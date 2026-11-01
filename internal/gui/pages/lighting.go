@@ -1,4 +1,3 @@
-// Package pages 实现 Viper 界面的各个页面。
 package pages
 
 import (
@@ -13,12 +12,10 @@ import (
 	"viper/internal/gui/widgets"
 )
 
-// Lighting 画键盘 RGB 灯效与背光控制页面。
 func Lighting(c *ui.Context, ctrl *controller.Controller, state *State) {
 	overview := ctrl.Snapshot()
 	lighting := overview.Lighting
 
-	// 初始化状态同步
 	if !state.LightingBrightnessInited {
 		if lighting.Brightness > 0 {
 			if lighting.Brightness <= 1 {
@@ -93,7 +90,6 @@ func Lighting(c *ui.Context, ctrl *controller.Controller, state *State) {
 	})
 }
 
-// lightingHero 画灯效页顶部的导航卡片（Tab 选择、30秒超时开关、恢复默认）。
 func lightingHero(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State) {
 	t := c.Theme()
 
@@ -107,14 +103,12 @@ func lightingHero(c *ui.Context, overview model.Overview, ctrl *controller.Contr
 				ui.Text(c, "四分区独立光谱 · 动态氛围流动与全域客制调光").FontSize(12).TextColor(t.TextMuted).NoWrap()
 			})
 
-			// 切换：全局设置 vs 分区设置
 			tabIdx := state.LightingTab
 			picker := ui.Segmented(c, &tabIdx, "全局设置", "分区设置").Label("灯效模式切换")
 			if picker.Changed() {
 				state.LightingTab = tabIdx
 			}
 
-			// 30 秒空闲自动休眠
 			timeoutOn := overview.BacklightTimeout
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(6, 12).Radius(10).
 				Background(t.Background).Border(1, t.Border).Children(func() {
@@ -128,13 +122,11 @@ func lightingHero(c *ui.Context, overview model.Overview, ctrl *controller.Contr
 				}
 			})
 
-			// 恢复出厂默认灯效按钮
 			resetBtn := ui.Button(c, "恢复默认").
 				Padding(8, 14).Radius(8).
 				Background(t.Background).Border(1, t.Border)
 			if resetBtn.Clicked() {
 				ctrl.ResetLighting(nil)
-				// 重置本地 state 状态（亮度恢复到最大 4 档即硬件 5 档）
 				state.LightingBrightness = 4
 				state.LightingSpeed = 5
 				state.LightingDirection = 0
@@ -149,14 +141,12 @@ func lightingHero(c *ui.Context, overview model.Overview, ctrl *controller.Contr
 	})
 }
 
-// lightingGlobalPanel 画全局动态模式与全局参数设置。
 func lightingGlobalPanel(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State) {
 	t := c.Theme()
 
 	effects := model.LightingEffects()
 	currentEffect := state.SelectedEffect
 
-	// 1. 全局灯效模式选择网格（4 列 x 2 行，视野开阔紧凑）
 	widgets.Card(c, "全局运转灯效模式", func() {
 		renderBtn := func(item model.LightingEffectItem) {
 			active := item.Effect == currentEffect
@@ -202,36 +192,29 @@ func lightingGlobalPanel(c *ui.Context, overview model.Overview, ctrl *controlle
 		})
 	})
 
-	// 2. 根据当前模式特性自适应排版调控区
 	canColor := model.LightingEffectCanColor(currentEffect)
 	hasDirection := currentEffect.HasDirection()
 
 	if currentEffect == domain.EffectStatic {
-		// 静态常亮：支持调亮度与选色板（无速度、无方向），左右对称并排
 		ui.Row(c).Gap(16).Children(func() {
 			renderBrightnessCard(c, overview, ctrl, state, t)
 			renderDynamicParamsCard(c, overview, ctrl, state, t, currentEffect, hasDirection)
 		})
 		renderColorPaletteCard(c, overview, ctrl, state, t, "静态全局色彩调控")
 	} else if !canColor {
-		// 霓虹与波形：不支持调色；波形可调方向；两者均可调速度和亮度
 		ui.Row(c).Gap(16).Children(func() {
 			renderBrightnessCard(c, overview, ctrl, state, t)
 			renderDynamicParamsCard(c, overview, ctrl, state, t, currentEffect, hasDirection)
 		})
 	} else {
-		// 其余动态模式（呼吸、切换、缩放、流星雨、闪烁）：
-		// 第一行：背光亮度 + 动态参数（速度与方向）
 		ui.Row(c).Gap(16).Children(func() {
 			renderBrightnessCard(c, overview, ctrl, state, t)
 			renderDynamicParamsCard(c, overview, ctrl, state, t, currentEffect, hasDirection)
 		})
-		// 第二行：全局选色板卡片
 		renderColorPaletteCard(c, overview, ctrl, state, t, "灯效色彩调控")
 	}
 }
 
-// renderBrightnessCard 画背光亮度卡片（0~4 档，0 档对应熄灭，4 档对应最高亮度）。
 func renderBrightnessCard(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State, t *ui.Theme) {
 	widgets.Card(c, "背光亮度", func() {
 		ui.Column(c).Gap(14).Children(func() {
@@ -270,14 +253,12 @@ func renderBrightnessCard(c *ui.Context, overview model.Overview, ctrl *controll
 	}).Grow(1)
 }
 
-// renderDynamicParamsCard 画动画速度与流动方向动态参数卡片。
 func renderDynamicParamsCard(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State, t *ui.Theme, effect domain.LightingEffect, hasDirection bool) {
 	canSpeed := model.LightingEffectCanSpeed(effect)
 
 	widgets.Card(c, "动态参数", func() {
 		ui.Column(c).Gap(12).Children(func() {
 			if canSpeed {
-				// 1. 动画速度调节（1~9），使用防抖并提供档位直选
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "动画速度").FontSize(12).TextColor(t.TextMuted).Width(60)
 					slider := ui.Slider(c, &state.LightingSpeed,
@@ -292,7 +273,6 @@ func renderDynamicParamsCard(c *ui.Context, overview model.Overview, ctrl *contr
 						FontSize(13).Bold().TextColor(t.Accent).Width(42)
 				})
 
-				// 快捷档位切换按钮
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "档位直选:").FontSize(11).TextColor(t.TextMuted).Width(60)
 					for _, item := range []struct {
@@ -327,14 +307,12 @@ func renderDynamicParamsCard(c *ui.Context, overview model.Overview, ctrl *contr
 					}
 				})
 			} else {
-				// 静态模式提示
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "● 当前为静态单色常亮，无需调节动态速度").
 						FontSize(11).TextColor(t.TextMuted)
 				})
 			}
 
-			// 2. 流动方向（仅波形与切换模式支持）
 			if hasDirection {
 				ui.Divider(c)
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
@@ -350,7 +328,6 @@ func renderDynamicParamsCard(c *ui.Context, overview model.Overview, ctrl *contr
 				})
 			}
 
-			// 3. 全光谱流动说明（霓虹与波形）
 			if !model.LightingEffectCanColor(effect) {
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "●").FontSize(8).TextColor(t.Accent)
@@ -362,7 +339,6 @@ func renderDynamicParamsCard(c *ui.Context, overview model.Overview, ctrl *contr
 	}).Grow(1)
 }
 
-// renderColorPaletteCard 画 PredatorSense 原厂风格的专业色轮取色板。
 func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State, t *ui.Theme, title string) {
 	widgets.Card(c, title, func() {
 		curColor := state.ZoneColors[state.SelectedZone]
@@ -373,9 +349,7 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 		hex := fmt.Sprintf("#%02X%02X%02X", curColor.R, curColor.G, curColor.B)
 
 		ui.Row(c).Gap(24).AlignItems(ui.Center).Children(func() {
-			// 左半部：极坐标平滑色轮（支持鼠标实时拖动与点击取色）+ 色相微调滑块
 			ui.Column(c).Gap(10).AlignItems(ui.Center).Children(func() {
-				// 1. 360 度原生圆盘平滑色轮，鼠标点击或直接按住拖动取色
 				satVal := state.ColorSat
 				if satVal <= 0 {
 					satVal = 1.0
@@ -395,7 +369,6 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 					},
 				})
 
-				// 2. 色轮下方：色相滑块
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "色相").FontSize(11).Bold().TextColor(t.TextMuted)
 					slider := ui.Slider(c, &state.ColorHue, 0, 360).Width(100)
@@ -413,11 +386,8 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 				})
 			})
 
-			// 右半部：原厂预设圆形色块排 + 垂直大色彩胶囊 + R/G/B 精准微调框
 			ui.Column(c).Grow(1).Gap(14).Children(func() {
-				// 1. 圆形快捷预设色盘（对应原厂面板：熄灭、青、绿、红、橙、紫、白）
 				ui.Row(c).Gap(10).AlignItems(ui.Center).Wrap().Children(func() {
-					// 熄灭按钮（带斜杠 ⃠）
 					offBtn := ui.Box(c).Size(22, 22).Radius(11).
 						Background(ui.RGB(20, 20, 20)).Border(1, t.Border).
 						Cursor(ui.CursorPointer).Label("熄灭").Draw(func(p *ui.Painter, r ui.Rect) {
@@ -434,7 +404,6 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 						ctrl.SetLighting(cfg, nil)
 					}
 
-					// 快捷原厂常用纯色圆圈（带无障碍语义标签，与官方一致）
 					for _, item := range []struct {
 						name  string
 						color domain.RGBColor
@@ -470,7 +439,6 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 						}
 					}
 
-					// 加号按钮（添加色彩收藏，与官方一致）
 					ui.Box(c).Size(22, 22).Radius(11).
 						Background(t.Border).Border(1, t.Border).
 						Cursor(ui.CursorPointer).Label("添加色彩").Draw(func(p *ui.Painter, r ui.Rect) {
@@ -484,15 +452,12 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 					})
 				})
 
-				// 2. 下部：垂直大胶囊色块 + RGB 独立数值框 + HEX 标签
 				ui.Row(c).Gap(18).AlignItems(ui.Center).Children(func() {
-					// 垂直色彩指示胶囊（对应原厂竖长条色块）
 					ui.Box(c).Size(24, 82).Radius(12).
 						Background(uiColor).
 						Shadow(0, 0, 14, 0, uiColor.Alpha(0.70)).
 						Border(1, t.Border)
 
-					// 纵向 R、G、B 数值行与微调
 					rVal := float64(curColor.R)
 					gVal := float64(curColor.G)
 					bVal := float64(curColor.B)
@@ -506,7 +471,6 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 								if slider.Changed() {
 									changed = true
 								}
-								// 对应原厂界面的数值边框盒子
 								ui.Box(c).Padding(2, 8).Radius(4).
 									Background(t.Background).Border(1, t.Border).Children(func() {
 									ui.Text(c, fmt.Sprintf("%d", int(*val))).
@@ -534,7 +498,6 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 						ctrl.SetLightingDebounced(cfg, 180*time.Millisecond, nil)
 					}
 
-					// HEX 色码标签
 					ui.Column(c).AlignItems(ui.End).Children(func() {
 						ui.Text(c, "HEX").FontSize(10).TextColor(t.TextMuted)
 						ui.Text(c, hex).FontSize(13).Bold().TextColor(t.Accent)
@@ -545,14 +508,11 @@ func renderColorPaletteCard(c *ui.Context, overview model.Overview, ctrl *contro
 	}).Grow(1)
 }
 
-// lightingZonesPanel 画四分区独立色彩设置面板。
 func lightingZonesPanel(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State) {
 	t := c.Theme()
 
-	// 1. 4 分区键盘拟物预览卡片行
 	widgets.Card(c, "四分区键盘色彩预览", func() {
 		ui.Column(c).Gap(12).Children(func() {
-			// 分区独立调色开关
 			ui.Row(c).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, "四分区独立调色").FontSize(13).Bold().TextColor(t.Text)
 				ui.Text(c, "（关闭时 4 个分区同步应用相同色彩）").FontSize(11).TextColor(t.TextMuted)
@@ -569,7 +529,6 @@ func lightingZonesPanel(c *ui.Context, overview model.Overview, ctrl *controller
 
 			ui.Divider(c)
 
-			// 并排 4 个分区大卡片
 			ui.Row(c).Gap(12).Children(func() {
 				for i := 0; i < 4; i++ {
 					zoneIdx := i
@@ -591,7 +550,6 @@ func lightingZonesPanel(c *ui.Context, overview model.Overview, ctrl *controller
 						AlignItems(ui.Center).Cursor(ui.CursorPointer).Children(func() {
 						ui.Text(c, model.ZoneName(zoneIdx)).FontSize(12).Bold().TextColor(t.Text).NoWrap()
 
-						// 色块发光效果
 						ui.Box(c).Size(46, 26).Radius(6).
 							Background(uiColor).
 							Shadow(0, 0, 10, 0, uiColor.Alpha(0.65))
@@ -614,12 +572,10 @@ func lightingZonesPanel(c *ui.Context, overview model.Overview, ctrl *controller
 		})
 	})
 
-	// 2. 当前选中分区的调色台
 	renderColorPaletteCard(c, overview, ctrl, state, t,
 		fmt.Sprintf("色彩调控 · %s", model.ZoneName(state.SelectedZone)))
 }
 
-// applyColor 把颜色应用到当前选区或全部选区。
 func applyColor(state *State, color domain.RGBColor) {
 	if state.LightingTab == 1 && state.PerZone {
 		state.ZoneColors[state.SelectedZone] = color
@@ -630,7 +586,6 @@ func applyColor(state *State, color domain.RGBColor) {
 	}
 }
 
-// buildLightingConfig 根据页面状态构建待写入的 RGBConfig。
 func buildLightingConfig(state *State, overview model.Overview) domain.RGBConfig {
 	speed := uint64(state.LightingSpeed)
 	if speed < domain.SpeedMin {
@@ -640,7 +595,6 @@ func buildLightingConfig(state *State, overview model.Overview) domain.RGBConfig
 		speed = domain.SpeedMax
 	}
 
-	// 界面 0~4 档映射到底层硬件 1~5 档（0 档对应熄灭即硬件 1，4 档对应最高亮度即硬件 5）
 	uiBrightness := uint64(state.LightingBrightness)
 	hwBrightness := uiBrightness + 1
 	if hwBrightness < domain.BrightnessMin {
@@ -653,7 +607,6 @@ func buildLightingConfig(state *State, overview model.Overview) domain.RGBConfig
 	effect := state.SelectedEffect
 	perZone := false
 
-	// 只有在分区设置 Tab 下且开启了独立分区时，才生效 PerZone
 	if state.LightingTab == 1 && state.PerZone {
 		perZone = true
 		effect = domain.EffectStatic

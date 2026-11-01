@@ -1,4 +1,3 @@
-// Package config 提供用户配置、灯效预设、风扇策略与场景绑定的持久化存储。
 package config
 
 import (
@@ -9,7 +8,6 @@ import (
 	"sync"
 )
 
-// 电源模式数值常量（对应 domain.PowerMode 编码）。
 const (
 	PowerQuiet uint64 = iota
 	PowerBalanced
@@ -19,14 +17,12 @@ const (
 	PowerEco
 )
 
-// 风扇模式数值常量。
 const (
 	FanAuto uint64 = iota
 	FanMax
 	FanCustom
 )
 
-// Lighting 记录持久化的键盘灯效设置。
 type Lighting struct {
 	Effect     uint64           `json:"effect"`
 	Speed      uint64           `json:"speed"`
@@ -36,14 +32,12 @@ type Lighting struct {
 	PerZone    bool             `json:"perZone"`
 }
 
-// LightingColor 记录分区 RGB 颜色。
 type LightingColor struct {
 	R uint8 `json:"r"`
 	G uint8 `json:"g"`
 	B uint8 `json:"b"`
 }
 
-// Fans 记录持久化的风扇配置。
 type Fans struct {
 	CPUMode    uint64 `json:"cpuMode"`
 	GPUMode    uint64 `json:"gpuMode"`
@@ -52,23 +46,17 @@ type Fans struct {
 	CoolBoost  bool   `json:"coolBoost"`
 }
 
-// Scenario 组合特定场景下的灯效与风扇设定。
 type Scenario struct {
 	Lighting Lighting `json:"lighting"`
 	Fans     Fans     `json:"fans"`
 }
 
-// 界面外观模式的取值，与 internal/gui/theme 的模式一一对应。
 const (
-	// ThemeAuto 让界面跟随系统的外观。
-	ThemeAuto = "auto"
-	// ThemeLight 让界面用亮色。
+	ThemeAuto  = "auto"
 	ThemeLight = "light"
-	// ThemeDark 让界面用暗色。
-	ThemeDark = "dark"
+	ThemeDark  = "dark"
 )
 
-// Settings 承载应用程序的全部持久化配置信息。
 type Settings struct {
 	Lighting         Lighting            `json:"lighting"`
 	Fans             Fans                `json:"fans"`
@@ -76,8 +64,7 @@ type Settings struct {
 	BacklightTimeout bool                `json:"backlightTimeout"`
 	Scenarios        map[string]Scenario `json:"scenarios"`
 	Bindings         map[string]string   `json:"bindings"`
-	// Theme 保存界面的外观模式：auto、light 或 dark。
-	Theme string `json:"theme"`
+	Theme            string              `json:"theme"`
 }
 
 func (s Settings) copy() Settings {
@@ -93,14 +80,12 @@ func (s Settings) copy() Settings {
 	return out
 }
 
-// Store 线程安全地管理配置文件的读取、修改与原子写入。
 type Store struct {
 	mu       sync.RWMutex
 	path     string
 	settings Settings
 }
 
-// Default 返回系统的默认出厂设置。
 func Default() Settings {
 	return Settings{
 		Lighting: Lighting{
@@ -124,7 +109,6 @@ func Default() Settings {
 	}
 }
 
-// Open 打开默认用户配置目录下的配置文件（%APPDATA%/Viper/config.json）。
 func Open() (*Store, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -133,7 +117,6 @@ func Open() (*Store, error) {
 	return OpenAt(filepath.Join(dir, "Viper", "config.json"))
 }
 
-// OpenAt 打开指定文件路径下的配置文件，如果不存在则使用默认配置。
 func OpenAt(path string) (*Store, error) {
 	store := &Store{path: path, settings: Default()}
 	data, err := os.ReadFile(path)
@@ -156,18 +139,14 @@ func OpenAt(path string) (*Store, error) {
 	return store, nil
 }
 
-// Settings 返回当前配置的快照拷贝。
 func (s *Store) Settings() Settings {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.settings.copy()
 }
 
-// Path 返回当前配置文件的物理存储路径。
 func (s *Store) Path() string { return s.path }
 
-// Theme 返回保存的界面外观模式：auto、light 或 dark。
-// 旧版本留下的配置文件没有这一项，此时按 auto 处理。
 func (s *Store) Theme() string {
 	mode := s.Settings().Theme
 	if mode == "" {
@@ -176,14 +155,12 @@ func (s *Store) Theme() string {
 	return mode
 }
 
-// SetTheme 保存界面外观模式，并原子刷写到配置文件。
 func (s *Store) SetTheme(mode string) error {
 	return s.Update(func(s *Settings) {
 		s.Theme = mode
 	})
 }
 
-// Save 将内存中的配置原子刷写到磁盘文件。
 func (s *Store) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -224,7 +201,6 @@ func (s *Store) save() error {
 	return nil
 }
 
-// Update 在排他锁保护下执行闭包修改并持久化到文件。
 func (s *Store) Update(change func(*Settings)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

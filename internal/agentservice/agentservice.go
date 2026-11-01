@@ -1,4 +1,3 @@
-// Package agentservice 提供与 AcerAgentService 后台服务的底层 TCP 通信客户端。
 package agentservice
 
 import (
@@ -19,30 +18,21 @@ const (
 	defaultTimeout = 5 * time.Second
 )
 
-// 数据包操作类型代码。
 const (
-	// PacketInitialization 用于初始化与能力查询。
-	PacketInitialization = 0
-	// PacketMonitorData 用于获取实时监控遥测数据。
-	PacketMonitorData = 10
-	// PacketGetUpdatedData 用于查询特定功能当前状态。
-	PacketGetUpdatedData = 20
-	// PacketGetConnectedDevice 用于枚举连接的受支持设备。
+	PacketInitialization     = 0
+	PacketMonitorData        = 10
+	PacketGetUpdatedData     = 20
 	PacketGetConnectedDevice = 30
-	// PacketGetLightingEffect 用于获取灯效配置。
-	PacketGetLightingEffect = 40
-	// PacketSetDeviceData 用于设置设备功能参数。
-	PacketSetDeviceData = 100
+	PacketGetLightingEffect  = 40
+	PacketSetDeviceData      = 100
 )
 
-// 服务端响应结果标识。
 const (
 	ResultOK          = "0"
 	ResultUnsupported = "3"
 	ResultFailed      = "4"
 )
 
-// 原厂服务支持的功能标识常量。
 const (
 	FunctionOperatingMode    = "OPERATING_MODE"
 	FunctionGPUMode          = "GPU_MODE"
@@ -59,7 +49,6 @@ const (
 	FunctionAdaptorStatus    = "ADAPTOR_STATUS"
 )
 
-// 原厂服务能力查询标识常量。
 const (
 	CapabilityVersion           = "VERSION"
 	CapabilityOperatingMode     = "SUPPORT_OPERATING_MODE_CAPABILITY"
@@ -76,27 +65,21 @@ const (
 )
 
 var (
-	// ErrUnsupported 表示目标功能不被当前机器或服务支持。
 	ErrUnsupported = errors.New("agentservice: 原厂服务不支持这个请求")
-	// ErrFailed 表示原厂服务拒绝或未能成功执行请求。
-	ErrFailed = errors.New("agentservice: 原厂服务没有执行这次操作")
-	// ErrUnavailable 表示无法连接至原厂服务进程。
+	ErrFailed      = errors.New("agentservice: 原厂服务没有执行这次操作")
 	ErrUnavailable = errors.New("agentservice: 原厂服务不可达")
 )
 
-// Answer 表示从 AcerAgentService 接收到的结构化响应。
 type Answer struct {
 	Data    json.RawMessage `json:"data"`
 	Request string          `json:"request"`
 	Result  string          `json:"result"`
 }
 
-// OK 判断响应是否成功。
 func (a Answer) OK() bool {
 	return a.Result == "" || a.Result == ResultOK
 }
 
-// Err 将服务返回的非零结果转换为 Go 错误对象。
 func (a Answer) Err() (error, bool) {
 	switch a.Result {
 	case "", ResultOK:
@@ -108,7 +91,6 @@ func (a Answer) Err() (error, bool) {
 	}
 }
 
-// Decode 将响应数据中的 JSON 反序列化到目标变量中。
 func (a Answer) Decode(target any) error {
 	if len(a.Data) == 0 {
 		return fmt.Errorf("agentservice: 应答 %s 没有数据", a.Request)
@@ -119,13 +101,11 @@ func (a Answer) Decode(target any) error {
 	return nil
 }
 
-// Options 定义连接 AcerAgentService 的配置参数。
 type Options struct {
 	Address string
 	Timeout time.Duration
 }
 
-// Client 封装与 AcerAgentService 的长连接与请求交互。
 type Client struct {
 	address string
 	timeout time.Duration
@@ -135,7 +115,6 @@ type Client struct {
 	read  *bufio.Reader
 }
 
-// Connect 建立与 AcerAgentService 的 TCP 连接。
 func Connect(options Options) (*Client, error) {
 	address := options.Address
 	if address == "" {
@@ -163,7 +142,6 @@ func (c *Client) open() error {
 	return nil
 }
 
-// Close 关闭与服务端的网络连接。
 func (c *Client) Close() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -177,35 +155,26 @@ func (c *Client) Close() error {
 	return err
 }
 
-// Capability 查询指定功能的支持情况。
 func (c *Client) Capability(function string) (Answer, error) {
 	return c.ask(PacketInitialization, function, nil)
 }
 
-// MonitorData 查询系统监控与传感器实时数据包。
 func (c *Client) MonitorData() (Answer, error) {
 	return c.ask(PacketMonitorData, "", nil)
 }
 
-// Get 查询指定功能的当前设置值。
 func (c *Client) Get(function string) (Answer, error) {
 	return c.ask(PacketGetUpdatedData, function, nil)
 }
 
-// GetFrom 查询指定设备上的当前设置值。
-//
-// 真机实测：灯光的读取需要带上设备号，否则服务只回 0 号设备的设置，
-// 读不到分区直控那一份。
 func (c *Client) GetFrom(function string, device int) (Answer, error) {
 	return c.ask(PacketGetUpdatedData, function, map[string]any{"device": device})
 }
 
-// Devices 枚举当前接入的设备列表。
 func (c *Client) Devices() (Answer, error) {
 	return c.ask(PacketGetConnectedDevice, "", nil)
 }
 
-// Set 向指定功能下发新的控制参数。
 func (c *Client) Set(function string, parameter any) (Answer, error) {
 	return c.ask(PacketSetDeviceData, function, parameter)
 }

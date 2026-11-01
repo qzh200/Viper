@@ -7,7 +7,6 @@ import (
 	"viper/internal/domain"
 )
 
-// Lighting 从硬件读取当前生效的 RGB 灯效配置。
 func (a *App) Lighting() (domain.RGBConfig, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -21,7 +20,6 @@ func (a *App) Lighting() (domain.RGBConfig, error) {
 	return result, nil
 }
 
-// StoredLighting 返回本地配置文件中保存的灯效数据。
 func (a *App) StoredLighting() domain.RGBConfig {
 	stored := a.store.Settings().Lighting
 
@@ -38,7 +36,6 @@ func (a *App) StoredLighting() domain.RGBConfig {
 	return result
 }
 
-// SetLighting 向硬件应用新的灯效设置并持久化至本地配置。
 func (a *App) SetLighting(value domain.RGBConfig) error {
 	value = clampLighting(value)
 
@@ -91,7 +88,6 @@ func clamp(value uint64, low, high uint64) uint64 {
 	return value
 }
 
-// ResetLighting 将键盘背光重置为默认出厂设置（全区白色常亮、最大亮度）。
 func (a *App) ResetLighting() error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -117,7 +113,6 @@ func (a *App) ResetLighting() error {
 	return nil
 }
 
-// BacklightTimeout 查询 30 秒无操作背光自动休眠熄灭功能是否启用。
 func (a *App) BacklightTimeout() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -130,7 +125,6 @@ func (a *App) BacklightTimeout() (bool, error) {
 	return backlight.Timeout, nil
 }
 
-// SetBacklightTimeout 设置背光 30 秒空闲自动熄灭开关并持久化。
 func (a *App) SetBacklightTimeout(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {

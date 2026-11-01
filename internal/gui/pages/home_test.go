@@ -128,7 +128,6 @@ func TestTheChoiceIsKeptUntilTheMachineAgrees(t *testing.T) {
 		t.Fatal("the page forgot the choice")
 	}
 
-	// The machine did it: the page may hand the choice back.
 	ctrl.Work()
 	tt.Frame()
 

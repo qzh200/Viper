@@ -7,7 +7,6 @@ import (
 	"viper/internal/domain"
 )
 
-// PowerMode 查询当前生效的电源性能模式。
 func (a *App) PowerMode() (domain.PowerMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -16,7 +15,6 @@ func (a *App) PowerMode() (domain.PowerMode, error) {
 	return backend.PowerMode()
 }
 
-// SetPowerMode 设置电源性能模式，更新本地配置，并自动应用绑定到该模式的场景预设（如果有）。
 func (a *App) SetPowerMode(mode domain.PowerMode) error {
 	if mode != domain.PowerQuiet && mode != domain.PowerBalanced &&
 		mode != domain.PowerPerformance && mode != domain.PowerTurbo &&
@@ -87,7 +85,6 @@ func storedPowerMode(mode domain.PowerMode) uint64 {
 	}
 }
 
-// AvailablePowerModes 返回当前机型支持的电源模式列表。
 func (a *App) AvailablePowerModes() []domain.PowerMode {
 	return domain.AvailablePowerModes()
 }

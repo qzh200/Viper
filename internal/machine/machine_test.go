@@ -22,10 +22,8 @@ type fakeService struct {
 
 	monitor agentservice.Answer
 
-	// devices 是设备列表的应答；为空时用默认的键盘灯光设备。
 	devices agentservice.Answer
 
-	// zones 是 1 号设备（分区直控）上的灯光设置。
 	zones agentservice.Answer
 
 	writes []fakeWrite
@@ -58,14 +56,12 @@ func (f *fakeService) Get(function string) (agentservice.Answer, error) {
 	return f.GetFrom(function, 0)
 }
 
-// GetFrom 读取指定设备上的设置。
 func (f *fakeService) GetFrom(function string, device int) (agentservice.Answer, error) {
 	if f.getErr != nil {
 		return agentservice.Answer{}, f.getErr
 	}
 	result, ok := f.answers[function]
 
-	// 分区直控的设置挂在 1 号设备上。
 	if device == 1 && f.zones.Data != nil {
 		return f.zones, nil
 	}
@@ -106,11 +102,6 @@ func (f *fakeService) Capability(function string) (agentservice.Answer, error) {
 	return f.Get(function)
 }
 
-// Devices 返回设备列表。默认给一台键盘灯光设备，
-// 亮度 5 档、跑在静态常亮上。
-//
-// 若之前写过 LIGHTING，这里按写入的值报告，
-// 好让写后核验能看出硬件换没换过来。
 func (f *fakeService) Devices() (agentservice.Answer, error) {
 	if f.getErr != nil {
 		return agentservice.Answer{}, f.getErr
@@ -160,7 +151,6 @@ func (f *fakeService) Devices() (agentservice.Answer, error) {
 	}, agentservice.ResultOK), nil
 }
 
-// modeIndexOf 返回灯效名在设备能力表里的下标。
 func modeIndexOf(effect string) int {
 	switch effect {
 	case "BREATHING":
@@ -367,7 +357,6 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 		"speed":      5,
 		"direction":  1,
 	}, agentservice.ResultOK)
-	// 设备列表才是硬件真值：亮度 3 档，跑在波形上。
 	service.devices = answer([]any{
 		map[string]any{
 			"device_index":      0,
@@ -419,8 +408,6 @@ func TestLightingIsReadFromTheService(t *testing.T) {
 
 func TestTheZoneColoursAreReadFromTheZoneDevice(t *testing.T) {
 	service := newFakeService()
-	// 分区直控时，硬件跑在 DIRECT 模式，
-	// 四个分区的颜色要带上设备号去 1 号设备上读。
 	service.devices = answer([]any{
 		map[string]any{
 			"device_index":      0,
@@ -472,8 +459,6 @@ func TestTheZoneColoursAreReadFromTheZoneDevice(t *testing.T) {
 
 func TestLightingTakesTheBrightnessAndTheEffectFromTheDevice(t *testing.T) {
 	service := newFakeService()
-	// 服务缓存里写的是 100 亮度与 ZOOM，
-	// 但设备列表说硬件其实是 2 档、跑在呼吸上。
 	service.answers[agentservice.FunctionLighting] = answer(map[string]any{
 		"brightness": 100,
 		"effect":     "ZOOM",

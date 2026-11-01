@@ -17,7 +17,7 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		LightingConfig: domain.RGBConfig{
 			Effect:     domain.EffectStatic,
 			Speed:      5,
-			Brightness: 5, // 对应 UI 4 档
+			Brightness: 5,
 			PerZone:    false,
 			Zones: [4]domain.RGBColor{
 				{R: 0, G: 136, B: 255},
@@ -36,7 +36,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		pages.Lighting(c, ctrl, state)
 	}, 1020, 680)
 
-	// 1. 静态模式下检查基本文本与选色板
 	for _, want := range []string{
 		"键盘 RGB 灯效",
 		"全局设置",
@@ -65,22 +64,18 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		}
 	}
 
-	// 策略指引卡片已被移除
 	if tt.HasText("键盘背光与氛围策略指引") {
 		t.Error("strategy card text should be removed")
 	}
 
-	// 静态模式不应显示动画速度滑块
 	if tt.HasText("动画速度") {
 		t.Error("static mode should not display speed slider")
 	}
 
-	// 验证色相滑块
 	if !tt.HasText("色相") {
 		t.Error("should show Hue slider")
 	}
 
-	// 2. 点击切换到“呼吸”模式（支持调速与调色）
 	if err := tt.Click("呼吸"); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +94,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		t.Error("breathing mode should allow color adjustment")
 	}
 
-	// 测试点击档位直选“极速 (9档)”
 	if err := tt.Click("极速 (9档)"); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +102,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		t.Errorf("expected speed 9, got %v", state.LightingSpeed)
 	}
 
-	// 3. 点击切换到“波形”模式（支持流动方向与速度，不支持调色）
 	if err := tt.Click("波形"); err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +114,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		t.Error("wave mode should not allow color adjustment")
 	}
 
-	// 4. 点击切换到“切换”模式（支持流动方向、调速、调色）
 	if err := tt.Click("切换"); err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +126,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		t.Error("switch mode should allow color adjustment")
 	}
 
-	// 5. 点击预设色彩“极光青”
 	if err := tt.Click("极光青"); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +135,6 @@ func TestLightingPageGlobalSettings(t *testing.T) {
 		t.Errorf("expected color green 230, got %d", state.ZoneColors[0].G)
 	}
 
-	// 6. 测试重置默认灯效
 	if err := tt.Click("恢复默认"); err != nil {
 		t.Fatal(err)
 	}
@@ -175,13 +165,12 @@ func TestLightingPagePerZoneSettings(t *testing.T) {
 	ctrl := controller.New(machine, &guitest.Store{})
 	defer ctrl.Stop()
 	state := pages.NewState()
-	state.LightingTab = 1 // 切换到分区设置
+	state.LightingTab = 1
 
 	tt := ui.NewTester(func(c *ui.Context) {
 		pages.Lighting(c, ctrl, state)
 	}, 1020, 680)
 
-	// 验证分区设置页面基本文本
 	for _, want := range []string{
 		"四分区键盘色彩预览",
 		"四分区独立调色",
@@ -199,7 +188,6 @@ func TestLightingPagePerZoneSettings(t *testing.T) {
 		}
 	}
 
-	// 测试点击预设颜色“烈焰红”
 	if err := tt.Click("烈焰红"); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +205,7 @@ func TestLightingPageNeonAndZeroBrightness(t *testing.T) {
 		LightingConfig: domain.RGBConfig{
 			Effect:     domain.EffectNeon,
 			Speed:      7,
-			Brightness: 1, // 硬件 1 档即对应界面 0 档（熄灭）
+			Brightness: 1,
 			PerZone:    false,
 		},
 	}
@@ -229,7 +217,6 @@ func TestLightingPageNeonAndZeroBrightness(t *testing.T) {
 		pages.Lighting(c, ctrl, state)
 	}, 1020, 680)
 
-	// 验证 0 档熄灭文字展示
 	if !tt.HasText("0 档") {
 		t.Errorf("expected 0 档 text for brightness 1, got %v", tt.Texts())
 	}
@@ -237,7 +224,6 @@ func TestLightingPageNeonAndZeroBrightness(t *testing.T) {
 		t.Errorf("expected 已熄灭 badge, got %v", tt.Texts())
 	}
 
-	// 验证霓虹模式下的动态参数（有动画速度、无流动方向、无调色盘）
 	if !tt.HasText("动画速度") {
 		t.Error("neon should show animation speed")
 	}

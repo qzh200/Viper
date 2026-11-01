@@ -6,7 +6,6 @@ import (
 	"viper/internal/domain"
 )
 
-// LCDOverdrive 查询屏幕响应时间超速加速功能是否开启。
 func (a *App) LCDOverdrive() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -15,7 +14,6 @@ func (a *App) LCDOverdrive() (bool, error) {
 	return backend.LCDOverdrive()
 }
 
-// SetLCDOverdrive 设置屏幕 LCD Overdrive 响应时间加速开关。
 func (a *App) SetLCDOverdrive(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -27,7 +25,6 @@ func (a *App) SetLCDOverdrive(enabled bool) error {
 	return nil
 }
 
-// WinKeyLocked 查询 Windows 徽标键是否处于锁定禁用状态。
 func (a *App) WinKeyLocked() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -36,7 +33,6 @@ func (a *App) WinKeyLocked() (bool, error) {
 	return backend.WinKeyLocked()
 }
 
-// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
 func (a *App) SetWinKeyLocked(locked bool) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -48,7 +44,6 @@ func (a *App) SetWinKeyLocked(locked bool) error {
 	return nil
 }
 
-// DiscreteGPU 查询当前是否工作在纯独显直连模式。
 func (a *App) DiscreteGPU() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -57,7 +52,6 @@ func (a *App) DiscreteGPU() (bool, error) {
 	return backend.DiscreteGPU()
 }
 
-// OverclockCapability 检测 GPU 与 CPU 的超频支持能力。
 func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -66,7 +60,6 @@ func (a *App) OverclockCapability() (gpu bool, cpu bool, err error) {
 	return backend.OverclockCapability()
 }
 
-// GPUMode 查询当前的显卡工作模式。
 func (a *App) GPUMode() (domain.GPUMode, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -75,7 +68,6 @@ func (a *App) GPUMode() (domain.GPUMode, error) {
 	return backend.GPUMode()
 }
 
-// SetGPUMode 切换显卡模式（混合/独显直连/自动）。
 func (a *App) SetGPUMode(mode domain.GPUMode) error {
 	backend, err := a.hardware()
 	if err != nil {
@@ -87,7 +79,6 @@ func (a *App) SetGPUMode(mode domain.GPUMode) error {
 	return nil
 }
 
-// BootSound 查询开机启动音效是否开启。
 func (a *App) BootSound() (bool, error) {
 	backend, err := a.hardware()
 	if err != nil {
@@ -96,7 +87,6 @@ func (a *App) BootSound() (bool, error) {
 	return backend.BootSound()
 }
 
-// SetBootSound 设置开机启动音效开关。
 func (a *App) SetBootSound(enabled bool) error {
 	backend, err := a.hardware()
 	if err != nil {

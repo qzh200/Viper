@@ -41,7 +41,6 @@ func TestSmootherInitializesDirectly(t *testing.T) {
 		t.Errorf("got metric number %f, want 80.0", metrics[0].Number)
 	}
 
-	// 稳定状态下 Step 应该返回 false
 	if s.Step(model.DefaultSmoothAlpha) {
 		t.Error("expected Step to return false when already at target")
 	}
@@ -51,17 +50,14 @@ func TestSmootherInterpolatesSmoothly(t *testing.T) {
 	s := model.NewSmoother()
 	s.SetTarget(domain.MonitorData{CPUTemperatureC: 50})
 
-	// 更新目标值从 50 到 100
 	s.SetTarget(domain.MonitorData{CPUTemperatureC: 100})
 
-	// 步进一步
 	changed := s.Step(0.2)
 	if !changed {
 		t.Fatal("expected Step to return true during transition")
 	}
 
 	cur, metrics := s.Current()
-	// 50 + (100 - 50)*0.2 = 60
 	if cur.CPUTemperatureC != 60 {
 		t.Errorf("after 1 step got CPU temp %d, want 60", cur.CPUTemperatureC)
 	}
@@ -69,7 +65,6 @@ func TestSmootherInterpolatesSmoothly(t *testing.T) {
 		t.Errorf("after 1 step got metric number %f, want ~60.0", metrics[0].Number)
 	}
 
-	// 连续步进直到收敛
 	steps := 0
 	for s.Step(0.2) {
 		steps++
@@ -86,7 +81,6 @@ func TestSmootherInterpolatesSmoothly(t *testing.T) {
 
 func TestSmootherFiltersNegativeAndIdleValues(t *testing.T) {
 	s := model.NewSmoother()
-	// 模拟独显休眠返回 -1、网卡离线返回 -1、负占用率等极端脏数据
 	raw := domain.MonitorData{
 		CPUTemperatureC:      -5,
 		CPUUsagePercent:      -1.0,
@@ -126,10 +120,8 @@ func TestSmootherDampensSuddenDrop(t *testing.T) {
 	s := model.NewSmoother()
 	s.SetTarget(domain.MonitorData{CPUUsagePercent: 30.0})
 
-	// 突然跳水至 0%
 	s.SetTarget(domain.MonitorData{CPUUsagePercent: 0.0})
 
-	// 经过加权滤波，目标值被缓冲，不会立刻暴跌
 	s.Step(model.DefaultSmoothAlpha)
 	cur, _ := s.Current()
 	if cur.CPUUsagePercent == 0 {

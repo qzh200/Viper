@@ -117,7 +117,6 @@ func TestTheSavedAppearanceIsTheOneTheWindowStartsWith(t *testing.T) {
 		window.View(c)
 	}, 1120, 720)
 
-	// The dark mode is the second segment, and it is the one that is on.
 	if !tt.HasText("暗色") {
 		t.Errorf("the window has no %q in %q", "暗色", tt.Texts())
 	}
@@ -245,13 +244,11 @@ func TestAnAppearanceCanBeGivenToTheWindow(t *testing.T) {
 		window.View(c)
 	}, 1120, 720)
 
-	// The dark mode is the second segment, and it is the one that is on.
 	if !tt.HasText("暗色") {
 		t.Errorf("the window has no %q in %q", "暗色", tt.Texts())
 	}
 }
 
-// errStore 是保存配置时遇到的失败。
 var errStore = errSave{}
 
 type errSave struct{}

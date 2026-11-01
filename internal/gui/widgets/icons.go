@@ -6,47 +6,29 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// Icon 是一枚线条图标。
-//
-// 图标都用路径画出来，因此亮色与暗色下都由主题的颜色说了算，
-// 不用另外准备两套图片。
 type Icon int
 
 const (
-	// IconCPU 是处理器。
 	IconCPU Icon = iota
-	// IconGPU 是显卡。
 	IconGPU
-	// IconMemory 是内存。
 	IconMemory
-	// IconThermometer 是温度。
 	IconThermometer
-	// IconFan 是风扇。
 	IconFan
-	// IconBolt 是供电。
 	IconBolt
-	// IconActivity 是负载。
 	IconActivity
-	// IconGear 是设置。
 	IconGear
-	// IconClock 是时钟。
 	IconClock
-	// IconDisplay 是屏幕。
 	IconDisplay
-	// IconSun 是亮色。
 	IconSun
-	// IconMoon 是暗色。
 	IconMoon
 )
 
-// IconElement 画一枚图标，大小是 size 见方。
 func IconElement(c *ui.Context, icon Icon, size float32, color ui.Color) ui.Element {
 	return ui.Box(c).Size(size, size).Draw(func(p *ui.Painter, r ui.Rect) {
 		icon.draw(p, r, color)
 	}).Label(icon.name())
 }
 
-// name 是图标的名字，给读屏软件用。
 func (i Icon) name() string {
 	switch i {
 	case IconCPU:
@@ -78,9 +60,6 @@ func (i Icon) name() string {
 	}
 }
 
-// draw 把图标画在 r 这块地方。
-//
-// 图标画在 24 见方的格子里，格子按 r 的大小缩放。
 func (i Icon) draw(p *ui.Painter, r ui.Rect, color ui.Color) {
 	side := r.W
 	if r.H < side {
@@ -120,7 +99,6 @@ func (i Icon) draw(p *ui.Painter, r ui.Rect, color ui.Color) {
 		}
 
 	case IconThermometer:
-		// 温度计：一根细杆，底下挂一个圆泡。
 		p.Line(x(12), y(4.5), x(12), y(14), 1.8, color)
 		p.FillPath(circle(x(12), y(16.5), 3.4*unit), color)
 		for _, at := range []float32{8, 11} {
@@ -128,12 +106,10 @@ func (i Icon) draw(p *ui.Painter, r ui.Rect, color ui.Color) {
 		}
 
 	case IconFan:
-		// 风扇：一圈边框，里面三片转子。
 		p.StrokePath(circle(x(12), y(12), 9*unit), 1.5, color)
 		for blade := 0; blade < 3; blade++ {
 			angle := float64(blade)*math.Pi*2/3 - math.Pi/2
 			cos, sin := math.Cos(angle), math.Sin(angle)
-			// 绕着轴心转，转出来的点也要按图标大小缩放。
 			at := func(px, py float32) (float32, float32) {
 				dx, dy := (px-12)*unit, (py-12)*unit
 				return x(12) + dx*float32(cos) - dy*float32(sin),
@@ -166,7 +142,6 @@ func (i Icon) draw(p *ui.Painter, r ui.Rect, color ui.Color) {
 		p.FillPath(path, color)
 
 	case IconActivity:
-		// 一排柱子，当作性能曲线。
 		for i, height := range []float32{5, 9.5, 6.5, 12} {
 			left := 3.5 + float32(i)*4.5
 			p.Fill(ui.Rect{
@@ -222,7 +197,6 @@ func (i Icon) draw(p *ui.Painter, r ui.Rect, color ui.Color) {
 	}
 }
 
-// circle 画一个圆的路径。
 func circle(cx, cy, r float32) *ui.Path {
 	path := &ui.Path{}
 	path.Circle(cx, cy, r)

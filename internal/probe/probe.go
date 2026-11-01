@@ -1,4 +1,3 @@
-// Package probe 提供针对 AcerAgentService 与硬件控制接口的底层探测与校验工具。
 package probe
 
 import (
@@ -7,7 +6,6 @@ import (
 	"viper/internal/agentservice"
 )
 
-// Service 定义与原厂服务进行原始数据交换的接口契约。
 type Service interface {
 	Get(function string) (agentservice.Answer, error)
 	Set(function string, parameter any) (agentservice.Answer, error)

@@ -1,18 +1,13 @@
 package domain
 
-// FanMode 表示风扇运转模式。
 type FanMode int
 
 const (
-	// FanAuto 表示风扇自动转速模式。
 	FanAuto FanMode = iota
-	// FanMax 表示风扇全速运转模式。
 	FanMax
-	// FanCustom 表示用户自定义转速模式。
 	FanCustom
 )
 
-// String 返回风扇模式的文本名称。
 func (m FanMode) String() string {
 	switch m {
 	case FanAuto:
@@ -26,25 +21,17 @@ func (m FanMode) String() string {
 	}
 }
 
-// PowerMode 表示系统电源/性能配置模式。
 type PowerMode int
 
 const (
-	// PowerQuiet 表示静音/低功耗模式。
 	PowerQuiet PowerMode = iota
-	// PowerBalanced 表示平衡模式。
 	PowerBalanced
-	// PowerPerformance 表示高性能模式。
 	PowerPerformance
-	// PowerTurbo 表示极速/狂暴模式。
 	PowerTurbo
-	// PowerUnknown 表示未识别模式。
 	PowerUnknown
-	// PowerEco 表示节能模式。
 	PowerEco PowerMode = 5
 )
 
-// String 返回电源模式的标识符。
 func (m PowerMode) String() string {
 	switch m {
 	case PowerQuiet:
@@ -79,7 +66,6 @@ func decodePowerMode(value uint64) PowerMode {
 	}
 }
 
-// PowerModeCode 返回对应底层提供方的数值编码。
 func PowerModeCode(mode PowerMode) uint64 {
 	return mode.providerCode()
 }
@@ -101,17 +87,14 @@ func (m PowerMode) providerCode() uint64 {
 	}
 }
 
-// DecodePowerMode 将底层数值编码转换为对应的 PowerMode。
 func DecodePowerMode(value uint64) PowerMode {
 	return decodePowerMode(value)
 }
 
-// AvailablePowerModes 返回机型支持的可用电源模式列表。
 func AvailablePowerModes() []PowerMode {
 	return []PowerMode{PowerQuiet, PowerBalanced, PowerPerformance, PowerTurbo, PowerEco}
 }
 
-// ParsePowerMode 根据名称解析电源模式。
 func ParsePowerMode(name string) (PowerMode, bool) {
 	switch name {
 	case "quiet":
@@ -129,88 +112,50 @@ func ParsePowerMode(name string) (PowerMode, bool) {
 	}
 }
 
-// RGBColor 表示 24 位 RGB 颜色分量。
 type RGBColor struct {
 	R uint8
 	G uint8
 	B uint8
 }
 
-// 键盘背光在原厂服务里的量程。
-//
-// 真机实测：亮度只有 1 到 5 档，写 0 或超出上限都会被服务钳回上限，
-// 因此这里用档位而不是百分比描述亮度。
 const (
-	// BrightnessMin 是背光最低的一档。
 	BrightnessMin uint64 = 1
-	// BrightnessMax 是背光最高的一档。
 	BrightnessMax uint64 = 5
 )
 
-// 动态灯效的速度量程。
-//
-// 真机实测：服务接受 1 到 9，越界会被钳回上限。
 const (
-	// SpeedMin 是灯效最慢的速度。
 	SpeedMin uint64 = 1
-	// SpeedMax 是灯效最快的速度。
 	SpeedMax uint64 = 9
 )
 
-// RGBConfig 描述背光灯效的完整配置参数。
 type RGBConfig struct {
-	// Effect 指定灯效模式。
-	Effect LightingEffect
-	// Speed 指定动态灯效速度，取值 1 到 9。
-	Speed uint64
-	// Direction 指定灯效流动方向。
-	//
-	// 真机实测：只有波形与切换这两种灯效有方向，其余灯效方向固定；
-	// 因此这个值只对那两种灯效有意义。
-	Direction uint64
-	// Brightness 指定背光档位，取值 1 到 5。
-	Brightness uint64
-	// Zones 包含各分区颜色（支持 4 分区）。
-	Zones [4]RGBColor
-	// PerZone 标识是否采用多分区独立颜色。
-	PerZone bool
-	// ColourReadable 标识颜色配置是否可读。
+	Effect         LightingEffect
+	Speed          uint64
+	Direction      uint64
+	Brightness     uint64
+	Zones          [4]RGBColor
+	PerZone        bool
 	ColourReadable bool
-	// EffectReadable 标识灯效模式是否可读。
 	EffectReadable bool
 }
 
-// HasDirection 判断该灯效是否有流动方向。
-//
-// 真机实测的设备能力表里，只有波形与切换两种灯效带方向，
-// 其余灯效的方向字段是空值。
 func (e LightingEffect) HasDirection() bool {
 	return e == EffectWave || e == EffectSwitch
 }
 
-// LightingEffect 表示背光动画效果类型。
 type LightingEffect uint64
 
 const (
-	// EffectStatic 静态常亮。
-	EffectStatic LightingEffect = 0
-	// EffectBreathing 呼吸渐变。
+	EffectStatic    LightingEffect = 0
 	EffectBreathing LightingEffect = 1
-	// EffectNeon 霓虹变色。
-	EffectNeon LightingEffect = 2
-	// EffectWave 波浪滚动。
-	EffectWave LightingEffect = 3
-	// EffectSwitch 交叉切换。
-	EffectSwitch LightingEffect = 4
-	// EffectScale 缩放脉冲。
-	EffectScale LightingEffect = 5
-	// EffectMeteor 流星划过。
-	EffectMeteor LightingEffect = 6
-	// EffectFlash 闪烁模式。
-	EffectFlash LightingEffect = 7
+	EffectNeon      LightingEffect = 2
+	EffectWave      LightingEffect = 3
+	EffectSwitch    LightingEffect = 4
+	EffectScale     LightingEffect = 5
+	EffectMeteor    LightingEffect = 6
+	EffectFlash     LightingEffect = 7
 )
 
-// String 返回灯效的文本表示。
 func (e LightingEffect) String() string {
 	switch e {
 	case EffectStatic:
@@ -234,7 +179,6 @@ func (e LightingEffect) String() string {
 	}
 }
 
-// ParseLightingEffect 根据字符串解析灯效类型。
 func ParseLightingEffect(name string) (LightingEffect, bool) {
 	switch name {
 	case "static":
@@ -258,19 +202,14 @@ func ParseLightingEffect(name string) (LightingEffect, bool) {
 	}
 }
 
-// GPUMode 表示显卡切换与工作模式。
 type GPUMode uint64
 
 const (
-	// GPUModeHybrid 混合模式（核显+独显 Dynamic/Optimus）。
-	GPUModeHybrid GPUMode = 1
-	// GPUModeDiscrete 纯独显直连模式。
+	GPUModeHybrid   GPUMode = 1
 	GPUModeDiscrete GPUMode = 2
-	// GPUModeAuto 自动显卡切换模式。
-	GPUModeAuto GPUMode = 3
+	GPUModeAuto     GPUMode = 3
 )
 
-// String 返回显卡模式的名称。
 func (m GPUMode) String() string {
 	switch m {
 	case GPUModeHybrid:
@@ -284,7 +223,6 @@ func (m GPUMode) String() string {
 	}
 }
 
-// ParseGPUMode 将模式名称解析为 GPUMode。
 func ParseGPUMode(name string) (GPUMode, bool) {
 	switch name {
 	case "hybrid", "optimus", "mshybrid":
@@ -308,10 +246,8 @@ func clampUint(value, low, high uint64) uint64 {
 	return value
 }
 
-// LightingZones 定义支持的背光分区数量。
 const LightingZones = 4
 
-// Sensors 包含基本的温度与转速传感器数据。
 type Sensors struct {
 	CPUTempC    int
 	CPUFanRPM   int
@@ -320,7 +256,6 @@ type Sensors struct {
 	SystemTempC int
 }
 
-// FanState 记录风扇当前的模式与运行状态。
 type FanState struct {
 	CPUMode         FanMode
 	GPUMode         FanMode
@@ -330,7 +265,6 @@ type FanState struct {
 	CoolBoost       bool
 }
 
-// FanConfig 定义待应用的风扇目标配置。
 type FanConfig struct {
 	CPUMode    FanMode
 	GPUMode    FanMode
@@ -339,7 +273,6 @@ type FanConfig struct {
 	CoolBoost  bool
 }
 
-// BacklightState 记录键盘背光亮度与自动超时关闭状态。
 type BacklightState struct {
 	Brightness int
 	Timeout    bool

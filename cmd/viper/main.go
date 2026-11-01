@@ -1,4 +1,3 @@
-// viper 是 Acer 游戏笔记本（掠夺者 Predator / 暗影骑士 Nitro）的跨平台硬件控制中心命令行客户端。
 package main
 
 import (

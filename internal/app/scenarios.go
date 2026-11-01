@@ -7,17 +7,14 @@ import (
 	"viper/internal/domain"
 )
 
-// Scenarios 返回所有已保存的命名场景配置字典。
 func (a *App) Scenarios() map[string]config.Scenario {
 	return a.store.Settings().Scenarios
 }
 
-// Bindings 返回所有电源模式与场景的绑定关联映射。
 func (a *App) Bindings() map[string]string {
 	return a.store.Settings().Bindings
 }
 
-// SaveScenario 将当前的灯效与风扇状态保存为一个新的命名场景。
 func (a *App) SaveScenario(name string) error {
 	if name == "" {
 		return fmt.Errorf("app: 场景需要一个名字")
@@ -32,7 +29,6 @@ func (a *App) SaveScenario(name string) error {
 	if lighting, err := a.Lighting(); err == nil {
 		stored := toStoredLighting(lighting)
 		if lighting.Brightness == 0 {
-			// 机器没报出亮度，就用设置里存的那一档。
 			stored.Brightness = settings.Lighting.Brightness
 		}
 		scenario.Lighting = stored
@@ -56,7 +52,6 @@ func (a *App) SaveScenario(name string) error {
 	return nil
 }
 
-// DeleteScenario 删除指定名称的场景，并自动解除相关电源模式绑定。
 func (a *App) DeleteScenario(name string) error {
 	if err := a.store.Update(func(s *config.Settings) {
 		delete(s.Scenarios, name)
@@ -71,7 +66,6 @@ func (a *App) DeleteScenario(name string) error {
 	return nil
 }
 
-// ApplyScenario 根据名称加载并应用指定的场景配置。
 func (a *App) ApplyScenario(name string) error {
 	scenario, ok := a.store.Settings().Scenarios[name]
 	if !ok {
@@ -104,7 +98,6 @@ func (a *App) applyScenario(scenario config.Scenario) error {
 	})
 }
 
-// BindScenario 将指定的场景绑定到特定电源性能模式，在切换到该模式时自动应用该场景。
 func (a *App) BindScenario(profile, scene string) error {
 	if _, ok := a.store.Settings().Scenarios[scene]; !ok {
 		return fmt.Errorf("app: 没有叫 %q 的场景", scene)
@@ -117,7 +110,6 @@ func (a *App) BindScenario(profile, scene string) error {
 	return nil
 }
 
-// UnbindScenario 解除特定电源性能模式的场景绑定。
 func (a *App) UnbindScenario(profile string) error {
 	if err := a.store.Update(func(s *config.Settings) {
 		delete(s.Bindings, profile)

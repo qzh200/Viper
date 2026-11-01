@@ -9,13 +9,10 @@ import (
 	"viper/internal/gui/capture"
 )
 
-// fakeWindow 是一扇会照着剧本说话的窗口。
 type fakeWindow struct {
-	png []byte
-	err error
-	// calls 记下截了多少次。
-	calls int
-	// failFirst 是开头失败的次数。
+	png       []byte
+	err       error
+	calls     int
 	failFirst int
 }
 
@@ -101,7 +98,6 @@ func TestAWindowThatNeverAppearsIsGivenUpOn(t *testing.T) {
 
 func TestAPlaceThatCannotHoldAPictureIsReported(t *testing.T) {
 	dir := t.TempDir()
-	// 一个普通文件不能当目录用。
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)

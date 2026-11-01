@@ -17,7 +17,6 @@ var (
 	wheelBitmap *ui.Bitmap
 )
 
-// getSmoothWheelBitmap 返回全局缓存的超高分辨率 360 度逐像素平滑抗锯齿 HSV 色盘位图。
 func getSmoothWheelBitmap() *ui.Bitmap {
 	wheelOnce.Do(func() {
 		const size = 320
@@ -35,7 +34,6 @@ func getSmoothWheelBitmap() *ui.Bitmap {
 					continue
 				}
 
-				// 边缘亚像素平滑抗锯齿
 				alpha := 1.0
 				if dist > radius-1.2 {
 					alpha = (radius - dist) / 1.2
@@ -68,7 +66,6 @@ func getSmoothWheelBitmap() *ui.Bitmap {
 	return wheelBitmap
 }
 
-// ColorWheelSpec 描述色轮组件的渲染与交互属性。
 type ColorWheelSpec struct {
 	Size       float32
 	Hue        float64
@@ -77,8 +74,6 @@ type ColorWheelSpec struct {
 	OnChange   func(hue float64, sat float64)
 }
 
-// ColorWheel 绘制原生 PredatorSense 风格的极坐标 360 度平滑色轮，
-// 并完整支持鼠标点击与按住实时拖动取色。
 func ColorWheel(c *ui.Context, spec ColorWheelSpec) ui.Element {
 	size := spec.Size
 	if size <= 0 {
@@ -87,7 +82,6 @@ func ColorWheel(c *ui.Context, spec ColorWheelSpec) ui.Element {
 
 	box := ui.Box(c).Size(size, size).Cursor(ui.CursorCrosshair)
 
-	// 指针交互处理：支持点击任意点以及按住鼠标实时拖拽取色
 	if spec.OnChange != nil {
 		px, py, over := box.PointerPosition()
 		if box.Pressed() || (over && box.Clicked()) {
@@ -116,7 +110,6 @@ func ColorWheel(c *ui.Context, spec ColorWheelSpec) ui.Element {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
 		radius := min(r.W, r.H)/2 - 3
 
-		// 1. 绘制逐像素平滑渲染的全局色轮位图
 		bmp := getSmoothWheelBitmap()
 		p.Image(bmp, ui.Rect{
 			X: cx - radius,
@@ -125,10 +118,8 @@ func ColorWheel(c *ui.Context, spec ColorWheelSpec) ui.Element {
 			H: radius * 2,
 		}, ui.Contain)
 
-		// 2. 外边框描边
 		p.StrokePath(circle(cx, cy, radius), 1.5, t.Border)
 
-		// 3. 当前颜色定位光标 (Picker Handle)
 		sat := spec.Saturation
 		if sat <= 0 {
 			sat = 1.0
@@ -141,7 +132,6 @@ func ColorWheel(c *ui.Context, spec ColorWheelSpec) ui.Element {
 		hx := cx + dist*float32(math.Cos(angleRad))
 		hy := cy + dist*float32(math.Sin(angleRad))
 
-		// 双层白环黑影光标，并填充当前选中的颜色
 		p.StrokePath(circle(hx, hy, 8), 1.5, ui.RGBA(0, 0, 0, 0.45))
 		p.StrokePath(circle(hx, hy, 7), 2.0, ui.RGB(255, 255, 255))
 		p.FillPath(circle(hx, hy, 4.5), ui.RGB(spec.Color.R, spec.Color.G, spec.Color.B))

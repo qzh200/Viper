@@ -29,7 +29,6 @@ type fanData struct {
 	} `json:"custom_fan_data"`
 }
 
-// Fans 读取当前 CPU 与 GPU 风扇的运转模式与转速百分比。
 func (b *Backend) Fans() (domain.FanState, error) {
 	data, err := b.fans()
 	if err != nil {
@@ -70,7 +69,6 @@ func (b *Backend) Fans() (domain.FanState, error) {
 	return state, nil
 }
 
-// SetFans 配置并下发风扇的目标运转模式及转速参数。
 func (b *Backend) SetFans(config domain.FanConfig) error {
 	if config.CoolBoost {
 		config.CPUMode = domain.FanMax
@@ -158,7 +156,6 @@ func fanRequest(mode domain.FanMode, percent int) (auto int, speed int) {
 	}
 }
 
-// CoolBoostEnabled 查询 CoolBoost 强冷是否开启（两风扇处于最大转速）。
 func (b *Backend) CoolBoostEnabled() (bool, error) {
 	state, err := b.Fans()
 	if err != nil {
@@ -167,7 +164,6 @@ func (b *Backend) CoolBoostEnabled() (bool, error) {
 	return state.CPUMode == domain.FanMax && state.GPUMode == domain.FanMax, nil
 }
 
-// CoolBoost 启用或禁用 CoolBoost 强冷功能。
 func (b *Backend) CoolBoost(enabled bool) error {
 	if enabled {
 		return b.SetFans(domain.FanConfig{

@@ -2,7 +2,6 @@ package widgets
 
 import "testing"
 
-// TestTheFanTurnsFasterWhenItRunsFaster 是风扇转速与画出来快慢的关系。
 func TestTheFanTurnsFasterWhenItRunsFaster(t *testing.T) {
 	if got := fanTurns(0); got != 0 {
 		t.Errorf("a stopped fan turns at %v, want nothing", got)

@@ -6,7 +6,6 @@ import (
 	"viper/internal/quickaccess"
 )
 
-// QuickAccess 定义与系统 QuickAccess 服务交互的抽象接口。
 type QuickAccess interface {
 	USBChargeLimit() (int, error)
 	SetUSBChargeLimit(percent int) error
@@ -27,7 +26,6 @@ type QuickAccess interface {
 	Close() error
 }
 
-// USBChargeLimit 读取关机 USB 供电终止的电量阈值百分比。
 func (a *App) USBChargeLimit() (int, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -41,7 +39,6 @@ func (a *App) USBChargeLimit() (int, error) {
 	return limit, nil
 }
 
-// SetUSBChargeLimit 设置关机 USB 充电截止电量百分比。
 func (a *App) SetUSBChargeLimit(percent int) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -54,7 +51,6 @@ func (a *App) SetUSBChargeLimit(percent int) error {
 	return nil
 }
 
-// USBChargeEnabled 查询关机 USB 充电功能是否开启。
 func (a *App) USBChargeEnabled() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -68,7 +64,6 @@ func (a *App) USBChargeEnabled() (bool, error) {
 	return enabled, nil
 }
 
-// SetUSBChargeEnabled 开启或关闭关机 USB 充电。
 func (a *App) SetUSBChargeEnabled(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -81,7 +76,6 @@ func (a *App) SetUSBChargeEnabled(enabled bool) error {
 	return nil
 }
 
-// DisplayMode 查询当前的显示切换模式。
 func (a *App) DisplayMode() (quickaccess.DisplayMode, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -95,7 +89,6 @@ func (a *App) DisplayMode() (quickaccess.DisplayMode, error) {
 	return mode, nil
 }
 
-// SetDisplayMode 设置显卡显示模式。
 func (a *App) SetDisplayMode(mode quickaccess.DisplayMode) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -108,7 +101,6 @@ func (a *App) SetDisplayMode(mode quickaccess.DisplayMode) error {
 	return nil
 }
 
-// DarkMode 查询 Windows 深色模式开关。
 func (a *App) DarkMode() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -122,7 +114,6 @@ func (a *App) DarkMode() (bool, error) {
 	return enabled, nil
 }
 
-// SetDarkMode 开启或关闭深色主题模式。
 func (a *App) SetDarkMode(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -135,7 +126,6 @@ func (a *App) SetDarkMode(enabled bool) error {
 	return nil
 }
 
-// TransparentEffect 查询窗口透明度视觉特效开关。
 func (a *App) TransparentEffect() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -149,7 +139,6 @@ func (a *App) TransparentEffect() (bool, error) {
 	return enabled, nil
 }
 
-// SetTransparentEffect 启用或关闭系统窗口透明效果。
 func (a *App) SetTransparentEffect(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -162,7 +151,6 @@ func (a *App) SetTransparentEffect(enabled bool) error {
 	return nil
 }
 
-// AutoHideTaskbar 查询任务栏自动隐藏开关。
 func (a *App) AutoHideTaskbar() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -176,7 +164,6 @@ func (a *App) AutoHideTaskbar() (bool, error) {
 	return enabled, nil
 }
 
-// SetAutoHideTaskbar 启用或关闭任务栏自动隐藏功能。
 func (a *App) SetAutoHideTaskbar(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -189,7 +176,6 @@ func (a *App) SetAutoHideTaskbar(enabled bool) error {
 	return nil
 }
 
-// ScreenSaver 查询屏幕保护程序是否启用。
 func (a *App) ScreenSaver() (bool, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -203,7 +189,6 @@ func (a *App) ScreenSaver() (bool, error) {
 	return enabled, nil
 }
 
-// SetScreenSaver 开启或关闭屏幕保护程序。
 func (a *App) SetScreenSaver(enabled bool) error {
 	client, release, err := a.quick()
 	if err != nil {
@@ -216,7 +201,6 @@ func (a *App) SetScreenSaver(enabled bool) error {
 	return nil
 }
 
-// ScreenSaverTimeout 获取屏幕保护程序的超时时间（秒）。
 func (a *App) ScreenSaverTimeout() (int, error) {
 	client, release, err := a.quick()
 	if err != nil {
@@ -230,7 +214,6 @@ func (a *App) ScreenSaverTimeout() (int, error) {
 	return seconds, nil
 }
 
-// SetScreenSaverTimeout 设置屏幕保护程序的超时秒数。
 func (a *App) SetScreenSaverTimeout(seconds int) error {
 	client, release, err := a.quick()
 	if err != nil {

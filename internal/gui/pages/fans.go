@@ -1,4 +1,3 @@
-// Package pages 实现 Viper 界面的各个页面。
 package pages
 
 import (
@@ -13,13 +12,11 @@ import (
 	"viper/internal/gui/widgets"
 )
 
-// Fans 画风扇与散热控制页面。
 func Fans(c *ui.Context, ctrl *controller.Controller, state *State) {
 	overview := ctrl.Snapshot()
 	fanState := overview.FanState
 	monitor := overview.Monitor
 
-	// 自定义占空比状态初始化（仅在首次未初始化时从硬件读数或默认 50% 载入）
 	if !state.CPUDutyInited {
 		if fanState.CPUPercent > 0 {
 			state.CPUDuty = float64(fanState.CPUPercent)
@@ -44,7 +41,6 @@ func Fans(c *ui.Context, ctrl *controller.Controller, state *State) {
 			widgets.ErrorNote(c, overview.Error)
 		}
 
-		// 左右并排的两台独立散热风扇大卡片。
 		ui.Row(c).Gap(16).Children(func() {
 			fanUnitCard(c, ctrl, state, overview, "CPU", widgets.IconCPU, widgets.ColorCPU,
 				fanState.CPUMode, fanState.CPUPercent, monitor.CPUFanRPM, monitor.CPUTemperatureC,
@@ -55,17 +51,14 @@ func Fans(c *ui.Context, ctrl *controller.Controller, state *State) {
 				model.FormatMHz(monitor.GPUFrequencyMHz), "频率")
 		})
 
-		// 底部：散热策略说明。
 		fanStrategyCard(c)
 	})
 }
 
-// fansHero 画风扇页顶部的模式选择与强冷控制横幅。
 func fansHero(c *ui.Context, overview model.Overview, ctrl *controller.Controller, state *State) {
 	t := c.Theme()
 	fanState := overview.FanState
 
-	// 当前模式下标
 	currentModeIndex := model.FanModeIndex(fanState.CPUMode)
 	if state.FanModeIndex >= 0 {
 		if model.FanModeFromIndex(state.FanModeIndex) == fanState.CPUMode {
@@ -85,7 +78,6 @@ func fansHero(c *ui.Context, overview model.Overview, ctrl *controller.Controlle
 				ui.Text(c, "双 AeroBlade 3D 金属风扇 · 动态温控调校与强冷加速").FontSize(12).TextColor(t.TextMuted).NoWrap()
 			})
 
-			// CoolBoost 强冷加速开关
 			coolBoostOn := fanState.CoolBoost
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(6, 12).Radius(10).
 				Background(t.Background).Border(1, t.Border).Children(func() {
@@ -99,7 +91,6 @@ func fansHero(c *ui.Context, overview model.Overview, ctrl *controller.Controlle
 				}
 			})
 
-			// 风扇模式选择器（自动 / 全速 / 自定义）
 			ui.Column(c).Gap(4).Children(func() {
 				ui.Text(c, "运转模式").FontSize(11).TextColor(t.TextMuted)
 				modeIdx := currentModeIndex
@@ -125,7 +116,6 @@ func fansHero(c *ui.Context, overview model.Overview, ctrl *controller.Controlle
 	})
 }
 
-// fanUnitCard 画单只风扇的大号监控与调节卡片。
 func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overview model.Overview,
 	name string, icon widgets.Icon, tint ui.Color, mode domain.FanMode, duty int,
 	rpm int, tempC int, auxValue, auxLabel string) ui.Element {
@@ -146,7 +136,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 	}
 
 	return widgets.Card(c, "", func() {
-		// 标题行
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 			widgets.IconBadge(c, icon, tint, 34)
 			ui.Column(c).Gap(2).Grow(1).Children(func() {
@@ -158,7 +147,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 
 		ui.Spacer(c)
 
-		// 核心区：大号旋转风扇动效 + 实时转速大字
 		ui.Row(c).Gap(16).AlignItems(ui.Center).Children(func() {
 			ui.Row(c).Grow(1).Center().Children(func() {
 				widgets.Fan(c, rpm, 88, tint)
@@ -172,7 +160,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 		ui.Spacer(c)
 		ui.Divider(c)
 
-		// 联动参数与占空比调控
 		ui.Column(c).Gap(10).Children(func() {
 			ui.Row(c).Gap(12).Children(func() {
 				ui.Column(c).Gap(2).Grow(1).Children(func() {
@@ -185,7 +172,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 				})
 			})
 
-			// 自定义模式下提供可拖动调节的 Slider
 			if mode == domain.FanCustom {
 				var dutyPtr *float64
 				if name == "CPU" {
@@ -210,7 +196,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 					ui.Text(c, fmt.Sprintf("%d%%", int(*dutyPtr))).FontSize(13).Bold().TextColor(tint).Width(42)
 				})
 			} else {
-				// 自动/全速模式下展示状态进度条
 				fraction := float64(rpm) / 5000.0
 				if fraction > 1 {
 					fraction = 1
@@ -228,7 +213,6 @@ func fanUnitCard(c *ui.Context, ctrl *controller.Controller, state *State, overv
 	}).Grow(1)
 }
 
-// fanStrategyCard 画底部的散热模式指引卡片。
 func fanStrategyCard(c *ui.Context) {
 	t := c.Theme()
 

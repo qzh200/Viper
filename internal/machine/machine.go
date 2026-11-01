@@ -1,4 +1,3 @@
-// Package machine 基于 AcerAgentService 实现 domain.Gaming 接口。
 package machine
 
 import (
@@ -10,10 +9,8 @@ import (
 	"viper/internal/domain"
 )
 
-// ErrNoProvider 表示目标功能缺少底层固件或服务驱动支持。
 var ErrNoProvider = errors.New("machine: 这一项需要固件接口，原厂服务不提供，需要管理员权限")
 
-// Service 定义与原厂服务交互的通信接口抽象。
 type Service interface {
 	Get(function string) (agentservice.Answer, error)
 	GetFrom(function string, device int) (agentservice.Answer, error)
@@ -24,18 +21,15 @@ type Service interface {
 	Close() error
 }
 
-// Options 定义初始化机器控制后端的选项。
 type Options struct {
 	Address string
 	Timeout time.Duration
 }
 
-// Backend 封装针对 Acer 笔记本硬件的具体控制逻辑。
 type Backend struct {
 	service Service
 }
 
-// New 创建并连接至 AcerAgentService 的硬件控制后端。
 func New(options Options) (*Backend, error) {
 	client, err := agentservice.Connect(agentservice.Options{
 		Address: options.Address,
@@ -48,17 +42,14 @@ func New(options Options) (*Backend, error) {
 	return &Backend{service: client}, nil
 }
 
-// NewWithService 使用已初始化的 Service 实例构建后端。
 func NewWithService(service Service) *Backend {
 	return &Backend{service: service}
 }
 
 var _ domain.Gaming = (*Backend)(nil)
 
-// Instance 返回当前后端的标识名称。
 func (b *Backend) Instance() string { return "AcerAgentService" }
 
-// Close 关闭后端并释放底层服务连接。
 func (b *Backend) Close() {
 	if b.service != nil {
 		b.service.Close()
@@ -76,7 +67,6 @@ func (b *Backend) get(function string) (agentservice.Answer, error) {
 	return answer, nil
 }
 
-// getFrom 读某个设备上的设置。
 func (b *Backend) getFrom(function string, device int) (agentservice.Answer, error) {
 	answer, err := b.service.GetFrom(function, device)
 	if err != nil {
@@ -99,7 +89,6 @@ func (b *Backend) set(function string, parameter any) error {
 	return nil
 }
 
-// Monitor 获取全套硬件运行状态与指标监控数据。
 func (b *Backend) Monitor() (domain.MonitorData, error) {
 	answer, err := b.service.MonitorData()
 	if err != nil {
@@ -175,7 +164,6 @@ func (b *Backend) Monitor() (domain.MonitorData, error) {
 	return result, nil
 }
 
-// Sensors 读取基本的 CPU/GPU 温度及风扇转速。
 func (b *Backend) Sensors() (domain.Sensors, error) {
 	data, err := b.Monitor()
 	if err != nil {
@@ -191,7 +179,6 @@ func (b *Backend) Sensors() (domain.Sensors, error) {
 	}, nil
 }
 
-// PowerMode 查询当前电源性能模式。
 func (b *Backend) PowerMode() (domain.PowerMode, error) {
 	answer, err := b.get(agentservice.FunctionOperatingMode)
 	if err != nil {
@@ -207,7 +194,6 @@ func (b *Backend) PowerMode() (domain.PowerMode, error) {
 	return domain.DecodePowerMode(uint64(data.Mode)), nil
 }
 
-// SetPowerMode 设置并校验目标电源性能模式。
 func (b *Backend) SetPowerMode(mode domain.PowerMode) error {
 	code := domain.PowerModeCode(mode)
 	if err := b.set(agentservice.FunctionOperatingMode, map[string]any{
@@ -247,7 +233,6 @@ func (b *Backend) verifyPowerMode(expected int) error {
 	return nil
 }
 
-// GPUMode 查询显卡直连/混合切换模式。
 func (b *Backend) GPUMode() (domain.GPUMode, error) {
 	answer, err := b.get(agentservice.FunctionGPUMode)
 	if err != nil {
@@ -263,7 +248,6 @@ func (b *Backend) GPUMode() (domain.GPUMode, error) {
 	return serviceGPUMode(data.Mode), nil
 }
 
-// SetGPUMode 设置显卡工作模式。
 func (b *Backend) SetGPUMode(mode domain.GPUMode) error {
 	code := int(mode)
 	if code < 1 {
@@ -287,7 +271,6 @@ func serviceGPUMode(value int) domain.GPUMode {
 	}
 }
 
-// DiscreteGPU 判断当前是否工作在纯独显直连模式。
 func (b *Backend) DiscreteGPU() (bool, error) {
 	mode, err := b.GPUMode()
 	if err != nil {
@@ -296,7 +279,6 @@ func (b *Backend) DiscreteGPU() (bool, error) {
 	return mode == domain.GPUModeDiscrete, nil
 }
 
-// OverclockCapability 探测 GPU 与 CPU 的超频支持能力。
 func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 	answer, err := b.service.Capability(agentservice.CapabilityOverclockingMode)
 	if err != nil {
@@ -311,7 +293,6 @@ func (b *Backend) OverclockCapability() (gpu bool, cpu bool, err error) {
 	return false, false, nil
 }
 
-// WinKeyLocked 查询 Windows 按键锁定状态。
 func (b *Backend) WinKeyLocked() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionWinKey)
 	if err != nil {
@@ -320,7 +301,6 @@ func (b *Backend) WinKeyLocked() (bool, error) {
 	return status == 0, nil
 }
 
-// SetWinKeyLocked 启用或禁用 Windows 徽标键锁定。
 func (b *Backend) SetWinKeyLocked(locked bool) error {
 	status := 1
 	if locked {
@@ -333,7 +313,6 @@ func (b *Backend) SetWinKeyLocked(locked bool) error {
 	return b.verifyStatus(agentservice.FunctionWinKey, status)
 }
 
-// LCDOverdrive 查询屏幕 LCD Overdrive 响应时间超速开关。
 func (b *Backend) LCDOverdrive() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionLCDOverdrive)
 	if err != nil {
@@ -342,7 +321,6 @@ func (b *Backend) LCDOverdrive() (bool, error) {
 	return status == 1, nil
 }
 
-// SetLCDOverdrive 设置屏幕 LCD Overdrive 开关。
 func (b *Backend) SetLCDOverdrive(enabled bool) error {
 	status := boolStatus(enabled)
 	if err := b.set(agentservice.FunctionLCDOverdrive, map[string]any{"status": status}); err != nil {
@@ -351,7 +329,6 @@ func (b *Backend) SetLCDOverdrive(enabled bool) error {
 	return b.verifyStatus(agentservice.FunctionLCDOverdrive, status)
 }
 
-// BootSound 查询开机启动音效开关状态。
 func (b *Backend) BootSound() (bool, error) {
 	status, err := b.switchStatus(agentservice.FunctionBootSound)
 	if err != nil {
@@ -360,7 +337,6 @@ func (b *Backend) BootSound() (bool, error) {
 	return status == 1, nil
 }
 
-// SetBootSound 设置开机启动音效开关。
 func (b *Backend) SetBootSound(enabled bool) error {
 	status := boolStatus(enabled)
 	if err := b.set(agentservice.FunctionBootSound, map[string]any{"status": status}); err != nil {

@@ -332,7 +332,6 @@ func TestLightingEffectHelpers(t *testing.T) {
 		t.Errorf("gray Hue want 0, got %v", h)
 	}
 
-	// 测试 HSV <-> RGB 往返与极限情况
 	white := HSVToRGB(0, 0, 1.0)
 	if white.R != 255 || white.G != 255 || white.B != 255 {
 		t.Errorf("HSV(0,0,1) want white, got %+v", white)

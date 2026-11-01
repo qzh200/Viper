@@ -10,9 +10,6 @@ import (
 	"viper/internal/gui/model"
 )
 
-// Trend 画温度与负载随时间变化的曲线。
-//
-// history 是最近的采样，越新越靠右。
 func Trend(c *ui.Context, history []model.Sample) ui.Element {
 	t := c.Theme()
 
@@ -58,7 +55,6 @@ func Trend(c *ui.Context, history []model.Sample) ui.Element {
 	return ui.Column(c).Gap(10).Grow(1).Children(func() {
 		chart.Plot(c, chart.Axes{Left: yt, Bottom: xt, Label: trendAxisLabel(c)}, func(area ui.Element) {
 			area.Draw(func(p *ui.Painter, r ui.Rect) {
-				// 竖线：每一个时刻一根，横线：每一档温度一根。
 				for _, tick := range xt {
 					x := chart.X(r, tick.At)
 					p.Line(x, r.Y, x, r.Y+r.H, 1, t.Border)
@@ -79,17 +75,12 @@ func Trend(c *ui.Context, history []model.Sample) ui.Element {
 	})
 }
 
-// secondTicks 造时间轴上的刻度：每两秒一个，标上时分秒。
-//
-// 时间轴自己挑的刻度是十秒二十秒一格的，看不出两秒一跳；这里自己来。
 func secondTicks(scale chart.Time, first, last time.Time) []chart.Tick {
 	span := last.Sub(first)
 	if span <= 0 {
 		return nil
 	}
 
-	// 挑一个整秒的步长，让刻度不超过十个，标签才叠不到一起。
-	// 两秒一格：竖线正好落在采样点上。
 	step := time.Minute
 	for _, candidate := range []time.Duration{
 		2 * time.Second, 5 * time.Second, 10 * time.Second, 15 * time.Second,
@@ -101,7 +92,6 @@ func secondTicks(scale chart.Time, first, last time.Time) []chart.Tick {
 		}
 	}
 
-	// 从整步的时刻开始，刻度才落在整秒上。
 	start := first.Truncate(step)
 	var ticks []chart.Tick
 	for moment := start; !moment.After(last); moment = moment.Add(step) {
@@ -117,7 +107,6 @@ func secondTicks(scale chart.Time, first, last time.Time) []chart.Tick {
 	return ticks
 }
 
-// TrendLegend 画图例：颜色与名字。
 func TrendLegend(c *ui.Context, names []string, colors []ui.Color) {
 	t := c.Theme()
 	ui.Row(c).Gap(16).Children(func() {
@@ -133,7 +122,6 @@ func TrendLegend(c *ui.Context, names []string, colors []ui.Color) {
 	})
 }
 
-// trendAxisLabel 是坐标轴上那些小字的样子。
 func trendAxisLabel(c *ui.Context) func(chart.Side, chart.Tick) {
 	return func(_ chart.Side, tick chart.Tick) {
 		ui.Text(c, tick.Label).NoWrap().FontSize(11).TextColor(c.Theme().TextMuted)
